@@ -2,6 +2,9 @@ const UpstoxMarketFeed = require('./upstoxMarketFeed');
 const DualCandleBuilder = require('./candleBuilder');
 const config = require('./config.json');
 
+require('dotenv').config();
+
+
 // Initialize dual candle builder
 const candleBuilder = new DualCandleBuilder({
     instruments: config.instruments,

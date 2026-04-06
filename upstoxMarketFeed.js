@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const protobuf = require('protobufjs');
+require('dotenv').config();
+
 
 class UpstoxMarketFeed {
     constructor(config) {
