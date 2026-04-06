@@ -47,5 +47,6 @@ jobs:
             PORT=3000
             EOF
 
-            pm2 restart market-feed || pm2 start index.js --name market-feed
+            pm2 restart market-feed --node-args="--env-file=.env" --update-env || \
+            pm2 start index.js --name market-feed --node-args="--env-file=.env" 
             pm2 save
