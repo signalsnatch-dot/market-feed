@@ -1,0 +1,32 @@
+{
+    "instruments": [
+        {
+            "key": "MCX_FO|487465",
+            "name": "Natural Gas Future",
+            "priceBarTicks": 50,
+            "volumePerBar": 25000,
+            "exchange": "MCX_FO",
+            "notes": "Price bar: 500 price changes | Volume bar: 25,000 units (~20 lots)"
+        },
+        {
+            "key": "NSE_FO|45450",
+            "name": "Nifty 50 Future",
+            "priceBarTicks": 2000,
+            "volumePerBar": 500,
+            "exchange": "NSE_FO",
+            "notes": "Price bar: 2000 price changes | Volume bar: 500 contracts"
+        },
+        {
+            "key": "NSE_FO|45455",
+            "name": "Nifty Bank Future",
+            "priceBarTicks": 2000,
+            "volumePerBar": 750,
+            "exchange": "NSE_FO",
+            "notes": "Price bar: 2000 price changes | Volume bar: 750 contracts"
+        }
+    ],
+    "directories": {
+        "rawDataDir": "./raw_ticks_data",
+        "candlesDataDir": "./candles_data"
+    }
+}

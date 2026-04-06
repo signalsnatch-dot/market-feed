@@ -1,0 +1,75 @@
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Data directories (all market data)
+market_data/
+raw_ticks_data/
+candles_data/
+volume_bars_data/
+ticker_candles_data/
+
+# Legacy data directories (if any)
+data/
+*.csv
+*.jsonl
+*.bin
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+token_cache.json
+.token_cache
+
+# Logs
+logs/
+*.log
+debug.log
+failed_messages.log
+error.log
+
+# AWS and deployment
+.aws/
+deployment-package.zip
+dist/
+build/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Testing coverage
+coverage/
+.nyc_output/
+
+# PM2 runtime files
+.pm2/
+pm2-*.log
+
+# S3 sync state
+.s3sync/
+
