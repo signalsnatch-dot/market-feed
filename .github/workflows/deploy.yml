@@ -39,11 +39,11 @@ jobs:
 
             # Create .env file with secrets (for Node.js to read)
             cat > .env << EOF
-            UPSTOX_API_KEY=${{ secrets.UPSTOX_API_KEY }}
-            UPSTOX_API_SECRET=${{ secrets.UPSTOX_API_SECRET }}
-            REDIRECT_URI=${{ secrets.REDIRECT_URI }}
-            AUTH_CODE=${{ secrets.AUTH_CODE }}
-            NODE_ENV=production
+            UPSTOX_API_KEY='${{ secrets.UPSTOX_API_KEY }}'
+            UPSTOX_API_SECRET='${{ secrets.UPSTOX_API_SECRET }}'
+            REDIRECT_URI='${{ secrets.REDIRECT_URI }}'
+            AUTH_CODE='${{ secrets.AUTH_CODE }}'
+            NODE_ENV='production'
             PORT=3000
             EOF
 
