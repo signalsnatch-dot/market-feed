@@ -1,0 +1,25 @@
+{
+  "type": "node",
+  "deployBranch": "main",
+  "ec2": {
+    "host": "ec2-15-206-88-155.ap-south-1.compute.amazonaws.com",
+    "user": "ubuntu",
+    "deployPath": "/home/ubuntu/app"
+  },
+  "deployment": {
+    "appName": "app",
+    "port": 3000
+  },
+  "env": {
+    "general": {
+      "NODE_ENV": "production",
+      "PORT": "3000"
+    },
+    "private": [
+      "UPSTOX_API_KEY",
+      "UPSTOX_API_SECRET",
+      "REDIRECT_URI",
+      "AUTH_CODE"
+    ]
+  }
+}

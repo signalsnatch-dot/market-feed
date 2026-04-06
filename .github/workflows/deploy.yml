@@ -1,0 +1,56 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Execute remote commands
+        uses: appleboy/ssh-action@master
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          # Private environment variables from GitHub secrets
+          UPSTOX_API_KEY: ${{ secrets.UPSTOX_API_KEY }}
+          UPSTOX_API_SECRET: ${{ secrets.UPSTOX_API_SECRET }}
+          REDIRECT_URI: ${{ secrets.REDIRECT_URI }}
+          AUTH_CODE: ${{ secrets.AUTH_CODE }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          envs: GITHUB_SHA,GITHUB_REPOSITORY_URL,UPSTOX_API_KEY,UPSTOX_API_SECRET,REDIRECT_URI,AUTH_CODE
+          script: |
+            cd ${{ secrets.EC2_DEPLOY_PATH }}
+            
+            # Update repository to latest code
+            git fetch origin main
+            git reset --hard ${GITHUB_SHA}
+            
+            # Setup environment variables
+            cat > .env << EOL
+            NODE_ENV=production
+            PORT=3000
+            UPSTOX_API_KEY=${{ secrets.UPSTOX_API_KEY }}
+            UPSTOX_API_SECRET=${{ secrets.UPSTOX_API_SECRET }}
+            REDIRECT_URI=${{ secrets.REDIRECT_URI }}
+            AUTH_CODE=${{ secrets.AUTH_CODE }}
+            EOL
+            
+            # Install production dependencies only
+            NODE_ENV=production npm ci --only=production
+            
+            # Start/restart the application using PM2
+            pm2 stop app || true
+            pm2 delete app || true
+            NODE_ENV=production pm2 start npm \
+              --name "app" \
+              --env production \
+              $([ -f .env ] && echo "--env-file .env") \
+              -- start
+            echo "Deployment completed successfully"
