@@ -131,6 +131,29 @@ class PriceBarBuilder extends EventEmitter {
         // Update global stats
         this.stats.totalTicks++;
         this.stats.totalVolume += volume;
+
+        if (bar.open !== null && this.emit) {
+            const liveCandle = {
+                instrument_key: instrument_key,
+                type: 'price',
+                is_live: true,
+                barNumber: bar.barNumber,
+                open: bar.open,
+                high: bar.high,
+                low: bar.low,
+                close: bar.close,
+                currentTicks: bar.currentTicks,
+                targetTicks: bar.targetTicks,
+                volume: bar.volume,
+                transactions: bar.transactions,
+                startTime: bar.startTimestamp,
+                timestamp: currentTime,
+                progress: (bar.currentTicks / bar.targetTicks) * 100
+            };
+            
+            this.emit('live_candle_update', liveCandle);
+        }
+        
         
         // Calculate progress
         const progress = (bar.currentTicks / bar.targetTicks) * 100;

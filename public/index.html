@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Feed - Real-time Candles</title>
+    <script src="/node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1e222d;
+            color: #d1d4dc;
+        }
+        
+        .header {
+            background: #2a2e39;
+            padding: 12px 20px;
+            border-bottom: 1px solid #2f3c5c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .status {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .status-badge.connected {
+            background: #00bcd4;
+            color: #fff;
+        }
+        
+        .status-badge.disconnected {
+            background: #f44336;
+            color: #fff;
+        }
+        
+        .instrument-selector {
+            background: #2a2e39;
+            padding: 12px 20px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #2f3c5c;
+            flex-wrap: wrap;
+        }
+        
+        .instrument-btn {
+            background: #363c4b;
+            border: none;
+            color: #d1d4dc;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .instrument-btn.active {
+            background: #2962ff;
+            color: white;
+        }
+        
+        .instrument-btn:hover {
+            background: #4a5568;
+        }
+        
+        .candle-type-selector {
+            background: #2a2e39;
+            padding: 12px 20px;
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #2f3c5c;
+        }
+        
+        .type-btn {
+            background: #363c4b;
+            border: none;
+            color: #d1d4dc;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .type-btn.active {
+            background: #00bcd4;
+            color: white;
+        }
+        
+        .chart-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 120px);
+            padding: 10px;
+        }
+        
+        .chart-wrapper {
+            flex: 3;
+            position: relative;
+        }
+        
+        .volume-wrapper {
+            flex: 1;
+            position: relative;
+            margin-top: 10px;
+        }
+        
+        .signals-panel {
+            background: #2a2e39;
+            border-left: 1px solid #2f3c5c;
+            width: 280px;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .signals-panel h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #00bcd4;
+        }
+        
+        .signal-item {
+            background: #363c4b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .signal-item.buy {
+            border-left: 3px solid #00bcd4;
+        }
+        
+        .signal-item.sell {
+            border-left: 3px solid #f44336;
+        }
+        
+        .signal-time {
+            color: #787b86;
+            font-size: 10px;
+        }
+        
+        .stats-bar {
+            background: #2a2e39;
+            padding: 8px 20px;
+            display: flex;
+            gap: 30px;
+            font-size: 12px;
+            border-top: 1px solid #2f3c5c;
+        }
+        
+        .stat {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .stat-label {
+            color: #787b86;
+        }
+        
+        .stat-value {
+            color: #00bcd4;
+            font-weight: 600;
+        }
+        
+        .layout {
+            display: flex;
+            height: calc(100vh - 120px);
+        }
+        
+        @media (max-width: 768px) {
+            .signals-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">📊 Market Feed - Real-time Candles</div>
+        <div class="status">
+            <div class="status-badge disconnected" id="wsStatus">Disconnected</div>
+            <div class="stat" id="candleCount">Candles: 0</div>
+        </div>
+    </div>
+    
+    <div class="instrument-selector" id="instrumentSelector"></div>
+    
+    <div class="candle-type-selector">
+        <button class="type-btn active" data-type="volume">📊 Volume Bars</button>
+        <button class="type-btn" data-type="price">💰 Price Bars (Tick-based)</button>
+    </div>
+    
+    <div class="layout">
+        <div style="flex: 1; display: flex; flex-direction: column;">
+            <div class="chart-container">
+                <div class="chart-wrapper">
+                    <div id="main-chart" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="volume-wrapper">
+                    <div id="bottom-chart" style="width: 100%; height: 150px;"></div>
+
+                </div>
+            </div>
+            <div class="stats-bar" id="statsBar"></div>
+        </div>
+        <div class="signals-panel">
+            <h3>📡 Trade Signals</h3>
+            <div id="signalsList">
+                <div style="color: #787b86; text-align: center; padding: 20px;">Waiting for signals...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="chart.js"></script>
+</body>
+</html>

@@ -19,6 +19,13 @@ class DualCandleBuilder extends EventEmitter {
             rawDataDir: config.rawDataDir || './raw_ticks_data'
         });
         
+        this.priceBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', candle);
+        });
+        
+        this.volumeBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', candle);
+        });
         // Track statistics for comparison
         this.comparisonStats = new Map();
         
