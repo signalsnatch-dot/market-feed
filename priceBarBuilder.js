@@ -73,7 +73,7 @@ class PriceBarBuilder extends EventEmitter {
         const price = parseFloat(ltp);
         const volume = parseInt(last_traded_quantity) || 0;
 
-        const exchangeTimeMs = parseInt(exchange_timestamp) * 1000;
+        const exchangeTimeMs = Number(exchange_timestamp);
         const receiveTimeMs = parseInt(timestamp);
        
         // Use exchange time for candle logic (source of truth)
@@ -220,8 +220,6 @@ class PriceBarBuilder extends EventEmitter {
             high: bar.close,
             low: bar.close,
             close: bar.close,
-            startTime: null,
-            startTimestamp: null,
             lastUpdateTime: null,
             volume: 0,
             transactions: 0,
