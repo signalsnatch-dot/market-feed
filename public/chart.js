@@ -215,22 +215,43 @@ class MarketChart {
         });
         
         this.socket.on('historical_candles', (data) => {
-            if (data.volume_bars) this.volume_candles = data.volume_bars;
-            if (data.price_bars) this.price_candles = data.price_bars;
+           // Normalize instrument field in historical data
+           if (data.volume_bars) {
+               this.volume_candles = data.volume_bars.map(c => ({
+                   ...c,
+                   instrument: c.instrument || c.instrument_key
+               }));
+           }
+           if (data.price_bars) {
+               this.price_candles = data.price_bars.map(c => ({
+                   ...c,
+                   instrument: c.instrument || c.instrument_key
+               }));
+           }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
         });
         
         this.socket.on('live_candle_update', (liveCandle) => {
-            const candleInst = liveCandle.instrument || liveCandle.instrument_key;
-            if (candleInst === this.currentInstrument && liveCandle.type === this.currentType) {
-                this.updateLiveCandle(liveCandle);
+           // Normalize instrument field
+           const normalizedCandle = {
+               ...liveCandle,
+               instrument: liveCandle.instrument || liveCandle.instrument_key
+           };
+           const candleInst = normalizedCandle.instrument;
+           if (candleInst === this.currentInstrument && liveCandle.type === this.currentType) {
+               this.updateLiveCandle(normalizedCandle);
             }
         });
         
         this.socket.on('candle_update', (candle) => {
-            const candleInst = candle.instrument || candle.instrument_key;
+           // Normalize instrument field
+           const normalizedCandle = {
+              ...candle,
+               instrument: candle.instrument || candle.instrument_key
+           };
+           const candleInst = normalizedCandle.instrument;
             if (candleInst === this.currentInstrument && candle.type === this.currentType && !candle.is_live) {
-                const newCandle = this.convertToChartCandle(candle);
+               const newCandle = this.convertToChartCandle(normalizedCandle);
                 if (newCandle) this.addCompletedCandle(newCandle);
             }
         });

@@ -32,42 +32,16 @@ const feed = new UpstoxMarketFeed({
 });
 
 candleBuilder.on('live_candle_update', (liveCandle) => {
-    // Send to chart server for real-time display
     chartServer.broadcastLiveCandle(
-        liveCandle.instrument_key, 
-        liveCandle, 
+        liveCandle.instrument,
+        liveCandle,
         liveCandle.type
     );
 });
-
-// Track last broadcast to avoid flooding
- let lastBroadcastTime = {};
-
-// Listen to both bar types and broadcast to chart server
-candleBuilder.priceBuilder.on('bar_close', (bar) => {
-   const instrumentKey = bar.instrument_key;
-   const now = Date.now();
-   
-   // Throttle broadcasts (max 10 per second per instrument)
-   if (!lastBroadcastTime[instrumentKey] || now - lastBroadcastTime[instrumentKey] > 100) {
-       chartServer.broadcastCandle(instrumentKey, bar, 'price');
-       lastBroadcastTime[instrumentKey] = now;
-   }
-   
-    console.log(`🎯 [PRICE BAR] ${bar.name} #${bar.barNumber}: ${bar.priceChangePercent}% change`);
-});
-
-candleBuilder.volumeBuilder.on('bar_close', (bar) => {
-   const instrumentKey = bar.instrument_key;
-   const now = Date.now();
   
-   
-   if (!lastBroadcastTime[instrumentKey] || now - lastBroadcastTime[instrumentKey] > 100) {
-       chartServer.broadcastCandle(instrumentKey, bar, 'volume');
-       lastBroadcastTime[instrumentKey] = now;
-   }
-  
-    console.log(`🎯 [VOLUME BAR] ${bar.name} #${bar.barNumber}: ${bar.priceChangePercent}% change`);
+candleBuilder.on('bar_close', (bar) => {
+    chartServer.broadcastCandle(bar.instrument, bar, bar.type);
+    console.log(`🎯 [${bar.type.toUpperCase()} BAR] ${bar.name} #${bar.barNumber}: ${bar.priceChangePercent}% change`);
 });
 
 // Real-time progress monitoring

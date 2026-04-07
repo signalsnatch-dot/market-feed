@@ -134,7 +134,7 @@ class PriceBarBuilder extends EventEmitter {
 
         if (bar.open !== null && this.emit) {
             const liveCandle = {
-                instrument_key: instrument_key,
+                instrument: instrument_key,
                 type: 'price',
                 is_live: true,
                 barNumber: bar.barNumber,

@@ -19,13 +19,38 @@ class DualCandleBuilder extends EventEmitter {
             rawDataDir: config.rawDataDir || './raw_ticks_data'
         });
         
-        this.priceBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', candle);
-        });
+           // Forward live updates from both builders and normalize
+       this.priceBuilder.on('live_candle_update', (candle) => {
+           this.emit('live_candle_update', {
+               ...candle,
+               instrument: candle.instrument  // Normalize field name
+           });
+         });
         
         this.volumeBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', candle);
+            this.emit('live_candle_update', {
+                ...candle,
+                instrument: candle.instrument  // Normalize field name
+            });
         });
+        
+         // Forward bar_close events with normalized instrument field
+        this.priceBuilder.on('bar_close', (bar) => {
+           this.emit('bar_close', {
+               ...bar,
+                instrument: bar.instrument_key,
+                type: 'price'
+            });
+        });
+        
+        this.volumeBuilder.on('bar_close', (bar) => {
+            this.emit('bar_close', {
+                ...bar,
+                instrument: bar.instrument_key,
+                type: 'volume'
+            });
+        });
+
         // Track statistics for comparison
         this.comparisonStats = new Map();
         
