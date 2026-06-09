@@ -23,8 +23,9 @@ const candleBuilder = new DualCandleBuilder({
 const feed = new UpstoxMarketFeed({
     apiKey: process.env.UPSTOX_API_KEY,
     apiSecret: process.env.UPSTOX_API_SECRET,
-    redirectUri: process.env.REDIRECT_URI,
-    authCode: process.env.AUTH_CODE,
+    redirectUri: process.env.UPSTOX_REDIRECT_URI,
+    analyticsToken: process.env.UPSTOX_ANALYTICS_TOKEN,  // ← CRITICAL: Add this line
+    authCode: process.env.UPSTOX_AUTH_CODE,
     instruments: config.instruments.map(i => i.key),
     dataDir: './market_data',
     mode: 'ltpc',

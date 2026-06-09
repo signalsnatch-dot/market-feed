@@ -25,7 +25,7 @@ echo "Step 3: Run the application to get authorization URL"
 echo "  node index.js"
 echo ""
 echo "Step 4: Copy the 'code' from redirect URL and run:"
-echo "  AUTH_CODE=your_code node index.js"
+echo "  UPSTOX_AUTH_CODE=your_code node index.js"
 echo ""
 
 # Save token for reuse within same day
