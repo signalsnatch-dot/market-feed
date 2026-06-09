@@ -8,7 +8,11 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 
-const chartServer = new ChartServer(3001, './candles_data');
+const options = {
+    allowedOrigins: process.env.hostname
+};
+
+const chartServer = new ChartServer(3001, './candles_data', options);
 chartServer.start();
 
 

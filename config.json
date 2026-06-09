@@ -1,7 +1,7 @@
 {
     "instruments": [
         {
-            "key": "MCX_FO|487465",
+            "key": "MCX_FO|504265",
             "name": "Natural Gas Future",
             "priceBarTicks": 120,
             "volumePerBar": 50000,
