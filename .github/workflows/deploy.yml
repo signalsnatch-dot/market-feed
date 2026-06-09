@@ -44,6 +44,7 @@ jobs:
             UPSTOX_REDIRECT_URI='${{ secrets.UPSTOX_REDIRECT_URI }}'
             UPSTOX_AUTH_CODE='${{ secrets.UPSTOX_AUTH_CODE }}'
             UPSTOX_ANALYTICS_TOKEN='${{ secrets.UPSTOX_ANALYTICS_TOKEN }}'
+            HOSTNAME='${{ secrets.HOSTNAME }}'
             NODE_ENV='production'
             PORT=3000
             EOF

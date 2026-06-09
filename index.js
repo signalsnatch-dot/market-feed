@@ -9,7 +9,7 @@ const express = require('express');
 const app = express();
 
 const options = {
-    allowedOrigins: process.env.hostname
+    allowedOrigins: [process.env.HOSTNAME]
 };
 
 const chartServer = new ChartServer(3001, './candles_data', options);
