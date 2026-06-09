@@ -3,6 +3,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const AuthManager = require('./auth-manager');
 const protobuf = require('protobufjs');
 require('dotenv').config();
 
@@ -12,6 +13,7 @@ class UpstoxMarketFeed {
         this.apiKey = config.apiKey;
         this.apiSecret = config.apiSecret;
         this.redirectUri = config.redirectUri;
+        this.analyticsToken = config.analyticsToken;
         this.authCode = config.authCode;
         this.instruments = config.instruments || [];
         this.dataDir = config.dataDir || './market_data';
@@ -211,61 +213,27 @@ class UpstoxMarketFeed {
     
     async authenticate() {
         try {
-            if (this.loadCachedToken()) {
-                return this.accessToken;
-            }
+            // Delegate all authentication logic to AuthManager
+            const authManager = new AuthManager({
+                apiKey: this.apiKey,
+                apiSecret: this.apiSecret,
+                redirectUri: this.redirectUri,
+                analyticsToken: this.analyticsToken,
+                authCode: this.authCode,
+                dataDir: this.dataDir
+            });
             
-            if (!this.authCode) {
-                const state = crypto.randomBytes(16).toString('hex');
-                const authUrl = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${this.apiKey}&redirect_uri=${this.redirectUri}&state=${state}`;
-                
-                console.log('\n=================================');
-                console.log('AUTHENTICATION REQUIRED');
-                console.log('=================================');
-                console.log('Please visit this URL to authorize:');
-                console.log(authUrl);
-                console.log('\nAfter authorization, copy the "code" parameter from redirect URL');
-                console.log('Then restart with: AUTH_CODE=your_code node index.js');
-                console.log('=================================\n');
-                throw new Error('Authorization code required');
-            }
-            
-            const params = new URLSearchParams();
-            params.append('code', this.authCode);
-            params.append('client_id', this.apiKey);
-            params.append('client_secret', this.apiSecret);
-            params.append('redirect_uri', this.redirectUri);
-            params.append('grant_type', 'authorization_code');
-            
-            const tokenResponse = await axios.post('https://api.upstox.com/v2/login/authorization/token', 
-                params.toString(),
-                {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Accept': 'application/json'
-                    }
-                }
-            );
-            
-            this.accessToken = tokenResponse.data.access_token;
-            this.logDebug('Access token obtained successfully');
-            
-            const tokenFile = path.join(this.dataDir, '.token_cache');
-            fs.writeFileSync(tokenFile, JSON.stringify({
-                token: this.accessToken,
-                expiry: Date.now() + (24 * 60 * 60 * 1000)
-            }));
-            
+            this.accessToken = await authManager.getValidAccessToken();
             return this.accessToken;
             
         } catch (error) {
-            console.error('Authentication failed:', error.response?.data || error.message);
+            console.error('❌ Authentication failed:', error.message);
             throw error;
         }
     }
     
     loadCachedToken() {
-        try {
+        /*try {
             const tokenFile = path.join(this.dataDir, '.token_cache');
             if (fs.existsSync(tokenFile)) {
                 const cached = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
@@ -277,9 +245,11 @@ class UpstoxMarketFeed {
             }
         } catch (error) {
             console.warn('Failed to load cached token:', error.message);
-        }
+        }*/
+        this.logDebug('loadCachedToken called - authentication delegated to AuthManager');
         return false;
     }
+    
     
     async validateInstrumentKeys() {
         // Common instrument key formats

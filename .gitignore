@@ -11,6 +11,7 @@ raw_ticks_data/
 candles_data/
 volume_bars_data/
 ticker_candles_data/
+backtest_results/
 
 # Legacy data directories (if any)
 data/

@@ -9,7 +9,7 @@
             "notes": "Price bar: 500 price changes | Volume bar: 50,000 units (~35 lots)"
         },
         {
-            "key": "NSE_FO|66691",
+            "key": "NSE_FO|62329",
             "name": "Nifty 50 Future",
             "priceBarTicks": 600,
             "volumePerBar": 57750,
@@ -17,7 +17,7 @@
             "notes": "Price bar: 2000 price changes | Volume bar: 500 contracts"
         },
         {
-            "key": "NSE_FO|66688",
+            "key": "NSE_FO|62326",
             "name": "Nifty Bank Future",
             "priceBarTicks": 185,
             "volumePerBar": 17250,

@@ -208,9 +208,9 @@
     
     <div class="candle-type-selector">
         <button class="type-btn active" data-type="volume">📊 Volume Bars</button>
-        <button class="type-btn" data-type="price">💰 Price Bars (Tick-based)</button>
-    </div>
-    
+        <button class="type-btn" data-type="price">💰 Price Bars</button>
+        <button id="reset-zoom-btn" style="margin-left: auto; background: #363c4b; border: none; color: #d1d4dc; padding: 6px 16px; border-radius: 20px; cursor: pointer;">🔍 Reset Zoom</button>
+    </div>    
     <div class="layout">
         <div style="flex: 1; display: flex; flex-direction: column;">
             <div class="chart-container">
@@ -232,6 +232,13 @@
         </div>
     </div>
 
+    <script>
+        document.getElementById('reset-zoom-btn')?.addEventListener('click', () => {
+            if (window.marketChart) {
+                window.marketChart.resetZoom();
+            }
+        });
+    </script>
     <script src="chart.js"></script>
 </body>
-</html>
+</html> 

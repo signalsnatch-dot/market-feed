@@ -10,6 +10,10 @@ class MarketChart {
         this.socket = null;
         this.instruments = new Map();
         this.isInitialized = false;
+        this.userHasZoomed = false;
+        this.zoomTimeout = null;
+        this.initialDataLoaded = false;
+
         this.init();
     }
     
@@ -261,50 +265,51 @@ class MarketChart {
             document.getElementById('wsStatus').className = 'status-badge disconnected';
         });
     }
-    
-    updateLiveCandle(liveCandle) {
-        const newCandle = this.convertToChartCandle(liveCandle);
-        if (!newCandle) return;
-        
-        const lastCandle = this.candles[this.candles.length - 1];
-        
-        if (lastCandle && lastCandle.barNumber === liveCandle.barNumber) {
-            this.candles[this.candles.length - 1] = newCandle;
+    updateProgressDisplay(progress, candle) {
+        const progressBar = document.getElementById('candle-progress');
+        if (!progressBar) {
+            // Create progress bar if it doesn't exist
+            const statsBar = document.getElementById('statsBar');
+            if (statsBar) {
+                const progressHtml = `
+                    <div id="candle-progress-container" style="margin-top: 8px; padding: 8px; background: #2a2e39; border-radius: 4px;">
+                        <div style="font-size: 11px; color: #787b86; margin-bottom: 4px;">
+                            Current Candle Progress: ${candle.type === 'volume' ? 'Volume' : 'Price Changes'}
+                        </div>
+                        <div style="background: #363c4b; border-radius: 4px; overflow: hidden;">
+                            <div id="candle-progress-bar" style="width: ${progress}%; background: #00bcd4; height: 8px; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 12px; margin-top: 4px;">
+                            ${progress.toFixed(1)}% complete
+                            ${candle.type === 'volume' ? 
+                                `(${candle.volume?.toLocaleString() || 0} / ${candle.targetVolume?.toLocaleString() || 0} units)` : 
+                                `(${candle.currentTicks || 0} / ${candle.targetTicks || 0} price changes)`}
+                        </div>
+                    </div>
+                `;
+                
+                // Check if already exists, update or append
+                let existing = document.getElementById('candle-progress-container');
+                if (existing) {
+                    existing.remove();
+                }
+                statsBar.insertAdjacentHTML('afterend', progressHtml);
+            }
         } else {
-            this.candles.push(newCandle);
+            // Update existing progress bar
+            const bar = document.getElementById('candle-progress-bar');
+            if (bar) bar.style.width = `${progress}%`;
+            const text = document.querySelector('#candle-progress-container div:last-child');
+            if (text) {
+                text.innerHTML = `${progress.toFixed(1)}% complete
+                    ${candle.type === 'volume' ? 
+                        `(${candle.volume?.toLocaleString() || 0} / ${candle.targetVolume?.toLocaleString() || 0} units)` : 
+                        `(${candle.currentTicks || 0} / ${candle.targetTicks || 0} price changes)`}`;
+            }
         }
-        
-        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
-        this.updateCharts();
-        this.updateStatsFromCandle(newCandle);
     }
     
-    addCompletedCandle(candle) {
-        const existingIndex = this.candles.findIndex(c => c.time === candle.time);
-        if (existingIndex >= 0) {
-            this.candles[existingIndex] = candle;
-        } else {
-            this.candles.push(candle);
-        }
-        
-        this.candles.sort((a, b) => a.time - b.time);
-        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
-        this.updateCharts();
-        this.updateStatsFromCandle(candle);
-    }
-    
-    subscribeToCandles() {
-        if (!this.socket || !this.currentInstrument) return;
-        
-        if (this.lastSubscription) {
-            this.socket.emit('unsubscribe', this.lastSubscription);
-        }
-        
-        this.lastSubscription = { instrument: this.currentInstrument, type: this.currentType };
-        this.socket.emit('subscribe', this.lastSubscription);
-    }
-    
-    initCharts() {
+   initCharts() {
         const chartElement = document.getElementById('main-chart');
         const bottomElement = document.getElementById('bottom-chart');
         
@@ -338,7 +343,7 @@ class MarketChart {
             upColor: '#26a69a', downColor: '#ef5350', borderVisible: false
         });
         
-        // Bottom chart (dynamic based on candle type)
+        // Bottom chart
         if (bottomElement) {
             const bottomChart = LightweightCharts.createChart(bottomElement, {
                 width: bottomElement.clientWidth,
@@ -353,22 +358,44 @@ class MarketChart {
                 timeScale: { visible: false }
             });
             
-            // Use HistogramSeries for bottom chart
             this.bottomSeries = bottomChart.addSeries(LightweightCharts.HistogramSeries, {
                 color: '#00bcd4',
                 priceFormat: { type: 'volume' }
             });
             
-            // Link time scales
+            // Link time scales - ONLY for synchronization, not for zoom detection
             bottomChart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                this.chart.timeScale().setVisibleRange(range);
+                if (range && this.chart) {
+                    this.chart.timeScale().setVisibleRange(range);
+                }
             });
+            
             this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                bottomChart.timeScale().setVisibleRange(range);
+                if (range && bottomChart) {
+                    bottomChart.timeScale().setVisibleRange(range);
+                }
             });
         }
         
+        // Track user zoom interactions
+        this.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+            this.userHasZoomed = true;
+            this.resetZoomState();
+        });
+        
+        this.chart.timeScale().subscribeSizeChange(() => {
+            this.userHasZoomed = true;
+            this.resetZoomState();
+        });
+        
         this.isInitialized = true;
+        
+        // Initial fit only once when data loads
+        if (!this.initialDataLoaded && this.candles.length > 0) {
+            this.chart.timeScale().fitContent();
+            this.initialDataLoaded = true;
+        }
+        
         this.updateCharts();
         
         window.addEventListener('resize', () => {
@@ -379,7 +406,8 @@ class MarketChart {
             }
         });
     }
-    
+
+// Update updateCharts method
     updateCharts() {
         if (!this.isInitialized || !this.candleSeries || !this.candles.length) return;
         
@@ -395,16 +423,13 @@ class MarketChart {
                 close: candle.close
             });
             
-            // Bottom chart data depends on candle type
             let bottomValue = 0;
             let bottomColor = '#00bcd4';
             
             if (this.currentType === 'volume') {
-                // Volume bars: show price changes count
                 bottomValue = candle.priceChanges || candle.transactions || 0;
                 bottomColor = '#ff9800';
             } else {
-                // Price bars: show traded volume
                 bottomValue = candle.volume || 0;
                 bottomColor = '#00bcd4';
             }
@@ -416,22 +441,115 @@ class MarketChart {
             });
         }
         
+        // Store current visible range before update
+        let currentRange = null;
+        if (this.userHasZoomed && this.chart) {
+            currentRange = this.chart.timeScale().getVisibleRange();
+        }
+        
         this.candleSeries.setData(chartData);
         if (this.bottomSeries) {
             this.bottomSeries.setData(bottomData);
-            
-            // Update right price scale formatting
-            const priceScale = this.bottomSeries.priceScale();
-            if (priceScale) {
-                priceScale.applyOptions({
-                    scaleMargins: { top: 0.1, bottom: 0.1 }
-                });
-            }
         }
         
-        this.chart.timeScale().fitContent();
+        // Restore zoom if user had zoomed, otherwise fit content
+        if (this.userHasZoomed && currentRange) {
+            this.chart.timeScale().setVisibleRange(currentRange);
+        } else if (!this.userHasZoomed && chartData.length > 0 && !this.initialDataLoaded) {
+            this.chart.timeScale().fitContent();
+            this.initialDataLoaded = true;
+        }
+        
         document.getElementById('candleCount').textContent = `Candles: ${chartData.length}`;
     }
+
+    // Update addLiveCandle method to not reset zoom
+    updateLiveCandle(liveCandle) {
+        const newCandle = this.convertToChartCandle(liveCandle);
+        if (!newCandle) return;
+        
+        const lastCandle = this.candles[this.candles.length - 1];
+        
+        // Store current visible range if user zoomed
+        let currentRange = null;
+        if (this.userHasZoomed && this.chart) {
+            currentRange = this.chart.timeScale().getVisibleRange();
+        }
+        
+        if (lastCandle && lastCandle.barNumber === liveCandle.barNumber) {
+            this.candles[this.candles.length - 1] = newCandle;
+        } else {
+            this.candles.push(newCandle);
+        }
+        
+        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
+        
+        // Update chart without changing zoom
+        const chartData = this.candles.map(c => ({
+            time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+        }));
+        
+        const bottomData = this.candles.map(c => ({
+            time: c.time,
+            value: this.currentType === 'volume' ? (c.priceChanges || c.transactions || 0) : (c.volume || 0),
+            color: this.currentType === 'volume' ? '#ff9800' : '#00bcd4'
+        }));
+        
+        this.candleSeries.setData(chartData);
+        if (this.bottomSeries) this.bottomSeries.setData(bottomData);
+        
+        // Restore zoom if user had zoomed
+        if (this.userHasZoomed && currentRange) {
+            this.chart.timeScale().setVisibleRange(currentRange);
+        }
+        
+        this.updateProgressDisplay(liveCandle.progress || 0, liveCandle);
+        this.updateStatsFromCandle(newCandle);
+    }
+
+    // Add method to manually reset zoom (optional - add a button in UI)
+    resetZoom() {
+        this.userHasZoomed = false;
+        this.initialDataLoaded = false;
+        if (this.chart && this.candles.length > 0) {
+            this.chart.timeScale().fitContent();
+            this.initialDataLoaded = true;
+        }
+    }
+    
+    addCompletedCandle(candle) {
+        const existingIndex = this.candles.findIndex(c => c.time === candle.time);
+        if (existingIndex >= 0) {
+            this.candles[existingIndex] = candle;
+        } else {
+            this.candles.push(candle);
+        }
+        
+        this.candles.sort((a, b) => a.time - b.time);
+        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
+        this.updateCharts();
+        this.updateStatsFromCandle(candle);
+    }
+    
+    subscribeToCandles() {
+        if (!this.socket || !this.currentInstrument) return;
+        
+        if (this.lastSubscription) {
+            this.socket.emit('unsubscribe', this.lastSubscription);
+        }
+        
+        this.lastSubscription = { instrument: this.currentInstrument, type: this.currentType };
+        this.socket.emit('subscribe', this.lastSubscription);
+    }
+
+    // Add new method to reset zoom state after period of inactivity
+    resetZoomState() {
+        if (this.zoomTimeout) clearTimeout(this.zoomTimeout);
+        this.zoomTimeout = setTimeout(() => {
+            this.userHasZoomed = false;
+        }, 5000); // Reset after 5 seconds of no zoom activity
+    }
+    
     
     updateStatsFromCandle(candle) {
         const statsBar = document.getElementById('statsBar');
