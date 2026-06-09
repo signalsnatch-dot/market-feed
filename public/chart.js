@@ -13,6 +13,8 @@ class MarketChart {
         this.userHasZoomed = false;
         this.zoomTimeout = null;
         this.initialDataLoaded = false;
+        this.isUpdatingFromSync = false;  // Prevent sync loops
+
 
         this.init();
     }
@@ -365,14 +367,18 @@ class MarketChart {
             
             // Link time scales - ONLY for synchronization, not for zoom detection
             bottomChart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                if (range && this.chart) {
+                if (range && this.chart && !this.isUpdatingFromSync) {
+                    this.isUpdatingFromSync = true;
                     this.chart.timeScale().setVisibleRange(range);
+                    this.isUpdatingFromSync = false;
                 }
             });
             
             this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                if (range && bottomChart) {
+                if (range && bottomChart && !this.isUpdatingFromSync) {
+                    this.isUpdatingFromSync = true;
                     bottomChart.timeScale().setVisibleRange(range);
+                    this.isUpdatingFromSync = false;
                 }
             });
         }
