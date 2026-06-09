@@ -33,7 +33,7 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             nvm use 20
 
-            cd /home/ubuntu/market-feed
+            cd /home/ubuntu/app/market-feed
             git pull origin main
             npm install
 
