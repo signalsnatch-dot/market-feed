@@ -41,6 +41,8 @@ class MarketChart {
         console.log(`Switching to instrument: ${key}`);
         this.currentInstrument = key;
         this.setActiveInstrument(key);
+        this.initialDataLoaded = false;
+        this.userHasZoomed = false;
         this.loadCandlesForCurrentInstrument();
         this.subscribeToCandles();
         this.updateBottomChartLabel();
@@ -210,9 +212,9 @@ class MarketChart {
     
     getInstrumentName(key) {
         const names = {
-            'MCX_FO|487465': 'Natural Gas Future',
-            'NSE_FO|45450': 'Nifty 50 Future',
-            'NSE_FO|66688': 'Nifty Bank Future'
+            'MCX_FO|504265': 'Natural Gas Future',
+            'NSE_FO|62329': 'Nifty 50 Future',
+            'NSE_FO|62326': 'Nifty Bank Future'
         };
         return names[key] || key.split('|')[1];
     }

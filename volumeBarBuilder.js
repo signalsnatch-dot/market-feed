@@ -101,6 +101,7 @@ class VolumeBarBuilder extends EventEmitter {
         
         // Initialize bar on first tick
         if (bar.open === null) {
+            bar.barNumber = this.stats.barsByInstrument.get(instrument_key) + 1;
             bar.open = price;
             bar.high = price;
             bar.low = price;
@@ -240,18 +241,31 @@ class VolumeBarBuilder extends EventEmitter {
         console.log(`   Duration: ${completedBar.durationSeconds}s`);
         console.log(`   Avg trade size: ${Math.round(bar.currentVolume / bar.transactions).toLocaleString()} units\n`);
         
-        // Reset bar (start at last close)
+        // Reset bar state completely for the next live candle
+        // If exactly at target (100%): set OHLC to null for fresh initialization
+        // If exceeded target (>100%): set OHLC to bar.low as starting point
+        const isExactClose = bar.currentVolume === bar.targetVolume;
+        const ohlcReset = isExactClose ? null : bar.close;
+        
         this.activeBars.set(instrumentKey, {
-            ...bar,
+            instrument_key: bar.instrument_key,
+            name: bar.name,
+            targetVolume: bar.targetVolume,
+
             currentVolume: 0,
-            open: bar.close,
-            high: bar.close,
-            low: bar.close,
-            close: bar.close,
+            open: ohlcReset,
+            high: ohlcReset,
+            low: ohlcReset,
+            close: ohlcReset,
+            startTime: null,
+            startTimestamp: null,
             lastUpdateTime: null,
             lastUpdateTimestamp: null,
             transactions: 0,
             priceChanges: 0,
+
+            bars: bar.bars,
+            barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
             lastEmittedProgress: 0
         });
     }
