@@ -3,29 +3,29 @@ class MarketChart {
     constructor() {
         this.currentInstrument = null;
         this.currentType = 'volume';
-        this.candles = [];
+        this.candles = [];          // Array of formatted candle objects
         this.chart = null;
         this.candleSeries = null;
         this.bottomSeries = null;
         this.socket = null;
         this.instruments = new Map();
         this.isInitialized = false;
-        this.userHasZoomed = false;
-        this.zoomTimeout = null;
+        this.userHasZoomed = false;      // True if user manually zoomed/panned
         this.initialDataLoaded = false;
-        this.isUpdatingFromSync = false;  // Prevent sync loops
-
-
+        this.zoomTimeout = null;
+        this.savedTimeRange = null;      // For restoring after data updates
+        this.savedPriceRange = null;     // For restoring top pane price scale
+        
         this.init();
     }
-    
+
     async init() {
         await this.loadHistoricalData();
         this.setupWebSocket();
         this.setupEventListeners();
         this.initCharts();
     }
-    
+
     setActiveInstrument(key) {
         const buttons = document.querySelectorAll('.instrument-btn');
         buttons.forEach(btn => {
@@ -46,6 +46,34 @@ class MarketChart {
         this.updateBottomChartLabel();
     }
     
+    convertToChartCandle(candleData) {
+        let timestamp = candleData.timestamp || candleData.end_time;
+        if (!timestamp) return null;
+        if (typeof timestamp === 'string') timestamp = new Date(timestamp).getTime();
+        let timeSec = Math.floor(timestamp / 1000);
+        if (timeSec < 1577836800 || timeSec > 1893456000) return null;
+
+        const open = parseFloat(candleData.open);
+        const high = parseFloat(candleData.high);
+        const low = parseFloat(candleData.low);
+        const close = parseFloat(candleData.close);
+        if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) return null;
+
+        // Preserve barNumber for identification
+        const barNumber = candleData.barNumber || candleData.bar_number;
+
+        return {
+            time: timeSec,
+            open, high, low, close,
+            volume: parseFloat(candleData.volume || candleData.targetVolume || 0),
+            barNumber: barNumber,
+            progress: candleData.progress,
+            priceChanges: candleData.priceChanges,
+            transactions: candleData.transactions
+        };
+    }
+
+
     updateBottomChartLabel() {
         const bottomChartContainer = document.getElementById('bottom-chart');
         if (!bottomChartContainer) return;
@@ -70,10 +98,11 @@ class MarketChart {
         const cacheKey = `${this.currentType}_candles`;
         if (this[cacheKey]) {
             this.candles = this[cacheKey]
-                .filter(c => c.instrument === this.currentInstrument || c.instrument_key === this.currentInstrument)
+                .filter(c => (c.instrument === this.currentInstrument || c.instrument_key === this.currentInstrument))
                 .map(c => this.convertToChartCandle(c))
                 .filter(c => c !== null);
-            
+            // Sort by time ascending
+            this.candles.sort((a,b) => a.time - b.time);
             console.log(`Loaded ${this.candles.length} ${this.currentType} candles for ${this.currentInstrument}`);
             this.updateCharts();
         } else {
@@ -81,7 +110,8 @@ class MarketChart {
             this.updateCharts();
         }
     }
-    
+
+
     convertToChartCandle(candleData) {
         // Get timestamp (already in IST from server)
         let timestamp = candleData.timestamp || candleData.end_time;
@@ -312,226 +342,200 @@ class MarketChart {
     }
     
    initCharts() {
-        const chartElement = document.getElementById('main-chart');
-        const bottomElement = document.getElementById('bottom-chart');
-        
-        if (!chartElement || typeof LightweightCharts === 'undefined') {
-            setTimeout(() => this.initCharts(), 500);
-            return;
-        }
-        
-        // Main price chart
-        this.chart = LightweightCharts.createChart(chartElement, {
-            width: chartElement.clientWidth,
-            height: 400,
-            layout: { background: { color: '#1e222d' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: '#2f3c5c' }, horzLines: { color: '#2f3c5c' } },
-            timeScale: { 
-                timeVisible: true, 
-                secondsVisible: true,
-                tickMarkFormatter: (time) => {
-                    const date = new Date(time * 1000);
-                    return date.toLocaleString('en-IN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    });
-                }
-            }
-        });
-        
-        this.candleSeries = this.chart.addSeries(LightweightCharts.CandlestickSeries, {
-            upColor: '#26a69a', downColor: '#ef5350', borderVisible: false
-        });
-        
-        // Bottom chart
-        if (bottomElement) {
-            const bottomChart = LightweightCharts.createChart(bottomElement, {
-                width: bottomElement.clientWidth,
-                height: 150,
-                layout: { background: { color: '#1e222d' }, textColor: '#d1d4dc' },
-                grid: { vertLines: { color: '#2f3c5c' }, horzLines: { color: '#2f3c5c' } },
-                rightPriceScale: { 
-                    visible: true,
-                    borderColor: '#2f3c5c',
-                    scaleMargins: { top: 0.1, bottom: 0.1 }
-                },
-                timeScale: { visible: false }
-            });
-            
-            this.bottomSeries = bottomChart.addSeries(LightweightCharts.HistogramSeries, {
-                color: '#00bcd4',
-                priceFormat: { type: 'volume' }
-            });
-            
-            // Link time scales - ONLY for synchronization, not for zoom detection
-            bottomChart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                if (range && this.chart && !this.isUpdatingFromSync) {
-                    this.isUpdatingFromSync = true;
-                    this.chart.timeScale().setVisibleRange(range);
-                    this.isUpdatingFromSync = false;
-                }
-            });
-            
-            this.chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
-                if (range && bottomChart && !this.isUpdatingFromSync) {
-                    this.isUpdatingFromSync = true;
-                    bottomChart.timeScale().setVisibleRange(range);
-                    this.isUpdatingFromSync = false;
-                }
-            });
-        }
-        
-        // Track user zoom interactions
-        this.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
-            this.userHasZoomed = true;
-            this.resetZoomState();
-        });
-        
-        this.chart.timeScale().subscribeSizeChange(() => {
-            this.userHasZoomed = true;
-            this.resetZoomState();
-        });
-        
-        this.isInitialized = true;
-        
-        // Initial fit only once when data loads
-        if (!this.initialDataLoaded && this.candles.length > 0) {
-            this.chart.timeScale().fitContent();
-            this.initialDataLoaded = true;
-        }
-        
-        this.updateCharts();
-        
-        window.addEventListener('resize', () => {
-            this.chart?.applyOptions({ width: chartElement.clientWidth });
-            if (bottomElement && this.bottomSeries) {
-                const bottomChart = this.bottomSeries.chart();
-                bottomChart?.applyOptions({ width: bottomElement.clientWidth });
-            }
-        });
+    const chartElement = document.getElementById('main-chart');
+    if (!chartElement || typeof LightweightCharts === 'undefined') {
+        setTimeout(() => this.initCharts(), 500);
+        return;
     }
+
+    this.chart = LightweightCharts.createChart(chartElement, {
+        width: chartElement.clientWidth,
+        height: 600,
+        layout: { background: { color: '#1e222d' }, textColor: '#d1d4dc' },
+        grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
+        timeScale: {
+            timeVisible: true,
+            secondsVisible: true,
+            tickMarkFormatter: (time) => {
+                const date = new Date(time * 1000);
+                return date.toLocaleString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+            }
+        },
+        rightPriceScale: {
+            borderColor: '#2a2e39',
+            scaleMargins: { top: 0.05, bottom: 0.25 }  // 70% for candles
+        },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+    });
+
+    // Candlestick series (top pane)
+    this.candleSeries = this.chart.addSeries(LightweightCharts.CandlestickSeries, {
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderVisible: false,
+        priceScaleId: 'right'
+    });
+
+    // Histogram series (bottom pane)
+    this.bottomSeries = this.chart.addSeries(LightweightCharts.HistogramSeries, {
+        color: '#00bcd4',
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'bottom'
+    });
+
+    // Configure bottom pane (20% of chart height)
+    this.chart.priceScale('bottom').applyOptions({
+        scaleMargins: { top: 0.75, bottom: 0.05 },
+        borderColor: '#2a2e39',
+        autoScale: true,
+        entireTextOnly: true
+    });
+
+    // Track time scale (horizontal) zoom/pan
+    this.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+        this.userHasZoomed = true;
+        this.savedTimeRange = this.chart.timeScale().getVisibleRange();
+    });
+
+    // Note: No direct event for price scale changes, but we'll save/restore price range before each data update.
+
+    this.isInitialized = true;
+
+    // Hide any old separate bottom chart
+    const oldBottom = document.getElementById('bottom-chart');
+    if (oldBottom) oldBottom.style.display = 'none';
+
+    this.addBottomPaneLabel();
+
+    this.updateCharts();
+
+    window.addEventListener('resize', () => {
+        this.chart?.applyOptions({ width: chartElement.clientWidth });
+    });
+}
+
 
 // Update updateCharts method
     updateCharts() {
         if (!this.isInitialized || !this.candleSeries || !this.candles.length) return;
-        
+
+        // Save current zoom/pan state before updating data
+        let savedTime = null;
+        let savedPrice = null;
+        if (this.userHasZoomed && this.chart) {
+            try {
+                savedTime = this.chart.timeScale().getVisibleRange();
+                savedPrice = this.chart.priceScale('right').getVisibleRange();
+            } catch(e) { /* ignore */ }
+        }
+
         const chartData = [];
         const bottomData = [];
-        
-        for (const candle of this.candles) {
-            chartData.push({
-                time: candle.time,
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close
-            });
-            
-            let bottomValue = 0;
-            let bottomColor = '#00bcd4';
-            
-            if (this.currentType === 'volume') {
-                bottomValue = candle.priceChanges || candle.transactions || 0;
-                bottomColor = '#ff9800';
-            } else {
-                bottomValue = candle.volume || 0;
-                bottomColor = '#00bcd4';
-            }
-            
-            bottomData.push({
-                time: candle.time,
-                value: bottomValue,
-                color: bottomColor
-            });
+        for (const c of this.candles) {
+            chartData.push({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close });
+            const val = (this.currentType === 'volume')
+                ? (c.priceChanges || c.transactions || 0)
+                : (c.volume || 0);
+            bottomData.push({ time: c.time, value: val, color: '#00bcd4' });
         }
-        
-        // Store current visible range before update
-        let currentRange = null;
-        if (this.userHasZoomed && this.chart) {
-            currentRange = this.chart.timeScale().getVisibleRange();
-        }
-        
+
         this.candleSeries.setData(chartData);
-        if (this.bottomSeries) {
-            this.bottomSeries.setData(bottomData);
+        this.bottomSeries.setData(bottomData);
+
+        // Restore zoom/pan if user had interacted
+        if (savedTime && this.userHasZoomed) {
+            this.chart.timeScale().setVisibleRange(savedTime);
         }
-        
-        // Restore zoom if user had zoomed, otherwise fit content
-        if (this.userHasZoomed && currentRange) {
-            this.chart.timeScale().setVisibleRange(currentRange);
-        } else if (!this.userHasZoomed && chartData.length > 0 && !this.initialDataLoaded) {
+        if (savedPrice && this.userHasZoomed) {
+            this.chart.priceScale('right').setVisibleRange(savedPrice);
+        } else if (!this.initialDataLoaded && chartData.length) {
+            // First load: fit content horizontally, auto-scale price
             this.chart.timeScale().fitContent();
+            this.chart.priceScale('right').applyOptions({ autoScale: true });
             this.initialDataLoaded = true;
+            this.userHasZoomed = false;
         }
-        
-        document.getElementById('candleCount').textContent = `Candles: ${chartData.length}`;
+
+        const countElem = document.getElementById('candleCount');
+        if (countElem) countElem.textContent = `Candles: ${chartData.length}`;
+    }
+
+
+    addBottomPaneLabel() {
+        const existing = document.getElementById('bottom-pane-label');
+        if (existing) existing.remove();
+        const label = document.createElement('div');
+        label.id = 'bottom-pane-label';
+        label.style.cssText = 'position: absolute; bottom: 40px; right: 70px; font-size: 11px; color: #787b86; background: rgba(30,34,45,0.8); padding: 2px 8px; border-radius: 4px; z-index: 10; font-family: monospace;';
+        label.textContent = this.currentType === 'volume' ? '📊 PRICE CHANGES' : '💰 TRADED VOLUME';
+        const container = document.getElementById('main-chart');
+        if (container) {
+            container.style.position = 'relative';
+            container.appendChild(label);
+        }
     }
 
     // Update addLiveCandle method to not reset zoom
+    // Process a live candle update from WebSocket
     updateLiveCandle(liveCandle) {
         const newCandle = this.convertToChartCandle(liveCandle);
         if (!newCandle) return;
-        
-        const lastCandle = this.candles[this.candles.length - 1];
-        
-        // Store current visible range if user zoomed
-        let currentRange = null;
-        if (this.userHasZoomed && this.chart) {
-            currentRange = this.chart.timeScale().getVisibleRange();
+
+        const barNum = newCandle.barNumber;
+        let existingIndex = -1;
+        if (barNum !== undefined && barNum !== null) {
+            existingIndex = this.candles.findIndex(c => c.barNumber === barNum);
         }
-        
-        if (lastCandle && lastCandle.barNumber === liveCandle.barNumber) {
-            this.candles[this.candles.length - 1] = newCandle;
+
+        if (existingIndex >= 0) {
+            // Update existing candle in place
+            this.candles[existingIndex] = newCandle;
+            // Force a full redraw of all data – this eliminates off-screen update bugs
+            this.updateCharts();
         } else {
+            // New candle – append
+            // Ensure strictly increasing time to avoid glitches
+            const last = this.candles[this.candles.length - 1];
+            if (last && newCandle.time <= last.time) {
+                newCandle.time = last.time + 1;
+            }
             this.candles.push(newCandle);
+            if (this.candles.length > 500) this.candles = this.candles.slice(-500);
+            this.updateCharts();
         }
-        
-        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
-        
-        // Update chart without changing zoom
-        const chartData = this.candles.map(c => ({
-            time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
-        }));
-        
-        const bottomData = this.candles.map(c => ({
-            time: c.time,
-            value: this.currentType === 'volume' ? (c.priceChanges || c.transactions || 0) : (c.volume || 0),
-            color: this.currentType === 'volume' ? '#ff9800' : '#00bcd4'
-        }));
-        
-        this.candleSeries.setData(chartData);
-        if (this.bottomSeries) this.bottomSeries.setData(bottomData);
-        
-        // Restore zoom if user had zoomed
-        if (this.userHasZoomed && currentRange) {
-            this.chart.timeScale().setVisibleRange(currentRange);
-        }
-        
+
+        // Update progress bar and stats (keep your existing methods)
         this.updateProgressDisplay(liveCandle.progress || 0, liveCandle);
         this.updateStatsFromCandle(newCandle);
     }
 
+
     // Add method to manually reset zoom (optional - add a button in UI)
-    resetZoom() {
+     resetZoom() {
         this.userHasZoomed = false;
         this.initialDataLoaded = false;
-        if (this.chart && this.candles.length > 0) {
+        if (this.chart && this.candles.length) {
             this.chart.timeScale().fitContent();
+            this.chart.priceScale('right').applyOptions({ autoScale: true });
             this.initialDataLoaded = true;
         }
     }
     
+     // Called when a candle is fully closed (finalized)
     addCompletedCandle(candle) {
-        const existingIndex = this.candles.findIndex(c => c.time === candle.time);
+        const barNum = candle.barNumber;
+        const existingIndex = barNum ? this.candles.findIndex(c => c.barNumber === barNum) : -1;
         if (existingIndex >= 0) {
             this.candles[existingIndex] = candle;
         } else {
             this.candles.push(candle);
+            this.candles.sort((a,b) => a.time - b.time);
         }
-        
-        this.candles.sort((a, b) => a.time - b.time);
         if (this.candles.length > 500) this.candles = this.candles.slice(-500);
         this.updateCharts();
         this.updateStatsFromCandle(candle);
