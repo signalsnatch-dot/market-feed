@@ -7,6 +7,8 @@ class MarketChart {
         this.chart = null;
         this.candleSeries = null;
         this.bottomSeries = null;
+        this.emaSeries = null;
+        this.emaPeriod = 20;
         this.socket = null;
         this.instruments = new Map();
         this.isInitialized = false;
@@ -47,34 +49,6 @@ class MarketChart {
         this.subscribeToCandles();
         this.updateBottomChartLabel();
     }
-    
-    convertToChartCandle(candleData) {
-        let timestamp = candleData.timestamp || candleData.end_time;
-        if (!timestamp) return null;
-        if (typeof timestamp === 'string') timestamp = new Date(timestamp).getTime();
-        let timeSec = Math.floor(timestamp / 1000);
-        if (timeSec < 1577836800 || timeSec > 1893456000) return null;
-
-        const open = parseFloat(candleData.open);
-        const high = parseFloat(candleData.high);
-        const low = parseFloat(candleData.low);
-        const close = parseFloat(candleData.close);
-        if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) return null;
-
-        // Preserve barNumber for identification
-        const barNumber = candleData.barNumber || candleData.bar_number;
-
-        return {
-            time: timeSec,
-            open, high, low, close,
-            volume: parseFloat(candleData.volume || candleData.targetVolume || 0),
-            barNumber: barNumber,
-            progress: candleData.progress,
-            priceChanges: candleData.priceChanges,
-            transactions: candleData.transactions
-        };
-    }
-
 
     updateBottomChartLabel() {
         const bottomChartContainer = document.getElementById('bottom-chart');
@@ -113,6 +87,31 @@ class MarketChart {
         }
     }
 
+
+    calculateEMA(data, period) {
+        if (!Array.isArray(data) || data.length === 0 || period <= 0) return [];
+
+        const emaData = [];
+        const k = 2 / (period + 1);
+        let prevEma = null;
+
+        for (let i = 0; i < data.length; i++) {
+            const item = data[i];
+            if (i < period - 1) continue;
+
+            if (i === period - 1) {
+                const sum = data.slice(0, period).reduce((acc, candle) => acc + candle.close, 0);
+                prevEma = sum / period;
+                emaData.push({ time: item.time, value: prevEma });
+                continue;
+            }
+
+            prevEma = (item.close - prevEma) * k + prevEma;
+            emaData.push({ time: item.time, value: prevEma });
+        }
+
+        return emaData;
+    }
 
     convertToChartCandle(candleData) {
         // Get timestamp (already in IST from server)
@@ -390,6 +389,14 @@ class MarketChart {
         priceScaleId: 'bottom'
     });
 
+    this.emaSeries = this.chart.addSeries(LightweightCharts.LineSeries, {
+        color: '#f9a825',
+        lineWidth: 2,
+        priceScaleId: 'right',
+        crosshairMarkerVisible: false,
+        lastValueVisible: true
+    });
+
     // Configure bottom pane (20% of chart height)
     this.chart.priceScale('bottom').applyOptions({
         scaleMargins: { top: 0.75, bottom: 0.05 },
@@ -413,11 +420,13 @@ class MarketChart {
     if (oldBottom) oldBottom.style.display = 'none';
 
     this.addBottomPaneLabel();
+    this.initDrawingTools();
 
     this.updateCharts();
 
     window.addEventListener('resize', () => {
         this.chart?.applyOptions({ width: chartElement.clientWidth });
+        this.renderDrawings();
     });
 }
 
@@ -448,6 +457,12 @@ class MarketChart {
 
         this.candleSeries.setData(chartData);
         this.bottomSeries.setData(bottomData);
+        if (this.emaSeries) {
+            const emaData = this.calculateEMA(chartData, this.emaPeriod);
+            this.emaSeries.setData(emaData);
+        }
+
+        this.renderDrawings();
 
         // Restore zoom/pan if user had interacted
         if (savedTime && this.userHasZoomed) {
@@ -480,6 +495,313 @@ class MarketChart {
             container.style.position = 'relative';
             container.appendChild(label);
         }
+    }
+
+    initDrawingTools() {
+        const toolButtons = document.querySelectorAll('.draw-tool-btn');
+        const chartElement = document.getElementById('main-chart');
+        if (!chartElement || !toolButtons.length) return;
+
+        this.currentTool = 'select';
+        this.drawings = [];
+        this.isDrawing = false;
+        this.drawingStart = null;
+        this.previewElement = null;
+
+        toolButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.id === 'clear-drawings-btn') {
+                    this.clearDrawings();
+                    return;
+                }
+                this.setDrawingTool(btn.dataset.tool);
+            });
+        });
+
+        const existingOverlay = document.getElementById('drawing-overlay');
+        if (existingOverlay) existingOverlay.remove();
+
+        const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        overlay.id = 'drawing-overlay';
+        overlay.setAttribute('width', '100%');
+        overlay.setAttribute('height', '100%');
+        overlay.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index: 5; pointer-events: none;';
+        overlay.innerHTML = '<g id="drawing-shapes"></g><g id="drawing-preview"></g>';
+        chartElement.appendChild(overlay);
+        this.drawingOverlay = overlay;
+
+        overlay.addEventListener('pointerdown', this.handleDrawingPointerDown.bind(this));
+        overlay.addEventListener('pointermove', this.handleDrawingPointerMove.bind(this));
+        overlay.addEventListener('pointerup', this.handleDrawingPointerUp.bind(this));
+        overlay.addEventListener('pointerleave', this.handleDrawingPointerCancel.bind(this));
+
+        this.setDrawingTool('select');
+        this.chart.timeScale().subscribeVisibleTimeRangeChange(() => this.renderDrawings());
+    }
+
+    setDrawingTool(tool) {
+        this.currentTool = tool;
+        document.querySelectorAll('.draw-tool-btn').forEach(btn => {
+            if (btn.id === 'clear-drawings-btn') return;
+            btn.classList.toggle('active', btn.dataset.tool === tool);
+        });
+        if (this.drawingOverlay) {
+            this.drawingOverlay.style.pointerEvents = tool === 'select' ? 'none' : 'all';
+            this.drawingOverlay.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+        }
+    }
+
+    handleDrawingPointerDown(event) {
+        if (event.button !== 0 || this.currentTool === 'select') return;
+        event.preventDefault();
+
+        const point = this.getOverlayPoint(event);
+        const chartValue = this.pointToChartValue(point);
+        if (!chartValue) return;
+
+        this.isDrawing = true;
+        this.drawingStart = chartValue;
+        this.clearPreview();
+        this.previewElement = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        this.previewElement.setAttribute('id', 'current-preview');
+        this.drawingOverlay.querySelector('#drawing-preview')?.appendChild(this.previewElement);
+        this.updatePreview(chartValue, chartValue);
+    }
+
+    handleDrawingPointerMove(event) {
+        if (!this.isDrawing || !this.drawingStart) return;
+        event.preventDefault();
+
+        const point = this.getOverlayPoint(event);
+        this.updatePreview(this.drawingStart, this.pointToChartValue(point), true);
+    }
+
+    handleDrawingPointerUp(event) {
+        if (!this.isDrawing || !this.drawingStart) return;
+        event.preventDefault();
+
+        const point = this.getOverlayPoint(event);
+        const endValue = this.pointToChartValue(point);
+        if (endValue) {
+            this.addDrawing({
+                type: this.currentTool,
+                from: this.drawingStart,
+                to: endValue
+            });
+        }
+
+        this.isDrawing = false;
+        this.drawingStart = null;
+        this.clearPreview();
+    }
+
+    handleDrawingPointerCancel() {
+        this.isDrawing = false;
+        this.drawingStart = null;
+        this.clearPreview();
+    }
+
+    getOverlayPoint(event) {
+        const rect = this.drawingOverlay.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+    }
+
+    pointToChartValue(point) {
+        if (!this.chart || !this.candleSeries) return null;
+        const time = this.chart.timeScale().coordinateToTime(point.x);
+        const price = this.candleSeries.coordinateToPrice(point.y);
+        if (!time || typeof price !== 'number') return null;
+        return { time, price };
+    }
+
+    chartValueToPoint(value) {
+        if (!this.chart || !this.candleSeries) return null;
+        const x = this.chart.timeScale().timeToCoordinate(value.time);
+        const y = this.candleSeries.priceToCoordinate(value.price);
+        if (typeof x !== 'number' || typeof y !== 'number') return null;
+        return { x, y };
+    }
+
+    updatePreview(startValue, endValue) {
+        if (!this.previewElement || !startValue || !endValue) return;
+        const fromPoint = this.chartValueToPoint(startValue);
+        const toPoint = this.chartValueToPoint(endValue);
+        if (!fromPoint || !toPoint) return;
+
+        this.previewElement.innerHTML = '';
+        if (this.currentTool === 'line' || this.currentTool === 'arrow') {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', String(fromPoint.x));
+            line.setAttribute('y1', String(fromPoint.y));
+            line.setAttribute('x2', String(toPoint.x));
+            line.setAttribute('y2', String(toPoint.y));
+            line.setAttribute('stroke', '#f9a825');
+            line.setAttribute('stroke-width', '2');
+            this.previewElement.appendChild(line);
+
+            if (this.currentTool === 'arrow') {
+                const arrowHead = this.createArrowHead(fromPoint, toPoint, '#f9a825');
+                if (arrowHead) this.previewElement.appendChild(arrowHead);
+            }
+        } else if (this.currentTool === 'channel') {
+            const channelGroup = this.createChannelPreview(fromPoint, toPoint);
+            if (channelGroup) this.previewElement.appendChild(channelGroup);
+        }
+    }
+
+    createArrowHead(fromPoint, toPoint, color) {
+        const dx = toPoint.x - fromPoint.x;
+        const dy = toPoint.y - fromPoint.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len === 0) return null;
+        const unitX = dx / len;
+        const unitY = dy / len;
+        const size = 10;
+        const perpX = -unitY;
+        const perpY = unitX;
+        const tipX = toPoint.x;
+        const tipY = toPoint.y;
+        const baseX = tipX - unitX * size;
+        const baseY = tipY - unitY * size;
+        const p1x = baseX + perpX * (size * 0.5);
+        const p1y = baseY + perpY * (size * 0.5);
+        const p2x = baseX - perpX * (size * 0.5);
+        const p2y = baseY - perpY * (size * 0.5);
+        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', `${tipX},${tipY} ${p1x},${p1y} ${p2x},${p2y}`);
+        polygon.setAttribute('fill', color);
+        return polygon;
+    }
+
+    createChannelPreview(fromPoint, toPoint) {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const slope = (toPoint.y - fromPoint.y) / (toPoint.x - fromPoint.x || 1);
+        const offset = toPoint.y - fromPoint.y;
+        const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', String(fromPoint.x));
+        line1.setAttribute('y1', String(fromPoint.y));
+        line1.setAttribute('x2', String(toPoint.x));
+        line1.setAttribute('y2', String(toPoint.y));
+        line1.setAttribute('stroke', '#f9a825');
+        line1.setAttribute('stroke-width', '2');
+        const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line2.setAttribute('x1', String(fromPoint.x));
+        line2.setAttribute('y1', String(fromPoint.y + offset));
+        line2.setAttribute('x2', String(toPoint.x));
+        line2.setAttribute('y2', String(toPoint.y + offset));
+        line2.setAttribute('stroke', '#f9a825');
+        line2.setAttribute('stroke-width', '2');
+        group.appendChild(line1);
+        group.appendChild(line2);
+        return group;
+    }
+
+    addDrawing(drawing) {
+        if (!drawing || !drawing.from || !drawing.to) return;
+        this.drawings.push(drawing);
+        this.renderDrawings();
+    }
+
+    clearDrawings() {
+        this.drawings = [];
+        this.renderDrawings();
+    }
+
+    renderDrawings() {
+        if (!this.drawingOverlay) return;
+        const shapes = this.drawingOverlay.querySelector('#drawing-shapes');
+        if (!shapes) return;
+        shapes.innerHTML = '';
+        for (const drawing of this.drawings) {
+            const rendered = this.renderDrawing(drawing);
+            if (rendered) shapes.appendChild(rendered);
+        }
+    }
+
+    renderDrawing(drawing) {
+        if (!drawing || !drawing.from || !drawing.to) return null;
+        const fromPoint = this.chartValueToPoint(drawing.from);
+        const toPoint = this.chartValueToPoint(drawing.to);
+        if (!fromPoint || !toPoint) return null;
+
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        if (drawing.type === 'line' || drawing.type === 'arrow') {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', String(fromPoint.x));
+            line.setAttribute('y1', String(fromPoint.y));
+            line.setAttribute('x2', String(toPoint.x));
+            line.setAttribute('y2', String(toPoint.y));
+            line.setAttribute('stroke', '#f9a825');
+            line.setAttribute('stroke-width', '2');
+            group.appendChild(line);
+            if (drawing.type === 'arrow') {
+                const arrowHead = this.createArrowHead(fromPoint, toPoint, '#f9a825');
+                if (arrowHead) group.appendChild(arrowHead);
+            }
+        } else if (drawing.type === 'channel') {
+            const channel = this.renderChannel(drawing);
+            if (channel) return channel;
+        }
+        return group;
+    }
+
+    renderChannel(drawing) {
+        if (!drawing.from || !drawing.to) return null;
+        const visibleRange = this.chart.timeScale().getVisibleRange();
+        if (!visibleRange || !visibleRange.from || !visibleRange.to) return null;
+
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const fromTime = this.normalizeTime(drawing.from.time);
+        const toTime = this.normalizeTime(drawing.to.time);
+        const slope = (drawing.to.price - drawing.from.price) / ((toTime - fromTime) || 1);
+
+        const leftTime = this.normalizeTime(visibleRange.from);
+        const rightTime = this.normalizeTime(visibleRange.to);
+        const topLeftPrice = drawing.from.price + slope * (leftTime - fromTime);
+        const topRightPrice = drawing.from.price + slope * (rightTime - fromTime);
+        const bottomLeftPrice = drawing.to.price + slope * (leftTime - toTime);
+        const bottomRightPrice = drawing.to.price + slope * (rightTime - toTime);
+
+        const topLeft = this.chartValueToPoint({ time: leftTime, price: topLeftPrice });
+        const topRight = this.chartValueToPoint({ time: rightTime, price: topRightPrice });
+        const bottomLeft = this.chartValueToPoint({ time: leftTime, price: bottomLeftPrice });
+        const bottomRight = this.chartValueToPoint({ time: rightTime, price: bottomRightPrice });
+        if (!topLeft || !topRight || !bottomLeft || !bottomRight) return null;
+
+        const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', String(topLeft.x));
+        line1.setAttribute('y1', String(topLeft.y));
+        line1.setAttribute('x2', String(topRight.x));
+        line1.setAttribute('y2', String(topRight.y));
+        line1.setAttribute('stroke', '#f9a825');
+        line1.setAttribute('stroke-width', '2');
+
+        const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line2.setAttribute('x1', String(bottomLeft.x));
+        line2.setAttribute('y1', String(bottomLeft.y));
+        line2.setAttribute('x2', String(bottomRight.x));
+        line2.setAttribute('y2', String(bottomRight.y));
+        line2.setAttribute('stroke', '#f9a825');
+        line2.setAttribute('stroke-width', '2');
+
+        group.appendChild(line1);
+        group.appendChild(line2);
+        return group;
+    }
+
+    normalizeTime(time) {
+        if (typeof time === 'object' && time !== null && 'getTime' in time) {
+            return Math.floor(time.getTime() / 1000);
+        }
+        return time;
+    }
+
+    clearPreview() {
+        const previewGroup = this.drawingOverlay?.querySelector('#drawing-preview');
+        if (previewGroup) previewGroup.innerHTML = '';
     }
 
     // Update addLiveCandle method to not reset zoom
