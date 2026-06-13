@@ -1,7 +1,7 @@
 // backtester.js - Standalone strategy backtesting system
 const fs = require('fs');
 const path = require('path');
-const csv = require('csv-parser');
+const { twoLeggedPullback, runPriceActionBacktest, DEFAULT_PARAMS } = require('./priceActionStrategy');
 
 class StrategyBacktester {
     constructor(config) {
@@ -17,11 +17,15 @@ class StrategyBacktester {
     // Load candle data from CSV
     async loadCandleData(instrumentKey, candleType = 'volume') {
         const safeKey = instrumentKey.replace(/[^a-zA-Z0-9]/g, '_');
-        console.log(safeKey);
-        const filepath = path.join(this.dataDir, `${safeKey}_${candleType}_bars.csv`);
-        
-        if (!fs.existsSync(filepath)) {
-            console.error(`File not found: ${filepath}`);
+        const subdir = candleType === 'price' ? 'price_bars' : 'volume_bars';
+        const candidates = [
+            path.join(this.dataDir, subdir, `${safeKey}_${candleType}_bars.csv`),
+            path.join(this.dataDir, `${safeKey}_${candleType}_bars.csv`)
+        ];
+        const filepath = candidates.find(p => fs.existsSync(p));
+
+        if (!filepath) {
+            console.error(`File not found. Tried:\n  ${candidates.join('\n  ')}`);
             return [];
         }
         
@@ -144,13 +148,17 @@ class StrategyBacktester {
             
             for (let i = params.period; i < candles.length; i++) {
                 const avgVol = avgVolume[i - params.period].value;
-                console
                 if (candles[i].volume > avgVol * params.multiplier) {
                     const direction = candles[i].close > candles[i].open ? 'BUY' : 'SELL';
                     signals.push({ index: i, type: direction, price: candles[i].close });
                 }
             }
             return signals;
+        },
+
+        // Price Action: 2-legged pullback to 20 EMA (Thomas Wade style, volume/price bars)
+        twoLeggedPullback: (candles, params = {}) => {
+            return twoLeggedPullback(candles, { ...DEFAULT_PARAMS, ...params });
         }
     };
     
@@ -219,26 +227,34 @@ class StrategyBacktester {
         return { upper, lower };
     }
     
-    // Backtest Engine
+    usesPriceActionExits(signals) {
+        return signals.length > 0 && signals.some(s => s.stopLoss != null && s.takeProfit != null);
+    }
+
+    // Backtest Engine — signal-only exits for classic strategies; stop/target bar simulation for price action
     runBacktest(candles, signals, initialCapital = 100000, tradeSize = 0.65) {
+        if (this.usesPriceActionExits(signals)) {
+            const { trades, finalEquity } = runPriceActionBacktest(candles, signals, initialCapital, tradeSize);
+            return this.calculateMetrics(trades, initialCapital, finalEquity);
+        }
+
         let equity = initialCapital;
         let position = null;
         const trades = [];
-        
+
         for (let i = 0; i < signals.length; i++) {
             const signal = signals[i];
             const price = signal.price;
 
-            //console.log(`Signal: ${signal.type} at index ${signal.index} ${new Date(signal.timestamp)} with price ${price}`);
-            
             if (signal.type === 'BUY' && !position) {
-                const quantity = (equity * tradeSize) / price;
-                position = { entry: price, quantity, index: i, entryIndex: signal.index };
+                const sizeFactor = (signal.confidence || 100) / 100;
+                const quantity = (equity * tradeSize * sizeFactor) / price;
+                position = { entry: price, quantity, index: i, entryIndex: signal.index, confidence: signal.confidence };
             } else if (signal.type === 'SELL' && position) {
                 const pnl = (price - position.entry) / position.entry;
                 const pnlAmount = position.quantity * price - position.quantity * position.entry;
                 equity += pnlAmount;
-                
+
                 trades.push({
                     entryIndex: position.entryIndex,
                     exitIndex: signal.index,
@@ -247,12 +263,13 @@ class StrategyBacktester {
                     quantity: position.quantity,
                     pnl: pnl * 100,
                     pnlAmount: pnlAmount,
-                    holdingPeriod: signal.index - position.entryIndex
+                    holdingPeriod: signal.index - position.entryIndex,
+                    confidence: position.confidence
                 });
                 position = null;
             }
         }
-        
+
         return this.calculateMetrics(trades, initialCapital, equity);
     }
     
@@ -263,8 +280,8 @@ class StrategyBacktester {
         
         // Calculate Sharpe Ratio
         const returns = trades.map(t => t.pnl);
-        const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-        const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+        const avgReturn = returns.length ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
+        const variance = returns.length ? returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length : 0;
         const sharpe = Math.sqrt(variance) === 0 ? 0 : (avgReturn / Math.sqrt(variance)).toFixed(2);
         
         // Calculate Maximum Drawdown
@@ -279,6 +296,13 @@ class StrategyBacktester {
             if (drawdown > maxDrawdown) maxDrawdown = drawdown;
         }
         
+        const confidenceTrades = trades.filter(t => t.confidence != null);
+        const avgConfidence = confidenceTrades.length
+            ? (confidenceTrades.reduce((s, t) => s + t.confidence, 0) / confidenceTrades.length).toFixed(1)
+            : null;
+        const stopExits = trades.filter(t => t.exitReason === 'stop_loss').length;
+        const targetExits = trades.filter(t => t.exitReason === 'take_profit').length;
+
         return {
             totalTrades: trades.length,
             winningTrades: winningTrades.length,
@@ -293,9 +317,12 @@ class StrategyBacktester {
             largestLoss: losingTrades.length ? Math.min(...losingTrades.map(t => t.pnl)).toFixed(2) : 0,
             sharpeRatio: sharpe,
             maxDrawdown: maxDrawdown.toFixed(2),
-            profitFactor: (Math.abs(winningTrades.reduce((s, t) => s + t.pnl, 0)) / 
+            profitFactor: (Math.abs(winningTrades.reduce((s, t) => s + t.pnl, 0)) /
                           Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0)) || 0).toFixed(2),
-            trades: trades.slice(-20) // Last 20 trades for display
+            avgConfidence,
+            stopExits,
+            targetExits,
+            trades: trades
         };
     }
     
@@ -338,14 +365,21 @@ class StrategyBacktester {
             signals = strategy(candles, strategyParams);
         }
         console.log(`   Generated ${signals.length} signals`);
-        
+        if (signals.length && signals[0].confidence != null) {
+            const avgConf = signals.reduce((s, sig) => s + sig.confidence, 0) / signals.length;
+            console.log(`   Avg confidence: ${avgConf.toFixed(1)} | Range: ${Math.min(...signals.map(s => s.confidence))}-${Math.max(...signals.map(s => s.confidence))}`);
+        }
+
         // Run backtest
         const results = this.runBacktest(candles, signals, initialCapital, tradeSize);
 
         // Save results
-        const resultFile = path.join(this.resultsDir, `${instrumentKey}_${candleType}_${strategyName}_${Date.now()}.json`);
+        const safeKey = instrumentKey.replace(/[^a-zA-Z0-9]/g, '_');
+        const resultFile = path.join(this.resultsDir, `${safeKey}_${candleType}_${strategyName}_${Date.now()}.json`);
         fs.writeFileSync(resultFile, JSON.stringify({
             config: options,
+            signalCount: signals.length,
+            sampleSignals: signals.slice(0, 5),
             results,
             timestamp: Date.now()
         }, null, 2));
@@ -400,13 +434,19 @@ class StrategyBacktester {
         console.log(`Max Drawdown:     ${results.maxDrawdown}%`);
         console.log(`Profit Factor:    ${results.profitFactor}`);
         console.log(`Final Equity:     ₹${parseFloat(results.finalEquity).toLocaleString()}`);
+        if (results.avgConfidence != null) {
+            console.log(`Avg Confidence:   ${results.avgConfidence}`);
+            console.log(`Exit Mix:         ${results.targetExits} targets / ${results.stopExits} stops`);
+        }
         console.log('='.repeat(50));
-        
+
         if (results.trades && results.trades.length > 0) {
             console.log('\n📋 Last 5 Trades:');
             results.trades.slice(-5).forEach(trade => {
                 const type = trade.pnl > 0 ? '✅ WIN' : '❌ LOSS';
-                console.log(`   ${type} | Entry: ${trade.entryPrice} | Exit: ${trade.exitPrice} | PnL: ${trade.pnl.toFixed(2)}%`);
+                const conf = trade.confidence != null ? ` | Conf: ${trade.confidence}` : '';
+                const exit = trade.exitReason ? ` | ${trade.exitReason}` : '';
+                console.log(`   ${type} | Entry: ${trade.entryPrice} | Exit: ${trade.exitPrice} | PnL: ${trade.pnl.toFixed(2)}%${conf}${exit}`);
             });
         }
     }
@@ -465,8 +505,8 @@ Usage:
   node backtester.js list
 
 Examples:
-  node backtester.js run MCX_FO|487465 volume smaCrossover 100000
-  node backtester.js compare MCX_FO|487465,NSE_FO|45450 volume
+  node backtester.js run MCX_FO|504265 volume twoLeggedPullback 100000
+  node backtester.js compare MCX_FO|504265,NSE_FO|62329 volume
   node backtester.js list
                 `);
         }

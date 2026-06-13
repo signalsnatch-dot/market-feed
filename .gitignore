@@ -12,6 +12,10 @@ candles_data/
 volume_bars_data/
 ticker_candles_data/
 backtest_results/
+version-backtest-results/
+extract-subset/
+extracted/
+candle-versions/
 
 # Legacy data directories (if any)
 data/
