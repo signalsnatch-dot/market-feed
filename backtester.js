@@ -88,6 +88,21 @@ class StrategyBacktester {
             }
             return signals;
         },
+
+        smaCrossoverReverse: (candles, params = {fast: 9, slow: 21 }) => {
+            const signals = [];
+            const fastSMA = this.calculateSMA(candles, params.fast);
+            const slowSMA = this.calculateSMA(candles, params.slow);
+
+            for (let i = 1; i < slowSMA.length; i++) {
+                if (fastSMA[i].value > slowSMA[i].value && fastSMA[i-1].value <= slowSMA[i-1].value) {
+                    signals.push({ index: fastSMA[i].index, type: 'SELL', price: candles[fastSMA[i].index].close });
+                } else if (fastSMA[i].value < slowSMA[i].value && fastSMA[i-1].value >= slowSMA[i-1].value) {
+                    signals.push({ index: fastSMA[i].index, type: 'BUY', price: candles[fastSMA[i].index].close });
+                }
+            }
+            return signals;
+        },
         
         // RSI Mean Reversion
         rsiMeanReversion: (candles, params = { period: 14, oversold: 30, overbought: 70 }) => {
@@ -127,7 +142,6 @@ class StrategyBacktester {
             const signals = [];
             const avgVolume = this.calculateSMA(candles.map(c => ({ value: c.volume })), params.period);
             
-            console.log(avgVolume);
             for (let i = params.period; i < candles.length; i++) {
                 const avgVol = avgVolume[i - params.period].value;
                 console
@@ -199,9 +213,6 @@ class StrategyBacktester {
             const upperI = { index: i, value: mean + (stdDev * std) };
             const lowerI = { index: i, value: mean - (stdDev * std) };
 
-            console.log(upperI);
-            console.log(lowerI);
-
             upper.push(upperI);
             lower.push(lowerI);
         }
@@ -209,7 +220,7 @@ class StrategyBacktester {
     }
     
     // Backtest Engine
-    runBacktest(candles, signals, initialCapital = 100000, tradeSize = 0.1) {
+    runBacktest(candles, signals, initialCapital = 100000, tradeSize = 0.65) {
         let equity = initialCapital;
         let position = null;
         const trades = [];
@@ -296,7 +307,7 @@ class StrategyBacktester {
             strategyName = 'smaCrossover',
             strategyParams = {},
             initialCapital = 100000,
-            tradeSize = 0.1
+            tradeSize = 0.65
         } = options;
         
         console.log(`\n📊 Running Backtest Analysis`);
@@ -410,6 +421,21 @@ if (require.main === module) {
     
     async function main() {
         switch(command) {
+            case 'run-all':
+                const instrumentKey = args[1] || 'MCX_FO|487465';
+                const capital = parseFloat(args[4]) || 100000;
+                for (const candleType of ['volume', 'price']) {
+                    for (const [strategyName] of Object.entries(backtester.strategies)) {
+                        console.log(`\nRunning strategy: ${strategyName} with candle type: ${candleType}`);
+                        await backtester.runCompleteAnalysis({
+                            instrumentKey: instrumentKey,
+                            candleType: candleType,
+                            strategyName: strategyName,
+                            initialCapital: capital
+                        });
+                    }
+                }
+                break;
             case 'run':
                 await backtester.runCompleteAnalysis({
                     instrumentKey: args[1] || 'MCX_FO|487465',
