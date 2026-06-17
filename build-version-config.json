@@ -1,0 +1,17 @@
+[
+    {
+      "instrument_key": "NSE_FO|62329",
+      "name": "NSE Future 62329",
+      "thresholds": [3250, 5700, 7500]
+    },
+    {
+        "instrument_key": "NSE_FO|62326",
+        "name": "NSE Future 62329",
+        "thresholds": [1800, 2600, 3000]
+    },
+    {
+      "instrument_key": "MCX_FO|504265",
+      "name": "NSE Future 62329",
+      "thresholds": [27000, 34000, 45000]
+    }
+]
