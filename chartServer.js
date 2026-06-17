@@ -1,4 +1,3 @@
-// chartServer.js - Secure version with path validation and CORS restrictions
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -43,6 +42,7 @@ class ChartServer {
         });
         
         this.recentCandles = { price_bars: [], volume_bars: [] };
+        this.tradeSignals = [];
         this.maxRecentCandles = 1000;
         
         this.setupRoutes();
@@ -171,11 +171,12 @@ class ChartServer {
         this.io.on('connection', (socket) => {
             console.log(`Client connected: ${socket.id} from ${socket.handshake.address}`);
             
-            // Send historical data
+            // Send historical data and active trade signals
             socket.emit('historical_candles', {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
-                instruments: this.getInstrumentsFromFiles()
+                instruments: this.getInstrumentsFromFiles(),
+                trade_signals: this.tradeSignals
             });
             
             socket.on('subscribe', (data) => {
@@ -498,6 +499,17 @@ class ChartServer {
         
         this.io.to(`${instrumentKey}_${type}`).emit(`${instrumentKey}_${type}_live_candle`, candleData);
         this.io.emit('live_candle_update', candleData);
+    }
+
+    broadcastTradeSignal(signalData) {
+        this.tradeSignals.push(signalData);
+        
+        // Cache maximum of 100 historical signals
+        if (this.tradeSignals.length > 100) {
+            this.tradeSignals.shift();
+        }
+        
+        this.io.emit('trade_signal', signalData);
     }
     
     start() {

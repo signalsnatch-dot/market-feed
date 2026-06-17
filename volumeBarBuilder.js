@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
+const { twoLeggedPullback } = require('./priceActionStrategy');
 
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {
@@ -54,15 +55,15 @@ class VolumeBarBuilder extends EventEmitter {
                 // History
                 bars: [],
                 barNumber: 0,
-                lastEmittedProgress: 0
+                lastEmittedProgress: 0,
+                lastSignalBarNumber: 0
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
             
             console.log(`📊 [VOLUME BAR] ${instrument.name}:`);
             console.log(`   Target: ${instrument.volumePerBar.toLocaleString()} units per bar`);
-            console.log(`   Logic: Each transaction contributes its quantity to volume total`);
-            console.log(`   Expected bars/day: ~${Math.floor(10000000 / instrument.volumePerBar)} (based on 1Cr volume)\n`);
+            console.log(`   Logic: Continuous volume candle building spread algorithm enabled.\n`);
         }
     }
     
@@ -74,8 +75,15 @@ class VolumeBarBuilder extends EventEmitter {
         const price = parseFloat(ltp);
         const volume = parseInt(last_traded_quantity) || 0;
 
-        const exchangeTimeMs = Number(exchange_timestamp);
-        const receiveTimeMs = parseInt(timestamp);
+        let exchangeTimeMs = Number(exchange_timestamp);
+        if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
+            exchangeTimeMs = Date.now();
+        }
+        
+        let receiveTimeMs = parseInt(timestamp, 10);
+        if (isNaN(receiveTimeMs) || receiveTimeMs <= 0) {
+            receiveTimeMs = Date.now();
+        }
        
         // Use exchange time for candle logic (source of truth)
         const currentTime = exchangeTimeMs || receiveTimeMs;
@@ -84,105 +92,193 @@ class VolumeBarBuilder extends EventEmitter {
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
         
-        // Save raw tick (shared with price builder)
-        this.saveRawTick({
-           ...tickData,
-           exchange_time_iso: exchangeTimeISO,
-           receive_time_iso: receiveTimeISO,
-           latency_ms: receiveTimeMs - exchangeTimeMs
-       });
+        // Note: saveRawTick invocation removed from VolumeBarBuilder to prevent duplication,
+        // as it is already cleanly registered within PriceBarBuilder.js.
         
         // Get bar
         let bar = this.activeBars.get(instrument_key);
         if (!bar) return;
         
-        // Track price change for comparison
-        const lastPrice = bar.close;
-        
-        // Initialize bar on first tick
-        if (bar.open === null) {
-            bar.barNumber = this.stats.barsByInstrument.get(instrument_key) + 1;
-            bar.open = price;
-            bar.high = price;
-            bar.low = price;
-            bar.startTime = currentTime;
-            bar.startTimestamp = exchangeTimeISO || receiveTimeISO;
-            
-            console.log(`\n🕯️ [VOLUME BAR] New bar #${bar.barNumber} for ${bar.name}`);
-            console.log(`   Starting price: ${price}`);
-            console.log(`   Start time (exchange): ${bar.startTimestamp}`);
-            console.log(`   Target volume: ${bar.targetVolume.toLocaleString()} units\n`);
-        }
-        
-        // Update bar
-        bar.high = Math.max(bar.high, price);
-        bar.low = Math.min(bar.low, price);
-        bar.close = price;
-        bar.lastUpdateTime = currentTime;
-        bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;    
-        
-        // CRITICAL: Volume bar logic - add ALL volume, not just price changes
-        bar.currentVolume += volume;
-        bar.transactions++;
-        
-        // Track price changes for comparison
-        if (lastPrice !== null && price !== lastPrice) {
-            bar.priceChanges++;
-        }
-        
         // Update global stats
         this.stats.totalTicks++;
         this.stats.totalVolume += volume;
 
-        if (bar.open !== null && this.emit) {
-            const liveCandle = {
-                instrument: instrument_key,
-                type: 'volume',
-                is_live: true,
-                barNumber: bar.barNumber,
-                open: bar.open,
-                high: bar.high,
-                low: bar.low,
-                close: bar.close,
-                volume: bar.currentVolume,
-                targetVolume: bar.targetVolume,
-                transactions: bar.transactions,
-                priceChanges: bar.priceChanges,
-                startTime: bar.startTimestamp,
-                timestamp: currentTime,
-                progress: (bar.currentVolume / bar.targetVolume) * 100
-            };
+        // Process this tick's volume with a continuous sliding loop
+        let tickVolume = volume;
+        let isFirstTransaction = bar.transactions === 0 || bar.open === null;
+
+        while (tickVolume > 0) {
+            // Initialize continuous bar properties on first transaction or if open is null
+            if (isFirstTransaction || bar.open === null) {
+                bar.barNumber = this.stats.barsByInstrument.get(instrument_key) + 1;
+                bar.open = price;
+                bar.high = price;
+                bar.low = price;
+                bar.close = price;
+                bar.startTime = currentTime;
+                bar.startTimestamp = exchangeTimeISO || receiveTimeISO;
+                bar.transactions = 0;
+                bar.priceChanges = 0;
+                isFirstTransaction = false;
+
+                console.log(`\n🕯️ [VOLUME BAR] New continuous bar #${bar.barNumber} for ${bar.name}`);
+                console.log(`   Starting price: ${price}`);
+                console.log(`   Start time (exchange): ${bar.startTimestamp}`);
+                console.log(`   Target volume: ${bar.targetVolume.toLocaleString()} units\n`);
+            }
+
+            // Calculate exact portion of volume needed to fulfill the continuous boundary
+            const needed = bar.targetVolume - bar.currentVolume;
+            let volumeToAdd = 0;
+            let exceededThreshold = false;
+            let remainingVolume = 0;
+
+            if (tickVolume <= needed) {
+                volumeToAdd = tickVolume;
+                tickVolume = 0;
+            } else {
+                volumeToAdd = needed;
+                remainingVolume = tickVolume - needed;
+                tickVolume = 0;
+                exceededThreshold = true;
+            }
+
+            // Update candle extremes and trackers on subsequent sub-ticks
+            if (bar.transactions > 0 && bar.open !== null) {
+                if (price !== bar.close) {
+                    bar.priceChanges++;
+                }
+                bar.high = Math.max(bar.high, price);
+                bar.low = Math.min(bar.low, price);
+                bar.close = price;
+            }
+
+            bar.currentVolume += volumeToAdd;
+            bar.lastUpdateTime = currentTime;
+            bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
+            bar.transactions++;
+
+            // If threshold is reached exactly or exceeded, close and transition
+            if (bar.currentVolume >= bar.targetVolume) {
+                const prevClose = bar.close;
+                this.closeBar(instrument_key, bar, exceededThreshold ? prevClose : null);
+
+                // Retrieve the refreshed container to continue looping over any remaining excess
+                bar = this.activeBars.get(instrument_key);
+
+                if (exceededThreshold) {
+                    tickVolume = remainingVolume;
+                    isFirstTransaction = true;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        // Emit updates and run strategy checks for the final post-loop state
+        let finalActiveBar = this.activeBars.get(instrument_key);
+        if (finalActiveBar && finalActiveBar.open !== null) {
+            if (this.emit) {
+                const liveCandle = {
+                    instrument: instrument_key,
+                    type: 'volume',
+                    is_live: true,
+                    barNumber: finalActiveBar.barNumber,
+                    open: finalActiveBar.open,
+                    high: finalActiveBar.high,
+                    low: finalActiveBar.low,
+                    close: finalActiveBar.close,
+                    volume: finalActiveBar.currentVolume,
+                    targetVolume: finalActiveBar.targetVolume,
+                    transactions: finalActiveBar.transactions,
+                    priceChanges: finalActiveBar.priceChanges,
+                    startTime: finalActiveBar.startTimestamp,
+                    timestamp: currentTime,
+                    progress: (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100
+                };
+                
+                this.emit('live_candle_update', liveCandle);
+            }
+
+            // Calculate progress and log
+            const progress = (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100;
+            if (Math.floor(progress) % 10 === 0 && progress !== finalActiveBar.lastEmittedProgress) {
+                finalActiveBar.lastEmittedProgress = progress;
+                this.emit('bar_update', {
+                    type: 'volume_bar',
+                    instrument_key: finalActiveBar.instrument_key,
+                    name: finalActiveBar.name,
+                    barNumber: finalActiveBar.barNumber,
+                    progress: progress.toFixed(1),
+                    currentVolume: finalActiveBar.currentVolume.toLocaleString(),
+                    targetVolume: finalActiveBar.targetVolume.toLocaleString(),
+                    transactions: finalActiveBar.transactions,
+                    priceChanges: finalActiveBar.priceChanges,
+                    currentPrice: price
+                });
+            }
+
+            // Seek for trade entry signals
+            const strategyCandles = finalActiveBar.bars.map(b => ({
+                open: b.open,
+                high: b.high,
+                low: b.low,
+                close: b.close,
+                volume: b.volume,
+                timestamp: b.timestamp
+            }));
             
-            this.emit('live_candle_update', liveCandle);
-        }
-        
-        // Calculate progress
-        const progress = (bar.currentVolume / bar.targetVolume) * 100;
-        
-        // Emit progress
-        if (Math.floor(progress) % 10 === 0 && progress !== bar.lastEmittedProgress) {
-            bar.lastEmittedProgress = progress;
-            this.emit('bar_update', {
-                type: 'volume_bar',
-                instrument_key: bar.instrument_key,
-                name: bar.name,
-                barNumber: bar.barNumber,
-                progress: progress.toFixed(1),
-                currentVolume: bar.currentVolume.toLocaleString(),
-                targetVolume: bar.targetVolume.toLocaleString(),
-                transactions: bar.transactions,
-                priceChanges: bar.priceChanges,
-                currentPrice: price
+            strategyCandles.push({
+                open: finalActiveBar.open,
+                high: finalActiveBar.high,
+                low: finalActiveBar.low,
+                close: finalActiveBar.close,
+                volume: finalActiveBar.currentVolume,
+                timestamp: currentTime
             });
-        }
-        
-        // Check if bar should close (based on volume)
-        if (bar.currentVolume >= bar.targetVolume) {
-            this.closeBar(instrument_key, bar);
+
+            if (strategyCandles.length >= 32) {
+                try {
+                    const signals = twoLeggedPullback(strategyCandles, { tickSize: 0.05 });
+                    if (signals && signals.length > 0) {
+                        const latestSignal = signals[signals.length - 1];
+                        if (latestSignal.index === strategyCandles.length - 1) {
+                            if (finalActiveBar.lastSignalBarNumber !== finalActiveBar.barNumber) {
+                                finalActiveBar.lastSignalBarNumber = finalActiveBar.barNumber;
+                                
+                                let confidence = 50;
+                                const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
+                                if (confMatch) {
+                                    confidence = parseInt(confMatch[1]);
+                                }
+                                
+                                const signalEvent = {
+                                    instrument: instrument_key,
+                                    name: finalActiveBar.name,
+                                    type: latestSignal.type,
+                                    entry: latestSignal.triggerPrice,
+                                    sl: latestSignal.stopLoss,
+                                    tp: latestSignal.takeProfit,
+                                    confidence: confidence,
+                                    reason: latestSignal.reason,
+                                    timestamp: currentTime,
+                                    barNumber: finalActiveBar.barNumber
+                                };
+                                
+                                this.emit('trade_signal', signalEvent);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Error processing signal rules for ${finalActiveBar.name}:`, err.message);
+                }
+            }
         }
     }
     
-    closeBar(instrumentKey, bar) {
+    closeBar(instrumentKey, bar, nextOhlc = null) {
         const completedBar = {
             type: 'volume_bar',
             instrument_key: instrumentKey,
@@ -241,66 +337,30 @@ class VolumeBarBuilder extends EventEmitter {
         console.log(`   Duration: ${completedBar.durationSeconds}s`);
         console.log(`   Avg trade size: ${Math.round(bar.currentVolume / bar.transactions).toLocaleString()} units\n`);
         
-        // Reset bar state completely for the next live candle
-        // If exactly at target (100%): set OHLC to null for fresh initialization
-        // If exceeded target (>100%): set OHLC to bar.low as starting point
-        const isExactClose = bar.currentVolume === bar.targetVolume;
-        const ohlcReset = isExactClose ? null : bar.close;
-        
+        // Reset active bar configurations for the next continuous iteration
+        const nextBarNumber = this.stats.barsByInstrument.get(instrumentKey) + 1;
         this.activeBars.set(instrumentKey, {
             instrument_key: bar.instrument_key,
             name: bar.name,
             targetVolume: bar.targetVolume,
 
             currentVolume: 0,
-            open: ohlcReset,
-            high: ohlcReset,
-            low: ohlcReset,
-            close: ohlcReset,
-            startTime: null,
-            startTimestamp: null,
-            lastUpdateTime: null,
-            lastUpdateTimestamp: null,
+            open: nextOhlc,
+            high: nextOhlc,
+            low: nextOhlc,
+            close: nextOhlc,
+            startTime: nextOhlc !== null ? bar.lastUpdateTime : null,
+            startTimestamp: nextOhlc !== null ? bar.lastUpdateTimestamp : null,
+            lastUpdateTime: nextOhlc !== null ? bar.lastUpdateTime : null,
+            lastUpdateTimestamp: nextOhlc !== null ? bar.lastUpdateTimestamp : null,
             transactions: 0,
             priceChanges: 0,
 
             bars: bar.bars,
-            barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
-            lastEmittedProgress: 0
+            barNumber: nextBarNumber,
+            lastEmittedProgress: 0,
+            lastSignalBarNumber: bar.lastSignalBarNumber
         });
-    }
-    
-    saveRawTick(tickData) {
-        const today = new Date().toISOString().split('T')[0];
-        const safeKey = tickData.instrument_key.replace(/[^a-zA-Z0-9]/g, '_');
-        const filename = path.join(this.rawDataDir, `${safeKey}_raw_ticks_${today}.csv`);
-        
-        const headers = [
-            'receive_timestamp', 'receive_time_iso',
-            'exchange_timestamp', 'exchange_time_iso',
-            'latency_ms',
-            'instrument_key', 'ltp', 'last_traded_quantity'
-        ];
-        const fileExists = fs.existsSync(filename);
-        const writeStream = fs.createWriteStream(filename, { flags: 'a' });
-        
-        if (!fileExists) {
-            writeStream.write(headers.join(',') + '\n');
-        }
-        
-        const row = [
-            tickData.timestamp,
-            tickData.receive_time_iso,
-            tickData.exchange_timestamp,
-            tickData.exchange_time_iso,
-            tickData.latency_ms || 0,
-            tickData.instrument_key,
-            tickData.ltp,
-            tickData.last_traded_quantity || 0
-        ].join(',');
-        
-        writeStream.write(row + '\n');
-        writeStream.end();
     }
     
     saveBarToCSV(bar) {

@@ -1,4 +1,4 @@
-// public/chart.js - Complete with IST timezone, dynamic bottom chart, and SMA indicators (9 & 21)
+// public/chart.js - Complete with IST timezone, dynamic bottom chart, SMA indicators, and real-time Trade Signals
 
 class MarketChart {
     constructor() {
@@ -260,6 +260,11 @@ class MarketChart {
                 }));
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
+
+            // Load and display pre-existing active trade signals
+            if (data.trade_signals) {
+                this.renderHistoricalSignals(data.trade_signals);
+            }
         });
         
         this.socket.on('live_candle_update', (liveCandle) => {
@@ -284,11 +289,73 @@ class MarketChart {
                 if (newCandle) this.addCompletedCandle(newCandle);
             }
         });
+
+        this.socket.on('trade_signal', (signal) => {
+            this.handleLiveSignal(signal);
+        });
         
         this.socket.on('disconnect', () => {
             document.getElementById('wsStatus').textContent = 'Disconnected';
             document.getElementById('wsStatus').className = 'status-badge disconnected';
         });
+    }
+
+    renderHistoricalSignals(signals) {
+        const listContainer = document.getElementById('signalsList');
+        if (!listContainer) return;
+        
+        if (!signals || signals.length === 0) {
+            listContainer.innerHTML = '<div style="color: #787b86; text-align: center; padding: 20px;">Waiting for signals...</div>';
+            return;
+        }
+        
+        listContainer.innerHTML = '';
+        const sortedSignals = [...signals].sort((a, b) => b.timestamp - a.timestamp);
+        sortedSignals.forEach(sig => {
+            const el = this.createSignalElement(sig);
+            listContainer.appendChild(el);
+        });
+    }
+
+    handleLiveSignal(signal) {
+        const listContainer = document.getElementById('signalsList');
+        if (!listContainer) return;
+        
+        const emptyMsg = listContainer.querySelector('div');
+        if (emptyMsg && emptyMsg.textContent.includes('Waiting for signals')) {
+            listContainer.innerHTML = '';
+        }
+        
+        const el = this.createSignalElement(signal);
+        listContainer.insertBefore(el, listContainer.firstChild);
+    }
+
+    createSignalElement(sig) {
+        const div = document.createElement('div');
+        const isBuy = sig.type.toUpperCase().includes('BUY');
+        div.className = `signal-item ${isBuy ? 'buy' : 'sell'}`;
+        
+        const timeStr = new Date(sig.timestamp).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-weight: bold; color: ${isBuy ? '#00bcd4' : '#ef5350'};">${sig.type}</span>
+                <span class="signal-time">${timeStr}</span>
+            </div>
+            <div style="font-weight: 500; margin-bottom: 4px; font-size: 13px;">${sig.name || sig.instrument.split('|')[1]}</div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; font-size: 11px; color: #d1d4dc;">
+                <div>Entry: <span style="color: #fff; font-weight: 600;">${sig.entry.toFixed(2)}</span></div>
+                <div>SL: <span style="color: #ef5350; font-weight: 600;">${sig.sl.toFixed(2)}</span></div>
+                <div>TP: <span style="color: #00bcd4; font-weight: 600;">${sig.tp.toFixed(2)}</span></div>
+                <div>Conf: <span style="color: #f9a825; font-weight: 600;">${sig.confidence}%</span></div>
+            </div>
+            <div style="font-size: 10px; color: #787b86; margin-top: 4px; font-style: italic;">${sig.reason || ''}</div>
+        `;
+        return div;
     }
 
     updateProgressDisplay(progress, candle) {

@@ -73,8 +73,15 @@ class PriceBarBuilder extends EventEmitter {
         const price = parseFloat(ltp);
         const volume = parseInt(last_traded_quantity) || 0;
 
-        const exchangeTimeMs = Number(exchange_timestamp);
-        const receiveTimeMs = parseInt(timestamp);
+        let exchangeTimeMs = Number(exchange_timestamp);
+        if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
+            exchangeTimeMs = Date.now();
+        }
+        
+        let receiveTimeMs = parseInt(timestamp, 10);
+        if (isNaN(receiveTimeMs) || receiveTimeMs <= 0) {
+            receiveTimeMs = Date.now();
+        }
        
         // Use exchange time for candle logic (source of truth)
         const currentTime = exchangeTimeMs || receiveTimeMs;
@@ -83,13 +90,13 @@ class PriceBarBuilder extends EventEmitter {
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
         
-        // Save raw tick
+        // Save raw tick (consolidated only in PriceBarBuilder to avoid duplication)
         this.saveRawTick({
            ...tickData, 
            exchange_time_iso: exchangeTimeISO,
            receive_time_iso: receiveTimeISO,
            latency_ms: receiveTimeMs - exchangeTimeMs
-       });
+        });
         
         // Get bar
         let bar = this.activeBars.get(instrument_key);
@@ -154,7 +161,6 @@ class PriceBarBuilder extends EventEmitter {
             
             this.emit('live_candle_update', liveCandle);
         }
-        
         
         // Calculate progress
         const progress = (bar.currentTicks / bar.targetTicks) * 100;
@@ -289,6 +295,7 @@ class PriceBarBuilder extends EventEmitter {
             tickData.exchange_timestamp,
             tickData.exchange_time_iso,
             tickData.latency_ms || 0,
+            tickData.instrument_key, // Restored the missing instrument_key field
             tickData.ltp,
             tickData.last_traded_quantity || 0
         ].join(',');
@@ -317,7 +324,7 @@ class PriceBarBuilder extends EventEmitter {
         }
         
         const row = [
-            bar.timestamp, bar.barNumber, bar.instrument_key, bar.name,
+            bar.timestamp || Date.now(), bar.barNumber, bar.instrument_key, bar.name,
             bar.open, bar.high, bar.low, bar.close,
             bar.ticks, bar.targetTicks, bar.volume, bar.transactions, bar.avgTradeSize.toFixed(2),
             bar.priceChange, bar.priceChangePercent, bar.priceRange, bar.priceRangePercent,
