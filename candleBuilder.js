@@ -23,23 +23,12 @@ class DualCandleBuilder extends EventEmitter {
             rawDataDir: config.rawDataDir || './raw_ticks_data'
         });
         
-        // Forward live updates from both builders and normalize
-        this.priceBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', {
-                ...candle,
-                instrument: candle.instrument  
-            });
-        });
-        
-        this.volumeBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', {
-                ...candle,
-                instrument: candle.instrument  
-            });
-        });
-        
-        // Forward bar_close events with normalized instrument field
+        // Forward bar_close events, normalize instrument fields, and increment completed stats
         this.priceBuilder.on('bar_close', (bar) => {
+            const stats = this.comparisonStats.get(bar.instrument_key);
+            if (stats) {
+                stats.priceBarsCompleted++;
+            }
             this.emit('bar_close', {
                 ...bar,
                 instrument: bar.instrument_key,
@@ -48,6 +37,10 @@ class DualCandleBuilder extends EventEmitter {
         });
         
         this.volumeBuilder.on('bar_close', (bar) => {
+            const stats = this.comparisonStats.get(bar.instrument_key);
+            if (stats) {
+                stats.volumeBarsCompleted++;
+            }
             this.emit('bar_close', {
                 ...bar,
                 instrument: bar.instrument_key,
@@ -105,7 +98,7 @@ class DualCandleBuilder extends EventEmitter {
         this.on('bar_close', (bar) => {
             const key = `${bar.instrument}_${bar.type}`;
 
-            // 1. Evaluate SL/TP Exits for Active Trades
+            // 1. Evaluate SL/TP Exits for Active Trades (On bar close)
             if (this.activeTrades.has(key)) {
                 const trade = this.activeTrades.get(key);
                 let exitPrice = null;
@@ -158,95 +151,10 @@ class DualCandleBuilder extends EventEmitter {
                 }
             }
 
-            // 2. Evaluate Triggers and Expirations for Pending Orders
+            // 2. Evaluate Pending Order Expirations (On next bar close if not yet triggered)
             if (this.pendingOrders.has(key)) {
                 const pending = this.pendingOrders.get(key);
-                let triggered = false;
-                let entryPrice = 0;
-
-                if (pending.type === 'BUY_STOP') {
-                    if (bar.high >= pending.entry) {
-                        triggered = true;
-                        entryPrice = Math.max(bar.open, pending.entry);
-                    }
-                } else {
-                    if (bar.low <= pending.entry) {
-                        triggered = true;
-                        entryPrice = Math.min(bar.open, pending.entry);
-                    }
-                }
-
-                if (triggered) {
-                    const activeTrade = {
-                        instrument: pending.instrument,
-                        name: pending.name,
-                        bar_type: pending.bar_type,
-                        barNumber: pending.barNumber,
-                        type: pending.type,
-                        entry: entryPrice,
-                        sl: pending.sl,
-                        tp: pending.tp,
-                        direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
-                        timestamp: bar.timestamp,
-                        status: 'active'
-                    };
-
-                    this.activeTrades.set(key, activeTrade);
-                    this.pendingOrders.delete(key);
-                    
-                    this.emit('trade_status_update', activeTrade);
-
-                    // Check if the order was triggered and stopped out inside the same bar
-                    let exitPrice = null;
-                    let exitReason = null;
-
-                    if (activeTrade.direction === 'long') {
-                        const stoppedOut = bar.low <= activeTrade.sl;
-                        const tpReached = bar.high >= activeTrade.tp;
-
-                        if (stoppedOut && tpReached) {
-                            exitPrice = activeTrade.sl;
-                            exitReason = 'stop_loss';
-                        } else if (stoppedOut) {
-                            exitPrice = activeTrade.sl;
-                            exitReason = 'stop_loss';
-                        } else if (tpReached) {
-                            exitPrice = activeTrade.tp;
-                            exitReason = 'take_profit';
-                        }
-                    } else {
-                        const stoppedOut = bar.high >= activeTrade.sl;
-                        const tpReached = bar.low <= activeTrade.tp;
-
-                        if (stoppedOut && tpReached) {
-                            exitPrice = activeTrade.sl;
-                            exitReason = 'stop_loss';
-                        } else if (stoppedOut) {
-                            exitPrice = activeTrade.sl;
-                            exitReason = 'stop_loss';
-                        } else if (tpReached) {
-                            exitPrice = activeTrade.tp;
-                            exitReason = 'take_profit';
-                        }
-                    }
-
-                    if (exitPrice !== null) {
-                        const statusUpdate = {
-                            instrument: activeTrade.instrument,
-                            bar_type: activeTrade.bar_type,
-                            barNumber: activeTrade.barNumber,
-                            type: activeTrade.type,
-                            exitReason: exitReason,
-                            exitPrice: exitPrice,
-                            timestamp: bar.timestamp,
-                            status: 'completed'
-                        };
-
-                        this.activeTrades.delete(key);
-                        this.emit('trade_status_update', statusUpdate);
-                    }
-                } else if (bar.barNumber >= pending.expiryBarNumber) {
-                    // Pending order failed to trigger on the next completed candle -> Expired
+                if (bar.barNumber >= pending.expiryBarNumber) {
                     const expiredSignal = {
                         instrument: pending.instrument,
                         bar_type: pending.bar_type,
@@ -267,15 +175,75 @@ class DualCandleBuilder extends EventEmitter {
      * Process incoming tick through both builders
      */
     processTick(tickData) {
-        const { instrument_key, last_traded_quantity } = tickData;
+        const { instrument_key, last_traded_quantity, ltp } = tickData;
+        const price = parseFloat(ltp);
         
+        // Update comparison stats
         const stats = this.comparisonStats.get(instrument_key);
         if (stats) {
             stats.totalTicks++;
             stats.totalVolume += parseInt(last_traded_quantity) || 0;
             this.comparisonStats.set(instrument_key, stats);
         }
+
+        // --- TICK-BY-TICK PENDING TRIGGER EVALUATION ---
+        if (price) {
+            for (const barType of ['volume', 'price']) {
+                const key = `${instrument_key}_${barType}`;
+                if (this.pendingOrders.has(key)) {
+                    const pending = this.pendingOrders.get(key);
+                    let triggered = false;
+
+                    if (pending.type === 'BUY_STOP') {
+                        if (price >= pending.entry) {
+                            triggered = true;
+                        }
+                    } else if (pending.type === 'SELL_STOP') {
+                        if (price <= pending.entry) {
+                            triggered = true;
+                        }
+                    }
+
+                    if (triggered) {
+                        const activeTrade = {
+                            instrument: pending.instrument,
+                            name: pending.name,
+                            bar_type: pending.bar_type,
+                            barNumber: pending.barNumber,
+                            type: pending.type,
+                            entry: price, // Fill price mapped to execution tick
+                            sl: pending.sl,
+                            tp: pending.tp,
+                            direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
+                            timestamp: Date.now(),
+                            status: 'active'
+                        };
+
+                        this.activeTrades.set(key, activeTrade);
+                        this.pendingOrders.delete(key);
+
+                        this.emit('trade_status_update', activeTrade);
+                    }
+                }
+            }
+        }
         
+        // Forward live candle tracking from both builders
+        this.priceBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', {
+                ...candle,
+                instrument: candle.instrument  
+            });
+        });
+        
+        this.volumeBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', {
+                ...candle,
+                instrument: candle.instrument  
+            });
+        });
+        
+        // Process through both builders
         this.priceBuilder.processTick(tickData);
         this.volumeBuilder.processTick(tickData);
         
