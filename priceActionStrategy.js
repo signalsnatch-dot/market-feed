@@ -580,6 +580,7 @@ function twoLeggedPullback(candles, params = {}) {
 // SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
 // ============================================================
 
+
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
     const p = { ...DEFAULT_PARAMS, ...params };
     
@@ -661,7 +662,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     exitIndex: i,
                     entryPrice: position.entry,
                     exitPrice,
-                    // BUG FIX: Restored exact 'pnl' property name in trade object to resolve the 0% win rate table display
+                    stopLoss: position.stopLoss,         // Restored stopLoss parameter to backtest details
+                    takeProfit: position.takeProfit,     // Restored takeProfit parameter to backtest details
                     pnl: position.direction === 'long' 
                         ? ((exitPrice - position.entry) / position.entry) * 100 
                         : ((position.entry - exitPrice) / position.entry) * 100,
@@ -765,6 +767,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             exitIndex: i,
                             entryPrice: position.entry,
                             exitPrice,
+                            stopLoss: position.stopLoss,     // Restored stopLoss parameter to backtest details
+                            takeProfit: position.takeProfit, // Restored takeProfit parameter to backtest details
                             pnl: position.direction === 'long' 
                                 ? ((exitPrice - position.entry) / position.entry) * 100 
                                 : ((position.entry - exitPrice) / position.entry) * 100,
@@ -801,8 +805,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
 
     // Report Summary
     const totalTrades = trades.length;
-    
-    // Calculate wins based on actual trade PnL outcomes
     const wins = trades.filter(t => t.pnlAmount > 0).length;
     const losses = trades.filter(t => t.pnlAmount <= 0).length;
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
@@ -813,7 +815,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     console.log(`Final Equity: ${equity.toFixed(2)} (Initial: ${startingCapital.toFixed(2)})`);
     console.log(`=======================================`);
 
-    // BUG FIX: Return several common variants of win rate to ensure 100% compatibility with any compare-runner parsing scripts
     return {
         trades,
         finalEquity: equity,

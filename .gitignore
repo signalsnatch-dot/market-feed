@@ -4,6 +4,8 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
+output-logs-*
+backtest-logs-*
 
 # Data directories (all market data)
 market_data/
@@ -16,6 +18,8 @@ version-backtest-results/
 extract-subset/
 extracted/
 candle-versions/
+backtest-logs/
+compare-output/
 
 # Legacy data directories (if any)
 data/

@@ -1,6 +1,8 @@
+// PriceBarBuilder.js
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
+const { twoLeggedPullback } = require('./priceActionStrategy');
 
 class PriceBarBuilder extends EventEmitter {
     constructor(config) {
@@ -55,7 +57,8 @@ class PriceBarBuilder extends EventEmitter {
                 // History
                 bars: [],
                 barNumber: 0,
-                lastEmittedProgress: 0
+                lastEmittedProgress: 0,
+                lastSignalBarNumber: 0
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
@@ -77,7 +80,8 @@ class PriceBarBuilder extends EventEmitter {
                     const lines = content.split('\n');
                     if (lines.length < 2) continue;
                     
-                    const headers = lines[0].split(',');
+                    // Sanitize carriage returns from headers
+                    const headers = lines[0].replace(/[\r\n]+/g, '').split(',');
                     const timestampIdx = headers.indexOf('timestamp');
                     const barNumberIdx = headers.indexOf('bar_number');
                     const openIdx = headers.indexOf('open');
@@ -94,7 +98,7 @@ class PriceBarBuilder extends EventEmitter {
 
                     const parsedBars = [];
                     for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
+                        const line = lines[i].replace(/[\r\n]+/g, '').trim();
                         if (!line) continue;
                         const values = line.split(',');
                         if (values.length < 10) continue;
@@ -296,7 +300,7 @@ class PriceBarBuilder extends EventEmitter {
         // Save to CSV
         this.saveBarToCSV(completedBar);
         
-        // Emit
+        // Emit closed bar event
         this.emit('bar_close', completedBar);
         
         // Log
@@ -306,6 +310,57 @@ class PriceBarBuilder extends EventEmitter {
         console.log(`   Change: ${completedBar.priceChange} (${completedBar.priceChangePercent}%)`);
         console.log(`   Volume: ${bar.volume.toLocaleString()} units`);
         console.log(`   Duration: ${completedBar.durationSeconds}s\n`);
+
+        // --- RUN SIGNAL STRATEGY NOW ON COMPLETED BARS ---
+        const strategyCandles = bar.bars.map(b => ({
+            open: b.open,
+            high: b.high,
+            low: b.low,
+            close: b.close,
+            volume: b.volume,
+            timestamp: b.timestamp
+        }));
+
+        if (strategyCandles.length >= 32) {
+            try {
+                const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
+                const signals = twoLeggedPullback(strategyCandles, { tickSize: tickSize });
+                if (signals && signals.length > 0) {
+                    const latestSignal = signals[signals.length - 1];
+                    
+                    // Match last completed index
+                    if (latestSignal.index === strategyCandles.length - 1) {
+                        if (bar.lastSignalBarNumber !== bar.barNumber) {
+                            bar.lastSignalBarNumber = bar.barNumber;
+                            
+                            let confidence = 50;
+                            const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
+                            if (confMatch) {
+                                confidence = parseInt(confMatch[1]);
+                            }
+                            
+                            const signalEvent = {
+                                instrument: instrumentKey,
+                                name: bar.name,
+                                type: latestSignal.type,
+                                entry: latestSignal.triggerPrice,
+                                sl: latestSignal.stopLoss,
+                                tp: latestSignal.takeProfit,
+                                confidence: confidence,
+                                reason: latestSignal.reason.replace('Conf:', 'Price, Conf:'), // Infuse source details into signal reason
+                                timestamp: completedBar.timestamp,
+                                barNumber: bar.barNumber,
+                                bar_type: 'price' // Explicit dimension marker
+                            };
+                            
+                            this.emit('trade_signal', signalEvent);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`Error processing price-based signal rules for ${bar.name}:`, err.message);
+            }
+        }
         
         // Reset bar state completely for the next live candle
         const isExactClose = bar.currentTicks === bar.targetTicks;
@@ -330,7 +385,8 @@ class PriceBarBuilder extends EventEmitter {
 
             bars: bar.bars,
             barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
-            lastEmittedProgress: 0
+            lastEmittedProgress: 0,
+            lastSignalBarNumber: bar.lastSignalBarNumber
         });
     }
     

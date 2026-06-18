@@ -1,3 +1,4 @@
+// VolumeBarBuilder.js
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
@@ -79,7 +80,8 @@ class VolumeBarBuilder extends EventEmitter {
                     const lines = content.split('\n');
                     if (lines.length < 2) continue;
                     
-                    const headers = lines[0].split(',');
+                    // Sanitize carriage returns from headers
+                    const headers = lines[0].replace(/[\r\n]+/g, '').split(',');
                     const timestampIdx = headers.indexOf('timestamp');
                     const barNumberIdx = headers.indexOf('bar_number');
                     const openIdx = headers.indexOf('open');
@@ -95,7 +97,7 @@ class VolumeBarBuilder extends EventEmitter {
 
                     const parsedBars = [];
                     for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
+                        const line = lines[i].replace(/[\r\n]+/g, '').trim();
                         if (!line) continue;
                         const values = line.split(',');
                         if (values.length < 10) continue;
@@ -238,7 +240,7 @@ class VolumeBarBuilder extends EventEmitter {
             }
         }
 
-        // Emit updates and run strategy checks for the final post-loop state
+        // Emit updates for the final post-loop state (live candle updates only)
         let finalActiveBar = this.activeBars.get(instrument_key);
         if (finalActiveBar && finalActiveBar.open !== null) {
             if (this.emit) {
@@ -279,62 +281,6 @@ class VolumeBarBuilder extends EventEmitter {
                     priceChanges: finalActiveBar.priceChanges,
                     currentPrice: price
                 });
-            }
-
-            // Seek for trade entry signals
-            const strategyCandles = finalActiveBar.bars.map(b => ({
-                open: b.open,
-                high: b.high,
-                low: b.low,
-                close: b.close,
-                volume: b.volume,
-                timestamp: b.timestamp
-            }));
-            
-            strategyCandles.push({
-                open: finalActiveBar.open,
-                high: finalActiveBar.high,
-                low: finalActiveBar.low,
-                close: finalActiveBar.close,
-                volume: finalActiveBar.currentVolume,
-                timestamp: currentTime
-            });
-
-            if (strategyCandles.length >= 32) {
-                try {
-                    const signals = twoLeggedPullback(strategyCandles, { tickSize: 0.05 });
-                    if (signals && signals.length > 0) {
-                        const latestSignal = signals[signals.length - 1];
-                        if (latestSignal.index === strategyCandles.length - 1) {
-                            if (finalActiveBar.lastSignalBarNumber !== finalActiveBar.barNumber) {
-                                finalActiveBar.lastSignalBarNumber = finalActiveBar.barNumber;
-                                
-                                let confidence = 50;
-                                const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
-                                if (confMatch) {
-                                    confidence = parseInt(confMatch[1]);
-                                }
-                                
-                                const signalEvent = {
-                                    instrument: instrument_key,
-                                    name: finalActiveBar.name,
-                                    type: latestSignal.type,
-                                    entry: latestSignal.triggerPrice,
-                                    sl: latestSignal.stopLoss,
-                                    tp: latestSignal.takeProfit,
-                                    confidence: confidence,
-                                    reason: latestSignal.reason,
-                                    timestamp: currentTime,
-                                    barNumber: finalActiveBar.barNumber
-                                };
-                                
-                                this.emit('trade_signal', signalEvent);
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error(`Error processing signal rules for ${finalActiveBar.name}:`, err.message);
-                }
             }
         }
     }
@@ -386,10 +332,10 @@ class VolumeBarBuilder extends EventEmitter {
         // Save to CSV
         this.saveBarToCSV(completedBar);
         
-        // Emit
+        // Emit closed bar event
         this.emit('bar_close', completedBar);
         
-        // Log
+        // Log completed bar
         console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
         console.log(`   Volume: ${bar.currentVolume.toLocaleString()} / ${bar.targetVolume.toLocaleString()} units`);
         console.log(`   Transactions: ${bar.transactions} | Price changes: ${bar.priceChanges}`);
@@ -397,6 +343,59 @@ class VolumeBarBuilder extends EventEmitter {
         console.log(`   Change: ${completedBar.priceChange} (${completedBar.priceChangePercent}%)`);
         console.log(`   Duration: ${completedBar.durationSeconds}s`);
         console.log(`   Avg trade size: ${Math.round(bar.currentVolume / bar.transactions).toLocaleString()} units\n`);
+        
+        // --- RUN SIGNAL STRATEGY NOW ON THE COMPLETED BARS ---
+        const strategyCandles = bar.bars.map(b => ({
+            open: b.open,
+            high: b.high,
+            low: b.low,
+            close: b.close,
+            volume: b.volume,
+            timestamp: b.timestamp
+        }));
+
+        if (strategyCandles.length >= 32) {
+            try {
+                // Determine tick size statically (or fallback dynamically if required)
+                const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
+                const signals = twoLeggedPullback(strategyCandles, { tickSize: tickSize });
+                
+                if (signals && signals.length > 0) {
+                    const latestSignal = signals[signals.length - 1];
+                    // Since strategyCandles now only consist of completed bars, 
+                    // the newly closed bar matches the last array index.
+                    if (latestSignal.index === strategyCandles.length - 1) {
+                        if (bar.lastSignalBarNumber !== bar.barNumber) {
+                            bar.lastSignalBarNumber = bar.barNumber;
+                            
+                            let confidence = 50;
+                            const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
+                            if (confMatch) {
+                                confidence = parseInt(confMatch[1]);
+                            }
+                            
+                           const signalEvent = {
+                            instrument: instrumentKey,
+                            name: bar.name,
+                            type: latestSignal.type,
+                            entry: latestSignal.triggerPrice,
+                            sl: latestSignal.stopLoss,
+                            tp: latestSignal.takeProfit,
+                            confidence: confidence,
+                            reason: latestSignal.reason.replace('Conf:', 'Volume, Conf:'), // Infuse source details into signal reason
+                            timestamp: completedBar.timestamp,
+                            barNumber: bar.barNumber,
+                            bar_type: 'volume' // Explicit dimension marker
+                        };
+
+                        this.emit('trade_signal', signalEvent);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`Error processing signal rules for ${bar.name}:`, err.message);
+            }
+        }
         
         // Reset active bar configurations for the next continuous iteration
         const nextBarNumber = this.stats.barsByInstrument.get(instrumentKey) + 1;
