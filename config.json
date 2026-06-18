@@ -9,6 +9,90 @@
             "notes": "Volume: 27,000 units | Retained original config thresholds"
         },
         {
+            "key": "MCX_FO|504270",
+            "name": "Crude Oil June Future",
+            "priceBarTicks": 9,
+            "volumePerBar": 18000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504275",
+            "name": "Silver June Future",
+            "priceBarTicks": 14,
+            "volumePerBar": 4500,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504276",
+            "name": "Silver Mini June Future",
+            "priceBarTicks": 12,
+            "volumePerBar": 1200,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504277",
+            "name": "Silver Micro June Future",
+            "priceBarTicks": 10,
+            "volumePerBar": 350,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504280",
+            "name": "Copper June Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 12000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504281",
+            "name": "Zinc June Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 25000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504282",
+            "name": "Lead June Future",
+            "priceBarTicks": 5,
+            "volumePerBar": 15000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504283",
+            "name": "Aluminium June Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 20000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504285",
+            "name": "Gold June Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 2000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504286",
+            "name": "Gold Mini June Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 800,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504287",
+            "name": "Gold Petal June Future",
+            "priceBarTicks": 12,
+            "volumePerBar": 12000,
+            "exchange": "MCX_FO"
+        },
+        {
+            "key": "MCX_FO|504290",
+            "name": "Bulldex June Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 1500,
+            "exchange": "MCX_FO"
+        },
+        {
             "key": "NSE_FO|62329",
             "name": "Nifty 50 Future",
             "priceBarTicks": 8,
