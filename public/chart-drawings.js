@@ -1,6 +1,7 @@
 /**
  * ChartDrawings Class
  * Manages vector-accurate interactive SVG drawing tools overlayed on Lightweight Charts.
+ * Enables zoom, pan, and scroll pass-through while keeping drawing nodes selectable.
  */
 class ChartDrawings {
     constructor(marketChart) {
@@ -67,7 +68,9 @@ class ChartDrawings {
         });
 
         if (this.overlay) {
-            this.overlay.style.pointerEvents = tool === 'select' ? 'all' : 'all';
+            // When tool is 'select', set overlay itself to 'none' so pan/scroll events bypass it to the chart canvas.
+            // Child elements with pointer-events explicitly enabled will still capture clicks.
+            this.overlay.style.pointerEvents = tool === 'select' ? 'none' : 'all';
             this.overlay.style.cursor = tool === 'select' ? 'default' : 'crosshair';
         }
     }
@@ -91,8 +94,8 @@ class ChartDrawings {
                 const duplicate = JSON.parse(JSON.stringify(this.copiedDrawing));
                 duplicate.id = 'draw-' + Date.now();
                 
-                // Shift coordinates slightly
-                duplicate.from.time += 600; // Shift 10 minutes (approx. 2 bars)
+                // Shift coordinates slightly to signify paste success
+                duplicate.from.time += 600; 
                 duplicate.to.time += 600;
                 duplicate.from.price *= 1.002;
                 duplicate.to.price *= 1.002;
@@ -148,7 +151,7 @@ class ChartDrawings {
             const targetId = target.getAttribute('data-id');
 
             if (handleType && targetId) {
-                // Clicking a specific resizing node
+                // Dragging a specific resizing node
                 this.dragMode = `handle-${handleType}`;
                 this.selectedId = targetId;
                 const drawing = this.drawings.find(d => d.id === targetId);
@@ -158,7 +161,7 @@ class ChartDrawings {
             }
 
             if (targetId) {
-                // Clicking the drawing outline itself to select or move
+                // Dragging the main line body
                 this.selectedId = targetId;
                 this.dragMode = 'move';
                 const drawing = this.drawings.find(d => d.id === targetId);
@@ -168,7 +171,7 @@ class ChartDrawings {
                 return;
             }
 
-            // Clicked empty background - clear active focus
+            // Clicked empty background
             this.selectedId = null;
             this.render();
             return;
@@ -184,7 +187,6 @@ class ChartDrawings {
                 this.drawingState = 'drawing-line';
             }
         } else if (this.drawingState === 'drawing-line') {
-            // Commit Line or Arrow
             this.drawings.push({
                 id: 'draw-' + Date.now(),
                 type: this.currentTool,
@@ -195,11 +197,9 @@ class ChartDrawings {
             this.setTool('select');
             this.render();
         } else if (this.drawingState === 'drawing-channel-line') {
-            // Lock in first boundary vector
             this.tempPoints.to = { time: chartPos.time, price: chartPos.price };
             this.drawingState = 'drawing-channel-offset';
         } else if (this.drawingState === 'drawing-channel-offset') {
-            // Commit parallel channel offset price
             const midTime = (this.tempPoints.from.time + this.tempPoints.to.time) / 2;
             const channelSlope = (this.tempPoints.to.price - this.tempPoints.from.price) / (this.tempPoints.to.time - this.tempPoints.from.time || 1);
             const anchorPrice = this.tempPoints.from.price + channelSlope * (midTime - this.tempPoints.from.time);
@@ -335,9 +335,10 @@ class ChartDrawings {
                 hitLine.setAttribute('x2', String(toPt.x));
                 hitLine.setAttribute('y2', String(toPt.y));
                 hitLine.setAttribute('stroke', 'transparent');
-                hitLine.setAttribute('stroke-width', '10');
+                hitLine.setAttribute('stroke-width', '12');
                 hitLine.setAttribute('cursor', 'pointer');
                 hitLine.setAttribute('data-id', drawing.id);
+                hitLine.setAttribute('pointer-events', 'stroke'); // Restores selectability under pointer-events: none
                 group.appendChild(hitLine);
 
                 const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -376,9 +377,10 @@ class ChartDrawings {
                     // Closed polygon backdrop
                     const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                     poly.setAttribute('points', `${fromPt.x},${fromPt.y} ${toPt.x},${toPt.y} ${offsetTo.x},${offsetTo.y} ${offsetFrom.x},${offsetFrom.y}`);
-                    poly.setAttribute('fill', isActive ? 'rgba(249, 168, 37, 0.25)' : 'rgba(249, 168, 37, 0.08)');
+                    poly.setAttribute('fill', isActive ? 'rgba(249, 168, 37, 0.22)' : 'rgba(249, 168, 37, 0.06)');
                     poly.setAttribute('cursor', 'pointer');
                     poly.setAttribute('data-id', drawing.id);
+                    poly.setAttribute('pointer-events', 'fill'); // Restores selectability under pointer-events: none
                     group.appendChild(poly);
 
                     // Top channel vector
@@ -423,13 +425,14 @@ class ChartDrawings {
         const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         handle.setAttribute('cx', String(x));
         handle.setAttribute('cy', String(y));
-        handle.setAttribute('r', '5');
+        handle.setAttribute('r', '5.5');
         handle.setAttribute('fill', '#ffffff');
         handle.setAttribute('stroke', '#2962FF');
         handle.setAttribute('stroke-width', '2');
         handle.setAttribute('cursor', 'pointer');
         handle.setAttribute('data-id', id);
         handle.setAttribute('data-handle', type);
+        handle.setAttribute('pointer-events', 'all'); // Restores drag functionality under pointer-events: none
         layer.appendChild(handle);
     }
 
@@ -446,7 +449,7 @@ class ChartDrawings {
         const perpY = unitX;
 
         const tipX = toPt.x;
-        const tipY = toPoint ? toPt.y : toPt.y;
+        const tipY = toPt.y; // Corrected typo: bypassed 'toPoint' validation
         
         const baseX = tipX - unitX * size;
         const baseY = tipY - unitY * size;

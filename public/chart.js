@@ -87,7 +87,9 @@ class MarketChart {
     }
 
     convertToChartCandle(candleData) {
-        let timestamp = candleData.timestamp || candleData.end_time;
+        // Prioritize startTime as the stable key for the candle time boundary.
+        // This ensures subsequent ticks update the current candle index in place instead of creating duplicates.
+        let timestamp = candleData.startTime || candleData.timestamp || candleData.end_time;
         if (!timestamp) return null;
         if (typeof timestamp === 'string') {
             timestamp = new Date(timestamp).getTime();
@@ -557,12 +559,17 @@ class MarketChart {
         if (barNum !== undefined && barNum !== null) {
             existingIndex = this.candles.findIndex(c => c.barNumber === barNum);
         }
+        
         if (existingIndex >= 0) {
+            // Keep the exact same timestamp originally assigned to this barNumber
+            // to prevent creating a duplicate "comb" of thin candles.
+            newCandle.time = this.candles[existingIndex].time;
             this.candles[existingIndex] = newCandle;
         } else {
+            // Ensure strictly increasing times for new candles
             const last = this.candles[this.candles.length - 1];
             if (last && newCandle.time <= last.time) {
-                newCandle.time = last.time + 1;
+                newCandle.time = last.time + 5;
             }
             this.candles.push(newCandle);
             if (this.candles.length > 500) this.candles = this.candles.slice(-500);
@@ -616,14 +623,18 @@ class MarketChart {
         const barNum = candle.barNumber;
         const existingIndex = barNum ? this.candles.findIndex(c => c.barNumber === barNum) : -1;
         if (existingIndex >= 0) {
+            // Keep the same timestamp key for finalized candles to prevent gaps
+            candle.time = this.candles[existingIndex].time;
             this.candles[existingIndex] = candle;
         } else {
+            const last = this.candles[this.candles.length - 1];
+            if (last && candle.time <= last.time) {
+                candle.time = last.time + 5;
+            }
             this.candles.push(candle);
             this.candles.sort((a,b) => a.time - b.time);
         }
         if (this.candles.length > 500) this.candles = this.candles.slice(-500);
-        
-        // Fully regenerate the indicators, candles and overlays on completed bar transitions
         this.updateCharts();
         this.updateStatsFromCandle(candle);
     }
