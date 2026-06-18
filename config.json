@@ -1,5 +1,5 @@
 {
-     "instruments": [
+    "instruments": [
         {
             "key": "MCX_FO|504265",
             "name": "Natural Gas Future",
@@ -14,7 +14,7 @@
             "priceBarTicks": 8,
             "volumePerBar": 5700,
             "exchange": "NSE_FO",
-            "notes": "Volume: 3,400 units ≈ 227 contracts | Price: 1 change/bar"
+            "notes": "Volume: 5,700 units ≈ 76 contracts | June Expiry"
         },
         {
             "key": "NSE_FO|62326",
@@ -22,7 +22,223 @@
             "priceBarTicks": 7,
             "volumePerBar": 2600,
             "exchange": "NSE_FO",
-            "notes": "Volume: 1,400 units ≈ 47 contracts | Price: 1 change/bar"
+            "notes": "Volume: 2,600 units ≈ 173 contracts | June Expiry"
+        },
+        {
+            "key": "NSE_FO|62323",
+            "name": "Fin Nifty Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 1800,
+            "exchange": "NSE_FO",
+            "notes": "Nifty Financial Services index monthly June contract"
+        },
+        {
+            "key": "NSE_FO|62324",
+            "name": "Midcap Nifty Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 1400,
+            "exchange": "NSE_FO",
+            "notes": "Nifty Midcap Index monthly June contract"
+        },
+        {
+            "key": "NSE_FO|62301",
+            "name": "Reliance Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 12500,
+            "exchange": "NSE_FO",
+            "notes": "Reliance June Future. Lot size: 250"
+        },
+        {
+            "key": "NSE_FO|62302",
+            "name": "HDFC Bank Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 27500,
+            "exchange": "NSE_FO",
+            "notes": "HDFCBANK June Future. Lot size: 550"
+        },
+        {
+            "key": "NSE_FO|62303",
+            "name": "ICICI Bank Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 18000,
+            "exchange": "NSE_FO",
+            "notes": "ICICIBANK June Future. Lot size: 700"
+        },
+        {
+            "key": "NSE_FO|62306",
+            "name": "SBI Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 45000,
+            "exchange": "NSE_FO",
+            "notes": "SBIN June Future. Lot size: 1500"
+        },
+        {
+            "key": "NSE_FO|62304",
+            "name": "TCS Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 4500,
+            "exchange": "NSE_FO",
+            "notes": "TCS June Future. Lot size: 175"
+        },
+        {
+            "key": "NSE_FO|62305",
+            "name": "Infosys Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 11200,
+            "exchange": "NSE_FO",
+            "notes": "INFY June Future. Lot size: 400"
+        },
+        {
+            "key": "NSE_FO|62308",
+            "name": "ITC Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 32000,
+            "exchange": "NSE_FO",
+            "notes": "ITC June Future. Lot size: 1600"
+        },
+        {
+            "key": "NSE_FO|62307",
+            "name": "Bharti Airtel Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 14000,
+            "exchange": "NSE_FO",
+            "notes": "BHARTIARTL June Future. Lot size: 950"
+        },
+        {
+            "key": "NSE_FO|62309",
+            "name": "Axis Bank Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 16000,
+            "exchange": "NSE_FO",
+            "notes": "AXISBANK June Future. Lot size: 625"
+        },
+        {
+            "key": "NSE_FO|62312",
+            "name": "L&T Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 6200,
+            "exchange": "NSE_FO",
+            "notes": "LT June Future. Lot size: 300"
+        },
+        {
+            "key": "NSE_FO|62313",
+            "name": "Tata Steel Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 65000,
+            "exchange": "NSE_FO",
+            "notes": "TATASTEEL June Future. Lot size: 5500"
+        },
+        {
+            "key": "NSE_FO|62314",
+            "name": "Tata Motors Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 35000,
+            "exchange": "NSE_FO",
+            "notes": "TATAMOTORS June Future. Lot size: 1425"
+        },
+        {
+            "key": "NSE_FO|62310",
+            "name": "Bajaj Finance Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 4800,
+            "exchange": "NSE_FO",
+            "notes": "BAJFINANCE June Future. Lot size: 125"
+        },
+        {
+            "key": "NSE_FO|62311",
+            "name": "Kotak Bank Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 11000,
+            "exchange": "NSE_FO",
+            "notes": "KOTAKBANK June Future. Lot size: 400"
+        },
+        {
+            "key": "NSE_FO|62316",
+            "name": "Sun Pharma Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 10500,
+            "exchange": "NSE_FO",
+            "notes": "SUNPHARMA June Future. Lot size: 700"
+        },
+        {
+            "key": "NSE_FO|62317",
+            "name": "JSW Steel Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 13500,
+            "exchange": "NSE_FO",
+            "notes": "JSWSTEEL June Future. Lot size: 675"
+        },
+        {
+            "key": "NSE_FO|62318",
+            "name": "Coal India Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 28000,
+            "exchange": "NSE_FO",
+            "notes": "COALINDIA June Future. Lot size: 4200"
+        },
+        {
+            "key": "NSE_FO|62319",
+            "name": "Adani Enterprises Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 12000,
+            "exchange": "NSE_FO",
+            "notes": "ADANIENT June Future. Lot size: 300"
+        },
+        {
+            "key": "NSE_FO|62320",
+            "name": "Adani Ports Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 15000,
+            "exchange": "NSE_FO",
+            "notes": "ADANIPORTS June Future. Lot size: 625"
+        },
+        {
+            "key": "NSE_FO|62321",
+            "name": "Hindalco Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 24000,
+            "exchange": "NSE_FO",
+            "notes": "HINDALCO June Future. Lot size: 1400"
+        },
+        {
+            "key": "NSE_FO|62322",
+            "name": "Apollo Hospitals Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 3500,
+            "exchange": "NSE_FO",
+            "notes": "APOLLOHOSP June Future. Lot size: 125"
+        },
+        {
+            "key": "MCX_FO|504203",
+            "name": "Crude Oil Future",
+            "priceBarTicks": 8,
+            "volumePerBar": 32000,
+            "exchange": "MCX_FO",
+            "notes": "Crude Oil June contract. Lot size: 100 bbl"
+        },
+        {
+            "key": "MCX_FO|504201",
+            "name": "Gold Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 1200,
+            "exchange": "MCX_FO",
+            "notes": "Gold standard June contract. Lot size: 1 kg"
+        },
+        {
+            "key": "MCX_FO|504202",
+            "name": "Silver Future",
+            "priceBarTicks": 6,
+            "volumePerBar": 6000,
+            "exchange": "MCX_FO",
+            "notes": "Silver standard June contract. Lot size: 30 kg"
+        },
+        {
+            "key": "MCX_FO|504204",
+            "name": "Copper Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 25000,
+            "exchange": "MCX_FO",
+            "notes": "Copper June contract. Lot size: 2500 kg"
         }
     ],
     "directories": {

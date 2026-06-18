@@ -47,6 +47,7 @@ class ChartServer {
         
         this.setupRoutes();
         this.setupSocketEvents();
+        this.loadSavedSignals(); // Load saved trade signals on startup
         this.loadHistoricalCandles();
     }
     
@@ -141,6 +142,11 @@ class ChartServer {
             );
             res.json(candles.slice(-limit));
         });
+
+        // API endpoint to retrieve saved trade signals
+        this.app.get('/api/signals', (req, res) => {
+            res.json(this.tradeSignals);
+        });
         
         // Health check
         this.app.get('/health', (req, res) => {
@@ -176,7 +182,7 @@ class ChartServer {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
-                trade_signals: this.tradeSignals
+                trade_signals: this.tradeSignals // Client now populates complete historical list instantly
             });
             
             socket.on('subscribe', (data) => {
@@ -252,6 +258,30 @@ class ChartServer {
         
         console.log(`✅ Loaded ${this.recentCandles.volume_bars.length} volume bars`);
         console.log(`✅ Loaded ${this.recentCandles.price_bars.length} price bars`);
+    }
+
+    loadSavedSignals() {
+        const jsonFile = 'signals_today_' + new Date().toISOString().split('T')[0] + '.json';
+        const signalsFile = path.join(this.candlesDataDir, jsonFile);
+        if (fs.existsSync(signalsFile)) {
+            try {
+                const fileData = fs.readFileSync(signalsFile, 'utf8');
+                this.tradeSignals = JSON.parse(fileData);
+                console.log(`✅ Loaded ${this.tradeSignals.length} persisted trade signals from disk`);
+            } catch (err) {
+                console.warn('⚠️ No signal file found or file corrupted, starting fresh.', err.message);
+                this.tradeSignals = [];
+            }
+        }
+    }
+
+    saveSignalsToDisk() {
+        try {
+            const signalsFile = path.join(this.candlesDataDir, 'signals_today.json');
+            fs.writeFileSync(signalsFile, JSON.stringify(this.tradeSignals, null, 2), 'utf8');
+        } catch (err) {
+            console.error('❌ Failed to write trade signals to disk:', err.message);
+        }
     }
     
     parseVolumeBarCSV(filepath, instrumentKey) {
@@ -504,11 +534,12 @@ class ChartServer {
     broadcastTradeSignal(signalData) {
         this.tradeSignals.push(signalData);
         
-        // Cache maximum of 100 historical signals
-        if (this.tradeSignals.length > 100) {
+        // Cache maximum of 200 historical signals in-memory
+        if (this.tradeSignals.length > 200) {
             this.tradeSignals.shift();
         }
         
+        this.saveSignalsToDisk(); // Save updated cache to disk
         this.io.emit('trade_signal', signalData);
     }
     
