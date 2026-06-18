@@ -345,6 +345,7 @@ class VolumeBarBuilder extends EventEmitter {
         console.log(`   Avg trade size: ${Math.round(bar.currentVolume / bar.transactions).toLocaleString()} units\n`);
         
         // --- RUN SIGNAL STRATEGY NOW ON THE COMPLETED BARS ---
+        // --- RUN SIGNAL STRATEGY NOW ON THE COMPLETED BARS ---
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
             high: b.high,
@@ -354,34 +355,17 @@ class VolumeBarBuilder extends EventEmitter {
             timestamp: b.timestamp
         }));
 
-        console.log(`\n🕵️ [Strategy Diagnostics - ${bar.name}]`);
-        console.log(`   - Completed bars count in history: ${strategyCandles.length}`);
-
         if (strategyCandles.length >= 32) {
             try {
                 // Determine tick size statically (or fallback dynamically if required)
                 const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
-                
-                // Diagnostic Run 1: Standard confidence threshold (45)
                 const signals = twoLeggedPullback(strategyCandles, { tickSize: tickSize });
                 
-                // Diagnostic Run 2: Zero confidence threshold to check raw strategy output
-                const rawSignals = twoLeggedPullback(strategyCandles, { tickSize: tickSize, minConfidenceThreshold: 0 });
-
-                console.log(`   - Signals (minConfidenceThreshold: 45): ${signals.length}`);
-                console.log(`   - Raw Signals (minConfidenceThreshold: 0): ${rawSignals.length}`);
-
-                if (rawSignals.length > 0) {
-                    const latestRaw = rawSignals[rawSignals.length - 1];
-                    console.log(`   - Latest Raw Signal: Index=${latestRaw.index}, Type=${latestRaw.type}, Reason=${latestRaw.reason}`);
-                    console.log(`   - Newly completed bar index in strategy array: ${strategyCandles.length - 1}`);
-                }
-
                 if (signals && signals.length > 0) {
                     const latestSignal = signals[signals.length - 1];
-                    const newlyClosedIndex = strategyCandles.length - 1;
-
-                    if (latestSignal.index === newlyClosedIndex) {
+                    // Since strategyCandles now only consist of completed bars, 
+                    // the newly closed bar matches the last array index.
+                    if (latestSignal.index === strategyCandles.length - 1) {
                         if (bar.lastSignalBarNumber !== bar.barNumber) {
                             bar.lastSignalBarNumber = bar.barNumber;
                             
@@ -405,23 +389,15 @@ class VolumeBarBuilder extends EventEmitter {
                                 bar_type: 'volume' // Explicit dimension marker
                             };
 
-                            console.log(`   ✅ [SIGNAL EMITTED] Bar #${bar.barNumber} | Type: ${latestSignal.type} | Entry: ${latestSignal.triggerPrice}`);
+                            console.log(`🎯 [SIGNAL DETECTED] ${bar.name} Bar #${bar.barNumber} | Type: ${latestSignal.type} | Entry: ${latestSignal.triggerPrice}`);
                             this.emit('trade_signal', signalEvent);
-                        } else {
-                            console.log(`   ℹ️ Signal ignored: Already processed bar #${bar.barNumber}`);
                         }
-                    } else {
-                        console.log(`   ℹ️ Signal skipped: Latest signal is on index ${latestSignal.index}, but newly closed bar is index ${newlyClosedIndex}`);
                     }
                 }
             } catch (err) {
-                console.error(`❌ Error processing signal rules for ${bar.name}:`, err.message);
+                console.error(`Error processing signal rules for ${bar.name}:`, err.message);
             }
-        } else {
-            console.log(`   ℹ️ Sidelined: Need at least 32 completed candles to evaluate EMA trend (current: ${strategyCandles.length})`);
         }
-        console.log(`--------------------------------------------------------\n`);
-        
         // Reset active bar configurations for the next continuous iteration
         const nextBarNumber = this.stats.barsByInstrument.get(instrumentKey) + 1;
         this.activeBars.set(instrumentKey, {

@@ -5,6 +5,9 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 
+// Import the strategy directly for historical lookup
+const { twoLeggedPullback } = require('./priceActionStrategy');
+
 class ChartServer {
     constructor(port = 3001, candlesDataDir = './candles_data', options = {}) {
         this.port = port;
@@ -50,6 +53,9 @@ class ChartServer {
         this.setupSocketEvents();
         this.loadSavedSignals(); // Load saved trade signals on startup
         this.loadHistoricalCandles();
+        
+        // NEW: Generate signals from historical loaded bars to populate chart instantly on launch
+        this.generateHistoricalSignals(); 
     }
     
     validateDataDirectory() {
@@ -59,7 +65,7 @@ class ChartServer {
         
         // Ensure the directory is within the project root (prevent directory traversal)
         if (!resolvedPath.startsWith(parentDir)) {
-            throw new Error(`Security violation: candlesDataDir "${this.candlesDataDir}" resolves outside project root`);
+            throw new Error("Security violation: candlesDataDir resolves outside project root");
         }
         
         // Check if directory exists, create if not
@@ -281,6 +287,87 @@ class ChartServer {
         
         console.log(`✅ Loaded ${this.recentCandles.volume_bars.length} volume bars`);
         console.log(`✅ Loaded ${this.recentCandles.price_bars.length} price bars`);
+    }
+
+    /**
+     * NEW: Scan loaded historical candles on startup to identify and register previous signals.
+     * This populates client charts with trade indicators immediately on startup.
+     */
+    generateHistoricalSignals() {
+        console.log('⚡ Generating trade signals on historical candles...');
+        
+        // Track unique keys to avoid duplicate insertion
+        const seenSignals = new Set();
+        this.tradeSignals.forEach(sig => {
+            const key = `${sig.instrument}_${sig.bar_type}_${sig.barNumber}_${sig.type}`;
+            seenSignals.add(key);
+        });
+
+        // Helper to process standard instruments
+        const processStrategyOnHistory = (candles, barType) => {
+            // Group the flat loaded candles list by instrument key
+            const grouped = {};
+            candles.forEach(c => {
+                const key = c.instrument || c.instrument_key;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(c);
+            });
+
+            for (const [instKey, list] of Object.entries(grouped)) {
+                if (list.length < 32) continue;
+                try {
+                    const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
+                    const signals = twoLeggedPullback(list, { tickSize });
+                    
+                    signals.forEach(sig => {
+                        const candle = list[sig.index];
+                        if (!candle) return;
+
+                        let confidence = 50;
+                        const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
+                        if (confMatch) {
+                            confidence = parseInt(confMatch[1]);
+                        }
+
+                        const signalEvent = {
+                            instrument: instKey,
+                            name: this.getInstrumentName(instKey),
+                            type: sig.type,
+                            entry: sig.triggerPrice,
+                            sl: sig.stopLoss,
+                            tp: sig.takeProfit,
+                            confidence: confidence,
+                            reason: sig.reason.replace('Conf:', `${barType === 'volume' ? 'Volume' : 'Price'}, Conf:`),
+                            timestamp: candle.timestamp,
+                            barNumber: candle.barNumber,
+                            bar_type: barType
+                        };
+
+                        const uniqueKey = `${instKey}_${barType}_${candle.barNumber}_${sig.type}`;
+                        if (!seenSignals.has(uniqueKey)) {
+                            seenSignals.add(uniqueKey);
+                            this.tradeSignals.push(signalEvent);
+                        }
+                    });
+                } catch (err) {
+                    console.error(`Error processing historical signals for ${instKey}:`, err.message);
+                }
+            }
+        };
+
+        processStrategyOnHistory(this.recentCandles.volume_bars, 'volume');
+        processStrategyOnHistory(this.recentCandles.price_bars, 'price');
+
+        // Keep list sorted chronologically
+        this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
+
+        // Limit in-memory database to maximum of 200 signals
+        if (this.tradeSignals.length > 200) {
+            this.tradeSignals = this.tradeSignals.slice(-200);
+        }
+
+        this.saveSignalsToDisk();
+        console.log(`✅ Ready: Calculated ${this.tradeSignals.length} total trade signals (including historical detections)`);
     }
 
     loadSavedSignals() {
@@ -565,73 +652,6 @@ class ChartServer {
         this.io.emit('candle_update', candleData);
     }
     
-    // Add this diagnostic check inside your candle_closed event handler in chartServer.js
-    runLiveStrategyDiagnostics(instrumentKey, candlesArray, strategyFunction) {
-        console.log(`\n=================== 🕵️ Strategy Diagnostics: ${instrumentKey} ===================`);
-        
-        // 1. Check Array Size
-        console.log(`📊 Candles Array Length: ${candlesArray.length}`);
-        if (candlesArray.length < 20) {
-            console.warn(`⚠️ WARNING: Array length (${candlesArray.length}) is less than 20. EMA-20 cannot stabilize!`);
-        }
-
-        // 2. Inspect Data Types and Keys of the Last Completed Candle
-        if (candlesArray.length > 0) {
-            const lastCandle = candlesArray[candlesArray.length - 1];
-            console.log(`📝 Last Candle Keys & Types:`);
-            Object.keys(lastCandle).forEach(key => {
-                console.log(`   - ${key}: ${lastCandle[key]} (type: ${typeof lastCandle[key]})`);
-            });
-
-            // Check if any critical field is a string
-            const hasStringFields = ['open', 'high', 'low', 'close', 'volume'].some(
-                field => typeof lastCandle[field] === 'string'
-            );
-            if (hasStringFields) {
-                console.error(`🚨 CRITICAL ERROR: Candle fields are Strings, not Numbers! This will cause NaN in EMA math.`);
-            }
-        }
-
-        // 3. Execute Strategy and Inspect Output
-        try {
-            const signals = strategyFunction(candlesArray);
-            console.log(`🎯 Total Signals Returned by Strategy: ${signals ? signals.length : 0}`);
-
-            if (signals && signals.length > 0) {
-                // Log the last 3 signals generated to see if they are matching older indices
-                const lastFewSignals = signals.slice(-3);
-                console.log(`📋 Last 3 Generated Signals:`, JSON.stringify(lastFewSignals, null, 2));
-
-                // Check if any signal has an index close to the end of our array
-                const latestIndex = candlesArray.length - 1;
-                console.log(`🔍 Checking for Match near Latest Index (${latestIndex}):`);
-                
-                lastFewSignals.forEach(sig => {
-                    const indexDifference = latestIndex - sig.index;
-                    console.log(`   - Signal index: ${sig.index} (Difference from latest: ${indexDifference} bars)`);
-                    
-                    if (indexDifference === 0) {
-                        console.log(`     ✅ Exact Match on the newly closed candle (index ${latestIndex})!`);
-                    } else if (indexDifference > 0) {
-                        console.log(`     ⚠️ This signal was generated on an older candle (${indexDifference} bars ago). If your live handler only checks the last index, this signal was ignored!`);
-                    }
-                });
-            } else {
-                console.log(`❌ No signals returned. Running EMA Math Sanity Check:`);
-                // Check if EMA calculations are resulting in NaN
-                const sampleCloses = candlesArray.map(c => Number(c.close));
-                const hasNaNClose = sampleCloses.some(isNaN);
-                if (hasNaNClose) {
-                    console.error(`   - 🚨 Close prices contain NaN values!`);
-                } else {
-                    console.log(`   - Close prices are clean numerical values.`);
-                }
-            }
-        } catch (err) {
-            console.error(`🚨 EXCEPTION thrown during strategy run:`, err);
-        }
-        console.log(`========================================================================\n`);
-    }
     broadcastLiveCandle(instrumentKey, liveCandle, type) {
         const candleData = {
             ...liveCandle,
@@ -646,6 +666,19 @@ class ChartServer {
     }
 
     broadcastTradeSignal(signalData) {
+        // Prevent duplicate broadcast/disk entry
+        const isDuplicate = this.tradeSignals.some(sig => 
+            sig.instrument === signalData.instrument &&
+            sig.bar_type === signalData.bar_type &&
+            sig.barNumber === signalData.barNumber &&
+            sig.type === signalData.type
+        );
+        
+        if (isDuplicate) {
+            console.log(`ℹ️ [Server] Duplicate signal ignored for ${signalData.instrument} Bar #${signalData.barNumber}`);
+            return;
+        }
+
         this.tradeSignals.push(signalData);
         
         // Cache maximum of 200 historical signals in-memory
@@ -655,6 +688,7 @@ class ChartServer {
         
         this.saveSignalsToDisk(); // Save updated cache to disk
         this.io.emit('trade_signal', signalData);
+        console.log(`🚀 [Server] Trade signal broadcasted & logged to disk: ${signalData.instrument} | Bar #${signalData.barNumber}`);
     }
     
     start() {

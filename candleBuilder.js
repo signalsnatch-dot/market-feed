@@ -1,3 +1,4 @@
+// candleBuilder.js
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
@@ -51,8 +52,12 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
-        // Forward trade signals from volume bar builder
+        // Forward trade signals from BOTH volume and price builders
         this.volumeBuilder.on('trade_signal', (signal) => {
+            this.emit('trade_signal', signal);
+        });
+
+        this.priceBuilder.on('trade_signal', (signal) => {
             this.emit('trade_signal', signal);
         });
 

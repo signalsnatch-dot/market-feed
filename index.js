@@ -1,3 +1,4 @@
+// index.js
 const UpstoxMarketFeed = require('./upstoxMarketFeed');
 const DualCandleBuilder = require('./candleBuilder');
 const config = require('./config.json');
@@ -14,7 +15,6 @@ process.env.HOSTNAME && (options.allowedOrigins = [process.env.HOSTNAME]);
 const chartServer = new ChartServer(3001, './candles_data', options);
 chartServer.start();
 
-
 // Initialize dual candle builder
 const candleBuilder = new DualCandleBuilder({
     instruments: config.instruments,
@@ -27,7 +27,7 @@ const feed = new UpstoxMarketFeed({
     apiKey: process.env.UPSTOX_API_KEY,
     apiSecret: process.env.UPSTOX_API_SECRET,
     redirectUri: process.env.UPSTOX_REDIRECT_URI,
-    analyticsToken: process.env.UPSTOX_ANALYTICS_TOKEN,  // ← CRITICAL: Add this line
+    analyticsToken: process.env.UPSTOX_ANALYTICS_TOKEN,
     authCode: process.env.UPSTOX_AUTH_CODE,
     instruments: config.instruments.map(i => i.key),
     dataDir: './market_data',
@@ -35,6 +35,7 @@ const feed = new UpstoxMarketFeed({
     debug: false
 });
 
+// Forward live candle tracking to Server
 candleBuilder.on('live_candle_update', (liveCandle) => {
     chartServer.broadcastLiveCandle(
         liveCandle.instrument,
@@ -43,9 +44,15 @@ candleBuilder.on('live_candle_update', (liveCandle) => {
     );
 });
   
+// Forward candle closures to Server
 candleBuilder.on('bar_close', (bar) => {
     chartServer.broadcastCandle(bar.instrument, bar, bar.type);
     console.log(`🎯 [${bar.type.toUpperCase()} BAR] ${bar.name} #${bar.barNumber}: ${bar.priceChangePercent}% change`);
+});
+
+// Forward Trade Signals from the DualCandleBuilder straight to Server (Saves & Broadcasts)
+candleBuilder.on('trade_signal', (signal) => {
+    chartServer.broadcastTradeSignal(signal);
 });
 
 // Real-time progress monitoring
@@ -93,7 +100,6 @@ process.on('SIGINT', () => {
     feed.stop();
     process.exit(0);
 });
-
 
 app.get('/api/instruments', (req, res) => {
     res.json(config.instruments.map(i => ({
