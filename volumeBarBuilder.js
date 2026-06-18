@@ -31,6 +31,7 @@ class VolumeBarBuilder extends EventEmitter {
         
         // Initialize bars
         this.initializeBars();
+        this.loadHistoryFromCSV(); // Pre-populate history on startup
     }
     
     initializeBars() {
@@ -66,6 +67,69 @@ class VolumeBarBuilder extends EventEmitter {
             console.log(`   Logic: Continuous volume candle building spread algorithm enabled.\n`);
         }
     }
+
+    loadHistoryFromCSV() {
+        console.log('📂 Pre-populating volume bar histories from CSV files...');
+        for (const [key, bar] of this.activeBars.entries()) {
+            const safeKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+            const filepath = path.join(this.dataDir, `${safeKey}_volume_bars.csv`);
+            if (fs.existsSync(filepath)) {
+                try {
+                    const content = fs.readFileSync(filepath, 'utf8');
+                    const lines = content.split('\n');
+                    if (lines.length < 2) continue;
+                    
+                    const headers = lines[0].split(',');
+                    const timestampIdx = headers.indexOf('timestamp');
+                    const barNumberIdx = headers.indexOf('bar_number');
+                    const openIdx = headers.indexOf('open');
+                    const highIdx = headers.indexOf('high');
+                    const lowIdx = headers.indexOf('low');
+                    const closeIdx = headers.indexOf('close');
+                    const volumeIdx = headers.indexOf('volume');
+                    const transactionsIdx = headers.indexOf('transactions');
+                    const priceChangesIdx = headers.indexOf('price_changes');
+                    const startTimeIdx = headers.indexOf('start_time');
+                    const endTimeIdx = headers.indexOf('end_time');
+                    const durationIdx = headers.indexOf('duration_seconds');
+
+                    const parsedBars = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        const values = line.split(',');
+                        if (values.length < 10) continue;
+
+                        parsedBars.push({
+                            type: 'volume_bar',
+                            instrument_key: key,
+                            name: bar.name,
+                            barNumber: parseInt(values[barNumberIdx]) || i,
+                            open: parseFloat(values[openIdx]),
+                            high: parseFloat(values[highIdx]),
+                            low: parseFloat(values[lowIdx]),
+                            close: parseFloat(values[closeIdx]),
+                            volume: parseFloat(values[volumeIdx]),
+                            targetVolume: parseFloat(values[endTimeIdx] ? (values[headers.indexOf('target_volume')] || bar.targetVolume) : bar.targetVolume),
+                            transactions: parseInt(values[transactionsIdx]) || 0,
+                            priceChanges: parseInt(values[priceChangesIdx]) || 0,
+                            startTime: values[startTimeIdx] || '',
+                            endTime: values[endTimeIdx] || '',
+                            durationSeconds: parseFloat(values[durationIdx]) || 0,
+                            timestamp: parseInt(values[timestampIdx]) || Date.now()
+                        });
+                    }
+
+                    // Pre-populate last 500 completed candles for continuous indices
+                    bar.bars = parsedBars.slice(-500);
+                    this.stats.barsByInstrument.set(key, parsedBars.length);
+                    console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
+                } catch (err) {
+                    console.error(`Failed to load history for ${bar.name}:`, err.message);
+                }
+            }
+        }
+    }
     
     processTick(tickData) {
         const { instrument_key, ltp, last_traded_quantity, exchange_timestamp, timestamp } = tickData;
@@ -91,9 +155,6 @@ class VolumeBarBuilder extends EventEmitter {
         // Store both timestamps for debugging
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
-        
-        // Note: saveRawTick invocation removed from VolumeBarBuilder to prevent duplication,
-        // as it is already cleanly registered within PriceBarBuilder.js.
         
         // Get bar
         let bar = this.activeBars.get(instrument_key);

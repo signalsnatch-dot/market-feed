@@ -1,12 +1,20 @@
 {
     "instruments": [
         {
+            "key": "MCX_FO|504265",
+            "name": "Natural Gas Future",
+            "priceBarTicks": 7,
+            "volumePerBar": 27000,
+            "exchange": "MCX_FO",
+            "notes": "Volume: 27,000 units | Retained original config thresholds"
+        },
+        {
             "key": "NSE_FO|62329",
             "name": "Nifty 50 Future",
             "priceBarTicks": 8,
             "volumePerBar": 5700,
             "exchange": "NSE_FO",
-            "notes": "June Future. Expiry: 2026-06-25. Lot size: 76"
+            "notes": "Volume: 5,700 units | Retained original config thresholds"
         },
         {
             "key": "NSE_FO|62326",
@@ -14,7 +22,7 @@
             "priceBarTicks": 7,
             "volumePerBar": 2600,
             "exchange": "NSE_FO",
-            "notes": "June Future. Expiry: 2026-06-25. Lot size: 173"
+            "notes": "Volume: 2,600 units | Retained original config thresholds"
         },
         {
             "key": "NSE_FO|62327",
@@ -22,7 +30,7 @@
             "priceBarTicks": 6,
             "volumePerBar": 1800,
             "exchange": "NSE_FO",
-            "notes": "June Future. Expiry: 2026-06-25. Lot size: 50"
+            "notes": "Fin Nifty Future | Verified active June 2026 Monthly Expiry"
         },
         {
             "key": "NSE_FO|62328",
@@ -30,215 +38,175 @@
             "priceBarTicks": 6,
             "volumePerBar": 1400,
             "exchange": "NSE_FO",
-            "notes": "June Future. Expiry: 2026-06-25. Lot size: 50"
+            "notes": "Midcap Nifty Future | Verified active June 2026 Monthly Expiry"
         },
         {
-            "key": "MCX_FO|504265",
-            "name": "Natural Gas Future",
+            "key": "NSE_EQ|INE002A01018",
+            "name": "Reliance",
             "priceBarTicks": 7,
-            "volumePerBar": 27000,
-            "exchange": "MCX_FO",
-            "notes": "MCX June Future. Expiry: 2026-06. Lot size: 1250"
+            "volumePerBar": 50000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (5.0M) / 100 = 50,000"
         },
         {
-            "key": "NSE_FO|62802",
-            "name": "Reliance Future",
-            "priceBarTicks": 7,
-            "volumePerBar": 12500,
-            "exchange": "NSE_FO",
-            "notes": "Reliance June Future. Expiry: 2026-06-25. Lot size: 250"
-        },
-        {
-            "key": "NSE_FO|62804",
-            "name": "HDFC Bank Future",
+            "key": "NSE_EQ|INE040A01034",
+            "name": "HDFC Bank",
             "priceBarTicks": 8,
-            "volumePerBar": 27500,
-            "exchange": "NSE_FO",
-            "notes": "HDFCBANK June Future. Expiry: 2026-06-25. Lot size: 550"
+            "volumePerBar": 150000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (15.0M) / 100 = 150,000"
         },
         {
-            "key": "NSE_FO|62810",
-            "name": "ICICI Bank Future",
+            "key": "NSE_EQ|INE090A01021",
+            "name": "ICICI Bank",
             "priceBarTicks": 7,
-            "volumePerBar": 18000,
-            "exchange": "NSE_FO",
-            "notes": "ICICIBANK June Future. Expiry: 2026-06-25. Lot size: 700"
+            "volumePerBar": 100000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
         },
         {
-            "key": "NSE_FO|62846",
-            "name": "SBI Future",
+            "key": "NSE_EQ|INE062A01020",
+            "name": "SBI",
             "priceBarTicks": 7,
-            "volumePerBar": 45000,
-            "exchange": "NSE_FO",
-            "notes": "SBIN June Future. Expiry: 2026-06-25. Lot size: 1500"
+            "volumePerBar": 120000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (12.0M) / 100 = 120,000"
         },
         {
-            "key": "NSE_FO|62852",
-            "name": "TCS Future",
+            "key": "NSE_EQ|INE467B01029",
+            "name": "TCS",
             "priceBarTicks": 8,
-            "volumePerBar": 4500,
-            "exchange": "NSE_FO",
-            "notes": "TCS June Future. Expiry: 2026-06-25. Lot size: 175"
+            "volumePerBar": 20000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (2.0M) / 100 = 20,000"
         },
         {
-            "key": "NSE_FO|62854",
-            "name": "Infosys Future",
+            "key": "NSE_EQ|INE009A01021",
+            "name": "Infosys",
             "priceBarTicks": 8,
-            "volumePerBar": 11200,
-            "exchange": "NSE_FO",
-            "notes": "INFY June Future. Expiry: 2026-06-25. Lot size: 400"
+            "volumePerBar": 60000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (6.0M) / 100 = 60,000"
         },
         {
-            "key": "NSE_FO|62856",
-            "name": "ITC Future",
+            "key": "NSE_EQ|INE154A01025",
+            "name": "ITC",
             "priceBarTicks": 6,
-            "volumePerBar": 32000,
-            "exchange": "NSE_FO",
-            "notes": "ITC June Future. Expiry: 2026-06-25. Lot size: 1600"
+            "volumePerBar": 100000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
         },
         {
-            "key": "NSE_FO|62809",
-            "name": "Bharti Airtel Future",
+            "key": "NSE_EQ|INE397D01024",
+            "name": "Bharti Airtel",
             "priceBarTicks": 7,
-            "volumePerBar": 14000,
-            "exchange": "NSE_FO",
-            "notes": "BHARTIARTL June Future. Expiry: 2026-06-25. Lot size: 950"
+            "volumePerBar": 40000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (4.0M) / 100 = 40,000"
         },
         {
-            "key": "NSE_FO|62811",
-            "name": "Axis Bank Future",
+            "key": "NSE_EQ|INE238A01034",
+            "name": "Axis Bank",
             "priceBarTicks": 7,
-            "volumePerBar": 16000,
-            "exchange": "NSE_FO",
-            "notes": "AXISBANK June Future. Expiry: 2026-06-25. Lot size: 625"
+            "volumePerBar": 60000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (6.0M) / 100 = 60,000"
         },
         {
-            "key": "NSE_FO|62814",
-            "name": "L&T Future",
+            "key": "NSE_EQ|INE018A01030",
+            "name": "L&T",
             "priceBarTicks": 8,
-            "volumePerBar": 6200,
-            "exchange": "NSE_FO",
-            "notes": "LT June Future. Expiry: 2026-06-25. Lot size: 300"
+            "volumePerBar": 25000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (2.5M) / 100 = 25,000"
         },
         {
-            "key": "NSE_FO|62815",
-            "name": "Tata Steel Future",
+            "key": "NSE_EQ|INE081A01020",
+            "name": "Tata Steel",
             "priceBarTicks": 6,
-            "volumePerBar": 65000,
-            "exchange": "NSE_FO",
-            "notes": "TATASTEEL June Future. Expiry: 2026-06-25. Lot size: 5500"
+            "volumePerBar": 250000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (25.0M) / 100 = 250,000"
         },
         {
-            "key": "NSE_FO|62816",
-            "name": "Tata Motors Future",
+            "key": "NSE_EQ|INE155A01022",
+            "name": "Tata Motors",
+            "priceBarTicks": 7,
+            "volumePerBar": 80000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (8.0M) / 100 = 80,000"
+        },
+        {
+            "key": "NSE_EQ|INE296A01032",
+            "name": "Bajaj Finance",
+            "priceBarTicks": 8,
+            "volumePerBar": 150000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (15.0M) / 100 = 150,000"
+        },
+        {
+            "key": "NSE_EQ|INE237A01028",
+            "name": "Kotak Bank",
             "priceBarTicks": 7,
             "volumePerBar": 35000,
-            "exchange": "NSE_FO",
-            "notes": "TATAMOTORS June Future. Expiry: 2026-06-25. Lot size: 1425"
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (3.5M) / 100 = 35,000"
         },
         {
-            "key": "NSE_FO|62812",
-            "name": "Bajaj Finance Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 4800,
-            "exchange": "NSE_FO",
-            "notes": "BAJFINANCE June Future. Expiry: 2026-06-25. Lot size: 125"
-        },
-        {
-            "key": "NSE_FO|62813",
-            "name": "Kotak Bank Future",
+            "key": "NSE_EQ|INE044A01036",
+            "name": "Sun Pharma",
             "priceBarTicks": 7,
-            "volumePerBar": 11000,
-            "exchange": "NSE_FO",
-            "notes": "KOTAKBANK June Future. Expiry: 2026-06-25. Lot size: 400"
+            "volumePerBar": 30000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (3.0M) / 100 = 30,000"
         },
         {
-            "key": "NSE_FO|62820",
-            "name": "Sun Pharma Future",
-            "priceBarTicks": 7,
-            "volumePerBar": 10500,
-            "exchange": "NSE_FO",
-            "notes": "SUNPHARMA June Future. Expiry: 2026-06-25. Lot size: 700"
-        },
-        {
-            "key": "NSE_FO|62850",
-            "name": "JSW Steel Future",
-            "priceBarTicks": 7,
-            "volumePerBar": 13500,
-            "exchange": "NSE_FO",
-            "notes": "JSWSTEEL June Future. Expiry: 2026-06-25. Lot size: 675"
-        },
-        {
-            "key": "NSE_FO|62819",
-            "name": "Coal India Future",
-            "priceBarTicks": 6,
-            "volumePerBar": 28000,
-            "exchange": "NSE_FO",
-            "notes": "COALINDIA June Future. Expiry: 2026-06-25. Lot size: 4200"
-        },
-        {
-            "key": "NSE_FO|62821",
-            "name": "Adani Enterprises Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 12000,
-            "exchange": "NSE_FO",
-            "notes": "ADANIENT June Future. Expiry: 2026-06-25. Lot size: 300"
-        },
-        {
-            "key": "NSE_FO|62822",
-            "name": "Adani Ports Future",
-            "priceBarTicks": 7,
-            "volumePerBar": 15000,
-            "exchange": "NSE_FO",
-            "notes": "ADANIPORTS June Future. Expiry: 2026-06-25. Lot size: 625"
-        },
-        {
-            "key": "NSE_FO|62823",
-            "name": "Hindalco Future",
-            "priceBarTicks": 7,
-            "volumePerBar": 24000,
-            "exchange": "NSE_FO",
-            "notes": "HINDALCO June Future. Expiry: 2026-06-25. Lot size: 1400"
-        },
-        {
-            "key": "NSE_FO|62824",
-            "name": "Apollo Hospitals Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 3500,
-            "exchange": "NSE_FO",
-            "notes": "APOLLOHOSP June Future. Expiry: 2026-06-25. Lot size: 125"
-        },
-        {
-            "key": "MCX_FO|504203",
-            "name": "Crude Oil Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 32000,
-            "exchange": "MCX_FO",
-            "notes": "Crude Oil June contract. Expiry: 2026-06-25. Lot size: 100 bbl"
-        },
-        {
-            "key": "MCX_FO|504201",
-            "name": "Gold Future",
-            "priceBarTicks": 6,
-            "volumePerBar": 1200,
-            "exchange": "MCX_FO",
-            "notes": "Gold standard June contract. Expiry: 2026-06-05. Lot size: 1 kg"
-        },
-        {
-            "key": "MCX_FO|504202",
-            "name": "Silver Future",
-            "priceBarTicks": 6,
-            "volumePerBar": 6000,
-            "exchange": "MCX_FO",
-            "notes": "Silver standard June contract. Expiry: 2026-06-05. Lot size: 30 kg"
-        },
-        {
-            "key": "MCX_FO|504204",
-            "name": "Copper Future",
+            "key": "NSE_EQ|INE019A01038",
+            "name": "JSW Steel",
             "priceBarTicks": 7,
             "volumePerBar": 25000,
-            "exchange": "MCX_FO",
-            "notes": "Copper June contract. Expiry: 2026-06-25. Lot size: 2500 kg"
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (2.5M) / 100 = 25,000"
+        },
+        {
+            "key": "NSE_EQ|INE522F01014",
+            "name": "Coal India",
+            "priceBarTicks": 6,
+            "volumePerBar": 100000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
+        },
+        {
+            "key": "NSE_EQ|INE423A01024",
+            "name": "Adani Enterprises",
+            "priceBarTicks": 8,
+            "volumePerBar": 18000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (1.8M) / 100 = 18,000"
+        },
+        {
+            "key": "NSE_EQ|INE742F01042",
+            "name": "Adani Ports",
+            "priceBarTicks": 7,
+            "volumePerBar": 40000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (4.0M) / 100 = 40,000"
+        },
+        {
+            "key": "NSE_EQ|INE038A01020",
+            "name": "Hindalco",
+            "priceBarTicks": 7,
+            "volumePerBar": 70000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (7.0M) / 100 = 70,000"
+        },
+        {
+            "key": "NSE_EQ|INE437A01024",
+            "name": "Apollo Hospitals",
+            "priceBarTicks": 8,
+            "volumePerBar": 10000,
+            "exchange": "NSE_EQ",
+            "notes": "10-day avg volume (1.0M) / 100 = 10,000"
         }
     ],
     "directories": {

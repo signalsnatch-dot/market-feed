@@ -1,3 +1,4 @@
+// chartServer.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -43,7 +44,7 @@ class ChartServer {
         
         this.recentCandles = { price_bars: [], volume_bars: [] };
         this.tradeSignals = [];
-        this.maxRecentCandles = 1000;
+        this.maxRecentCandlesPerInstrument = 1200; // Increased to support 1200 candles on chart
         
         this.setupRoutes();
         this.setupSocketEvents();
@@ -112,11 +113,29 @@ class ChartServer {
         // API endpoint to get recent candles
         this.app.get('/api/recent/:type', (req, res) => {
             const type = req.params.type;
-            const limit = parseInt(req.query.limit) || 500;
             
             if (type === 'price' || type === 'volume') {
-                const candles = this.recentCandles[`${type}_bars`];
-                res.json(candles.slice(-limit));
+                const storeKey = `${type}_bars`;
+                const candles = this.recentCandles[storeKey];
+                
+                // Group candles by instrument to make sure we return full requested history up to 1200 for all
+                const candlesByInstrument = {};
+                for (const c of candles) {
+                    const key = c.instrument || c.instrument_key;
+                    if (!candlesByInstrument[key]) {
+                        candlesByInstrument[key] = [];
+                    }
+                    candlesByInstrument[key].push(c);
+                }
+                
+                const responseCandles = [];
+                for (const key of Object.keys(candlesByInstrument)) {
+                    responseCandles.push(...candlesByInstrument[key].slice(-this.maxRecentCandlesPerInstrument));
+                }
+                
+                // Sort chronologically before returning
+                responseCandles.sort((a, b) => a.timestamp - b.timestamp);
+                res.json(responseCandles);
             } else {
                 res.status(400).json({ error: 'Invalid type. Use "price" or "volume"' });
             }
@@ -131,14 +150,14 @@ class ChartServer {
         // API endpoint for historical candles
         this.app.get('/api/historical/:instrument/:type', (req, res) => {
             const { instrument, type } = req.params;
-            const limit = parseInt(req.query.limit) || 500;
+            const limit = parseInt(req.query.limit) || this.maxRecentCandlesPerInstrument;
             
             if (type !== 'price' && type !== 'volume') {
                 return res.status(400).json({ error: 'Invalid type' });
             }
             
             const candles = this.recentCandles[`${type}_bars`].filter(
-                c => (c.instrument || c.instrument_key) === instrument
+                c => (c.instrument === instrument || c.instrument_key === instrument)
             );
             res.json(candles.slice(-limit));
         });
@@ -224,7 +243,9 @@ class ChartServer {
                         this.validateFilePath(filepath, 'volume_bars');
                         const instrumentKey = this.extractInstrumentKey(file);
                         const candles = this.parseVolumeBarCSV(filepath, instrumentKey);
-                        this.recentCandles.volume_bars.push(...candles);
+                        // Limit to maximum configured depth per instrument to avoid memory exhaustion
+                        const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
+                        this.recentCandles.volume_bars.push(...limitedCandles);
                     } catch (err) {
                         console.error(`Security error loading ${file}:`, err.message);
                     }
@@ -244,7 +265,9 @@ class ChartServer {
                         this.validateFilePath(filepath, 'price_bars');
                         const instrumentKey = this.extractInstrumentKey(file);
                         const candles = this.parsePriceBarCSV(filepath, instrumentKey);
-                        this.recentCandles.price_bars.push(...candles);
+                        // Limit to maximum configured depth per instrument
+                        const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
+                        this.recentCandles.price_bars.push(...limitedCandles);
                     } catch (err) {
                         console.error(`Security error loading ${file}:`, err.message);
                     }
@@ -252,7 +275,7 @@ class ChartServer {
             });
         }
         
-        // Sort and limit
+        // Sort
         this.recentCandles.volume_bars.sort((a, b) => a.timestamp - b.timestamp);
         this.recentCandles.price_bars.sort((a, b) => a.timestamp - b.timestamp);
         
@@ -277,7 +300,8 @@ class ChartServer {
 
     saveSignalsToDisk() {
         try {
-            const signalsFile = path.join(this.candlesDataDir, 'signals_today.json');
+            const jsonFile = 'signals_today_' + new Date().toISOString().split('T')[0] + '.json';
+            const signalsFile = path.join(this.candlesDataDir, jsonFile);
             fs.writeFileSync(signalsFile, JSON.stringify(this.tradeSignals, null, 2), 'utf8');
         } catch (err) {
             console.error('❌ Failed to write trade signals to disk:', err.message);
@@ -293,7 +317,7 @@ class ChartServer {
             
             if (lines.length < 2) return candles;
             
-            const headers = lines[0].split(',');
+            const headers = lines[0].trim().split(',');
             
             const timestampIdx = headers.indexOf('timestamp');
             const barNumberIdx = headers.indexOf('bar_number');
@@ -337,6 +361,7 @@ class ChartServer {
                     timestamp: istTimestamp,
                     original_timestamp: timestamp,
                     instrument: instrumentKey,
+                    instrument_key: instrumentKey,
                     type: 'volume',
                     barNumber: parseInt(values[barNumberIdx]) || i,
                     open: open,
@@ -368,7 +393,7 @@ class ChartServer {
             
             if (lines.length < 2) return candles;
             
-            const headers = lines[0].split(',');
+            const headers = lines[0].trim().split(',');
             
             const timestampIdx = headers.indexOf('timestamp');
             const barNumberIdx = headers.indexOf('bar_number');
@@ -412,6 +437,7 @@ class ChartServer {
                     timestamp: istTimestamp,
                     original_timestamp: timestamp,
                     instrument: instrumentKey,
+                    instrument_key: instrumentKey,
                     type: 'price',
                     barNumber: parseInt(values[barNumberIdx]) || i,
                     open: open,
@@ -474,6 +500,9 @@ class ChartServer {
     
     getInstrumentName(key) {
         const names = {
+            'MCX_FO|504265': 'Natural Gas Future',
+            'NSE_FO|62329': 'Nifty 50 Future',
+            'NSE_FO|62326': 'Nifty Bank Future',
             'MCX_FO|487465': 'Natural Gas Future',
             'NSE_FO|45450': 'Nifty 50 Future',
             'NSE_FO|66688': 'Nifty Bank Future'
@@ -486,13 +515,14 @@ class ChartServer {
         const seen = new Set();
         
         [...this.recentCandles.volume_bars, ...this.recentCandles.price_bars].forEach(candle => {
-            if (!seen.has(candle.instrument)) {
-                seen.add(candle.instrument);
+            const key = candle.instrument || candle.instrument_key;
+            if (key && !seen.has(key)) {
+                seen.add(key);
                 instruments.push({
-                    key: candle.instrument,
-                    name: this.getInstrumentName(candle.instrument),
-                    exchange: candle.instrument.split('|')[0],
-                    symbol: candle.instrument.split('|')[1]
+                    key: key,
+                    name: this.getInstrumentName(key),
+                    exchange: key.split('|')[0],
+                    symbol: key.split('|')[1]
                 });
             }
         });
@@ -505,15 +535,31 @@ class ChartServer {
             ...candle,
             type: type,
             instrument: instrumentKey,
+            instrument_key: instrumentKey,
             broadcast_time: Date.now()
         };
         
         const storeKey = `${type}_bars`;
         this.recentCandles[storeKey].push(candleData);
         
-        if (this.recentCandles[storeKey].length > this.maxRecentCandles) {
-            this.recentCandles[storeKey] = this.recentCandles[storeKey].slice(-this.maxRecentCandles);
+        // Group by instrument to slice each instrument dataset up to 1200 candles safely
+        const candlesByInstrument = {};
+        for (const c of this.recentCandles[storeKey]) {
+            const key = c.instrument || c.instrument_key;
+            if (!candlesByInstrument[key]) {
+                candlesByInstrument[key] = [];
+            }
+            candlesByInstrument[key].push(c);
         }
+        
+        // Re-flatten limited bars
+        const updatedCandles = [];
+        for (const key of Object.keys(candlesByInstrument)) {
+            updatedCandles.push(...candlesByInstrument[key].slice(-this.maxRecentCandlesPerInstrument));
+        }
+        
+        // Sort chronologically
+        this.recentCandles[storeKey] = updatedCandles.sort((a, b) => a.timestamp - b.timestamp);
         
         this.io.to(`${instrumentKey}_${type}`).emit(`${instrumentKey}_${type}_candle`, candleData);
         this.io.emit('candle_update', candleData);
@@ -523,6 +569,7 @@ class ChartServer {
         const candleData = {
             ...liveCandle,
             instrument: instrumentKey,
+            instrument_key: instrumentKey,
             type: type,
             broadcast_time: Date.now()
         };
@@ -552,7 +599,6 @@ class ChartServer {
             console.log(`   Price bars loaded: ${this.recentCandles.price_bars.length}`);
         });
     }
-     
 }
 
 module.exports = ChartServer;
