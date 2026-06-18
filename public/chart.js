@@ -79,7 +79,7 @@ class MarketChart {
             this.candles = this[cacheKey]
                 .filter(c => (c.instrument === this.currentInstrument || c.instrument_key === this.currentInstrument))
                 .map(c => this.convertToChartCandle(c))
-                .filter(c => c !== null);
+                .filter(c => null !== c);
             this.candles.sort((a,b) => a.time - b.time);
             console.log(`Loaded ${this.candles.length} ${this.currentType} candles for ${this.currentInstrument}`);
             this.updateCharts();
@@ -452,8 +452,8 @@ class MarketChart {
         const ohlc = this.convertToChartCandle(normalizedCandle);
         if (!ohlc) return;
 
-        // Feed live tick prices directly into our trade tracker module for real-time risk updates
-        this.tracker.tracker.updateLivePrice(normalizedCandle.instrument, normalizedCandle.close, normalizedCandle.type);
+        // Feed live tick prices directly into our trade tracker module for real-time risk updates (corrected lookup call)
+        this.tracker.handleTickPriceUpdate(normalizedCandle.instrument, normalizedCandle.type, normalizedCandle.close);
 
         if (!this.isInitialized) return;
 
@@ -551,6 +551,34 @@ class MarketChart {
 
         console.log(`🕯️ [${formattedType} BAR] Completed: Bar #${candle.barNumber} | O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close} | Vol: ${candle.volume}`);
     }
+    
+    setupEventListeners() {
+        document.querySelectorAll('.type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentType = btn.dataset.type;
+                this.loadCandlesForCurrentInstrument();
+                this.subscribeToCandles();
+                this.updateBottomChartLabel();
+            });
+        });
+
+        // Clear active drawings
+        document.getElementById('clear-drawings-btn')?.addEventListener('click', () => {
+            this.drawings?.clearAll();
+        });
+
+        // Set toolbars
+        document.querySelectorAll('.draw-tool-btn').forEach(btn => {
+            if (btn.id === 'clear-drawings-btn') return;
+            btn.addEventListener('click', () => {
+                this.drawings?.setTool(btn.dataset.tool);
+            });
+        });
+    }
 }
 
-module.exports = ChartServer;
+document.addEventListener('DOMContentLoaded', () => {
+    window.marketChart = new MarketChart();
+});

@@ -1,4 +1,4 @@
-// public/signalsPanel.js
+// public/signalPanel.js
 // Handles split layout (Volume vs Price), live state tracking, tick trigger evaluation, and exits.
 
 class LiveTradeTracker {
@@ -13,8 +13,7 @@ class LiveTradeTracker {
     initializeUI() {
         // Find or create layout containers
         const signalsTodayContainer = document.getElementById('signals-container');
-        if (!signalsFileContainer) {
-            // If the element doesn't exist, we'll programmatically structure the sidebar signalsList container
+        if (!signalsTodayContainer) { // Fixed typo: changed from signalsFileContainer to signalsTodayContainer
             const container = document.getElementById('signalsList');
             if (container) {
                 container.innerHTML = `
