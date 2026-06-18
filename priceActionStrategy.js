@@ -45,14 +45,17 @@ const DEFAULT_PARAMS = {
     enableLiquiditySweeps: true,        // Evaluates structural swing sweeps for scoring
     sweepLookback: 15,                  // Bars back to check for swept highs/lows
     
-    // === Confidence Filter (NEW) ===
+    // === Confidence Filter ===
     minConfidenceThreshold: 45,         // Only execute setups that score >= 45/100 on the Confluence Matrix
     
     // === Risk Management ===
     maxRiskPerTrade: 0.01,              // Risk 1% of equity per trade
-    maxConsecutiveLosses: 3,            // Cool-down after consecutive losses
+    maxConsecutiveLosses: 3,           // Cool-down after consecutive losses
     maxDailyLoss: 0.03,                 // Max daily loss limit (3%)
     minBarsBetweenSignals: 3,           // Minimum candles to wait before scanning new setups
+    
+    // === Backtest Specific ===
+    allowOverlappingTrades: false,      // If true, takes all concurrent signals (matches live signal list)
 };
 
 // ============================================================
@@ -580,9 +583,9 @@ function twoLeggedPullback(candles, params = {}) {
 // SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
 // ============================================================
 
-
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
     const p = { ...DEFAULT_PARAMS, ...params };
+    const allowOverlapping = p.allowOverlappingTrades || false;
     
     let startingCapital = parseFloat(initialCapital);
     if (isNaN(startingCapital) || typeof startingCapital !== 'number') {
@@ -590,13 +593,15 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     }
     
     let equity = startingCapital;
-    let position = null;
+    let activePositions = []; // Tracks multiple concurrent positions if allowOverlapping is true
+    let position = null;      // Standard single position
     let pendingOrder = null; 
     const trades = [];
     
     let consecutiveLosses = 0;
     let dailyPnL = 0;
     const maxDailyLoss = equity * p.maxDailyLoss;
+    let lastTradeDay = null;
 
     const signalMap = new Map();
     if (Array.isArray(signals)) {
@@ -608,8 +613,92 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     for (let i = p.emaPeriod + p.minTrendBars; i < candles.length; i++) {
         const bar = candles[i];
 
+        // 0. Detect Day Boundary to Reset Daily Limits
+        if (bar.timestamp) {
+            const dateObj = new Date(bar.timestamp);
+            const currentDay = dateObj.getUTCDate();
+            if (lastTradeDay !== null && currentDay !== lastTradeDay) {
+                dailyPnL = 0;
+                consecutiveLosses = 0; // Reset consecutive loss counters daily
+            }
+            lastTradeDay = currentDay;
+        }
+
         // 1. Process active trade exits
-        if (position) {
+        if (allowOverlapping) {
+            const remainingPositions = [];
+            for (const pos of activePositions) {
+                let exitPrice = null;
+                let exitReason = null;
+
+                if (pos.direction === 'long') {
+                    const stoppedOut = bar.low <= pos.stopLoss;
+                    const tpReached = bar.high >= pos.takeProfit;
+
+                    if (stoppedOut && tpReached) {
+                        exitPrice = pos.stopLoss;
+                        exitReason = 'stop_loss';
+                    } else if (stoppedOut) {
+                        exitPrice = pos.stopLoss;
+                        exitReason = 'stop_loss';
+                    } else if (tpReached) {
+                        exitPrice = pos.takeProfit;
+                        exitReason = 'take_profit';
+                    }
+                } else {
+                    const stoppedOut = bar.high >= pos.stopLoss;
+                    const tpReached = bar.low <= pos.takeProfit;
+
+                    if (stoppedOut && tpReached) {
+                        exitPrice = pos.stopLoss;
+                        exitReason = 'stop_loss';
+                    } else if (stoppedOut) {
+                        exitPrice = pos.stopLoss;
+                        exitReason = 'stop_loss';
+                    } else if (tpReached) {
+                        exitPrice = pos.takeProfit;
+                        exitReason = 'take_profit';
+                    }
+                }
+
+                if (exitPrice !== null) {
+                    const pnlAmount = pos.direction === 'long'
+                        ? pos.quantity * (exitPrice - pos.entry)
+                        : pos.quantity * (pos.entry - exitPrice);
+                    
+                    equity += pnlAmount;
+
+                    if (pnlAmount < 0) {
+                        consecutiveLosses++;
+                        dailyPnL += pnlAmount;
+                    } else {
+                        consecutiveLosses = 0;
+                    }
+
+                    trades.push({
+                        entryIndex: pos.entryIndex,
+                        exitIndex: i,
+                        entryPrice: pos.entry,
+                        exitPrice,
+                        stopLoss: pos.stopLoss,
+                        takeProfit: pos.takeProfit,
+                        pnl: pos.direction === 'long' 
+                            ? ((exitPrice - pos.entry) / pos.entry) * 100 
+                            : ((pos.entry - exitPrice) / pos.entry) * 100,
+                        pnlPercentage: pos.direction === 'long' 
+                            ? ((exitPrice - pos.entry) / pos.entry) * 100 
+                            : ((pos.entry - exitPrice) / pos.entry) * 100,
+                        pnlAmount,
+                        exitReason,
+                        direction: pos.direction,
+                        metadata: pos.metadata
+                    });
+                } else {
+                    remainingPositions.push(pos);
+                }
+            }
+            activePositions = remainingPositions;
+        } else if (position) {
             let exitPrice = null;
             let exitReason = null;
 
@@ -662,8 +751,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     exitIndex: i,
                     entryPrice: position.entry,
                     exitPrice,
-                    stopLoss: position.stopLoss,         // Restored stopLoss parameter to backtest details
-                    takeProfit: position.takeProfit,     // Restored takeProfit parameter to backtest details
+                    stopLoss: position.stopLoss,         
+                    takeProfit: position.takeProfit,     
                     pnl: position.direction === 'long' 
                         ? ((exitPrice - position.entry) / position.entry) * 100 
                         : ((position.entry - exitPrice) / position.entry) * 100,
@@ -681,7 +770,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
         }
 
         // 2. Check and execute pending Stop Orders on the next bar
-        if (!position && pendingOrder) {
+        const hasCapacity = allowOverlapping || !position;
+        if (hasCapacity && pendingOrder) {
             let triggered = false;
             let entryPrice = 0;
 
@@ -703,7 +793,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     const riskAmount = equity * p.maxRiskPerTrade;
                     const quantity = riskAmount / risk;
 
-                    position = {
+                    const newPos = {
                         direction: pendingOrder.type === 'BUY_STOP' ? 'long' : 'short',
                         entry: entryPrice,
                         quantity,
@@ -715,43 +805,51 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         metadata: pendingOrder.metadata
                     };
 
+                    if (allowOverlapping) {
+                        activePositions.push(newPos);
+                    } else {
+                        position = newPos;
+                    }
+
+                    // Check if it triggers and exits on the exact same bar
                     let exitPrice = null;
                     let exitReason = null;
+                    const checkPos = allowOverlapping ? activePositions[activePositions.length - 1] : position;
 
-                    if (position.direction === 'long') {
-                        const stoppedOut = bar.low <= position.stopLoss;
-                        const tpReached = bar.high >= position.takeProfit;
+                    if (checkPos.direction === 'long') {
+                        const stoppedOut = bar.low <= checkPos.stopLoss;
+                        const tpReached = bar.high >= checkPos.takeProfit;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = position.stopLoss;
+                            exitPrice = checkPos.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = position.stopLoss;
+                            exitPrice = checkPos.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = position.takeProfit;
+                            exitPrice = checkPos.takeProfit;
                             exitReason = 'take_profit';
                         }
                     } else {
-                        const stoppedOut = bar.high >= position.stopLoss;
-                        const tpReached = bar.low <= position.takeProfit;
+                        const stoppedOut = bar.high >= checkPos.stopLoss;
+                        const tpReached = bar.low <= checkPos.takeProfit;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = position.stopLoss;
+                            exitPrice = checkPos.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = position.stopLoss;
+                            exitPrice = checkPos.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = position.takeProfit;
+                            exitPrice = checkPos.takeProfit;
                             exitReason = 'take_profit';
                         }
                     }
 
                     if (exitPrice !== null) {
-                        const pnlAmount = position.direction === 'long'
-                            ? position.quantity * (exitPrice - position.entry)
-                            : position.quantity * (position.entry - exitPrice);
+                        const pnlAmount = checkPos.direction === 'long'
+                            ? checkPos.quantity * (exitPrice - checkPos.entry)
+                            : checkPos.quantity * (checkPos.entry - exitPrice);
                         
                         equity += pnlAmount;
 
@@ -763,25 +861,29 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         }
 
                         trades.push({
-                            entryIndex: position.entryIndex,
+                            entryIndex: checkPos.entryIndex,
                             exitIndex: i,
-                            entryPrice: position.entry,
+                            entryPrice: checkPos.entry,
                             exitPrice,
-                            stopLoss: position.stopLoss,     // Restored stopLoss parameter to backtest details
-                            takeProfit: position.takeProfit, // Restored takeProfit parameter to backtest details
-                            pnl: position.direction === 'long' 
-                                ? ((exitPrice - position.entry) / position.entry) * 100 
-                                : ((position.entry - exitPrice) / position.entry) * 100,
-                            pnlPercentage: position.direction === 'long' 
-                                ? ((exitPrice - position.entry) / position.entry) * 100 
-                                : ((position.entry - exitPrice) / position.entry) * 100,
+                            stopLoss: checkPos.stopLoss,     
+                            takeProfit: checkPos.takeProfit, 
+                            pnl: checkPos.direction === 'long' 
+                                ? ((exitPrice - checkPos.entry) / checkPos.entry) * 100 
+                                : ((checkPos.entry - exitPrice) / checkPos.entry) * 100,
+                            pnlPercentage: checkPos.direction === 'long' 
+                                ? ((exitPrice - checkPos.entry) / checkPos.entry) * 100 
+                                : ((checkPos.entry - exitPrice) / checkPos.entry) * 100,
                             pnlAmount,
                             exitReason,
-                            direction: position.direction,
-                            metadata: position.metadata
+                            direction: checkPos.direction,
+                            metadata: checkPos.metadata
                         });
 
-                        position = null;
+                        if (allowOverlapping) {
+                            activePositions.pop();
+                        } else {
+                            position = null;
+                        }
                     }
                 }
             }
@@ -790,7 +892,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
         }
 
         // 3. Scan lookup map for pre-generated signals that ended on this bar
-        if (!position && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
+        const canTakeNewTrade = allowOverlapping || (!position && activePositions.length === 0);
+        if (canTakeNewTrade && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
             if (signalMap.has(i)) {
                 const signal = signalMap.get(i);
                 pendingOrder = {

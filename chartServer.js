@@ -340,7 +340,9 @@ class ChartServer {
                             reason: sig.reason.replace('Conf:', `${barType === 'volume' ? 'Volume' : 'Price'}, Conf:`),
                             timestamp: candle.timestamp,
                             barNumber: candle.barNumber,
-                            bar_type: barType
+                            bar_type: barType,
+                            status: 'cancelled', // Defaults historical signals to cancelled status
+                            overlapping: false
                         };
 
                         const uniqueKey = `${instKey}_${barType}_${candle.barNumber}_${sig.type}`;
@@ -679,6 +681,8 @@ class ChartServer {
             return;
         }
 
+        signalData.status = signalData.status || 'pending';
+
         this.tradeSignals.push(signalData);
         
         // Cache maximum of 200 historical signals in-memory
@@ -688,7 +692,32 @@ class ChartServer {
         
         this.saveSignalsToDisk(); // Save updated cache to disk
         this.io.emit('trade_signal', signalData);
-        console.log(`🚀 [Server] Trade signal broadcasted & logged to disk: ${signalData.instrument} | Bar #${signalData.barNumber}`);
+        console.log(`🚀 [Server] Trade signal logged & broadcasted: ${signalData.instrument} | Bar #${signalData.barNumber} | status: ${signalData.status}`);
+    }
+
+    broadcastTradeStatusUpdate(updateData) {
+        const matchIndex = this.tradeSignals.findIndex(sig => 
+            sig.instrument === updateData.instrument &&
+            sig.bar_type === updateData.bar_type &&
+            sig.barNumber === updateData.barNumber &&
+            sig.type === updateData.type
+        );
+
+        if (matchIndex !== -1) {
+            this.tradeSignals[matchIndex].status = updateData.status;
+            
+            if (updateData.exitReason) {
+                this.tradeSignals[matchIndex].exitReason = updateData.exitReason;
+                this.tradeSignals[matchIndex].exitPrice = updateData.exitPrice;
+            }
+
+            console.log(`ℹ️ [Server] Status transition: ${updateData.instrument} Bar #${updateData.barNumber} -> ${updateData.status}`);
+            
+            this.saveSignalsToDisk();
+            this.io.emit('trade_status_update', this.tradeSignals[matchIndex]);
+        } else {
+            console.warn(`⚠️ [Server] Failed to locate signal for status update: ${updateData.instrument} Bar #${updateData.barNumber}`);
+        }
     }
     
     start() {

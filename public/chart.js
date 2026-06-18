@@ -20,6 +20,9 @@ class MarketChart {
         this.indicators = new ChartIndicators(this);
         this.drawings = null; // initialized after LightweightCharts mounts
         
+        // Live Trade Lifecycle Tracking Module (ES6 Split-Layout Refactor)
+        this.tracker = new LiveTradeTracker(this);
+
         this.init();
     }
 
@@ -87,8 +90,6 @@ class MarketChart {
     }
 
     convertToChartCandle(candleData) {
-        // Prioritize startTime as the stable key for the candle time boundary.
-        // This ensures subsequent ticks update the current candle index in place instead of creating duplicates.
         let timestamp = candleData.startTime || candleData.timestamp || candleData.end_time;
         if (!timestamp) return null;
         if (typeof timestamp === 'string') {
@@ -105,9 +106,9 @@ class MarketChart {
         
         let bottomValue = 0;
         if (this.currentType === 'volume') {
-            bottomValue = candleData.priceChanges || candleData.transactions || 0;
+            bottomValue = parseFloat(candleData.priceChanges) || parseFloat(candleData.transactions) || 0;
         } else {
-            bottomValue = candleData.volume || 0;
+            bottomValue = parseFloat(candleData.volume) || 0;
         }
         
         return {
@@ -226,9 +227,9 @@ class MarketChart {
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
 
-            // Load and display pre-existing active trade signals
+            // Delegate load of prior signals to live tracker module
             if (data.trade_signals) {
-                this.renderHistoricalSignals(data.trade_signals);
+                this.tracker.renderSignals(data.trade_signals);
             }
         });
         
@@ -255,110 +256,20 @@ class MarketChart {
             }
         });
 
+        // Delegate new trade setup events directly to live tracker
         this.socket.on('trade_signal', (signal) => {
-            this.handleLiveSignal(signal);
+            this.tracker.handleIncomingSignal(signal);
+        });
+
+        // Delegate execution state triggers or stop/limit fills directly to live tracker
+        this.socket.on('trade_status_update', (update) => {
+            this.tracker.handleStatusUpdate(update);
         });
         
         this.socket.on('disconnect', () => {
             document.getElementById('wsStatus').textContent = 'Disconnected';
             document.getElementById('wsStatus').className = 'status-badge disconnected';
         });
-    }
-
-    renderHistoricalSignals(signals) {
-        const listContainer = document.getElementById('signalsList');
-        if (!listContainer) return;
-        
-        if (!signals || signals.length === 0) {
-            listContainer.innerHTML = '<div style="color: #787b86; text-align: center; padding: 20px;">Waiting for signals...</div>';
-            return;
-        }
-        
-        listContainer.innerHTML = '';
-        const sortedSignals = [...signals].sort((a, b) => b.timestamp - a.timestamp);
-        sortedSignals.forEach(sig => {
-            const el = this.createSignalElement(sig);
-            listContainer.appendChild(el);
-        });
-    }
-
-    handleLiveSignal(signal) {
-        const listContainer = document.getElementById('signalsList');
-        if (!listContainer) return;
-        
-        const emptyMsg = listContainer.querySelector('div');
-        if (emptyMsg && emptyMsg.textContent.includes('Waiting for signals')) {
-            listContainer.innerHTML = '';
-        }
-        
-        const el = this.createSignalElement(signal);
-        listContainer.insertBefore(el, listContainer.firstChild);
-    }
-
-    createSignalElement(sig) {
-        const div = document.createElement('div');
-        const isBuy = sig.type.toUpperCase().includes('BUY');
-        div.className = `signal-item ${isBuy ? 'buy' : 'sell'}`;
-        
-        const timeStr = new Date(sig.timestamp).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-        
-        div.innerHTML = `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="font-weight: bold; color: ${isBuy ? '#00bcd4' : '#ef5350'};">${sig.type}</span>
-                <span class="signal-time">${timeStr}</span>
-            </div>
-            <div style="font-weight: 500; margin-bottom: 4px; font-size: 13px;">${sig.name || sig.instrument.split('|')[1]}</div>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; font-size: 11px; color: #d1d4dc;">
-                <div>Entry: <span style="color: #fff; font-weight: 600;">${sig.entry.toFixed(2)}</span></div>
-                <div>SL: <span style="color: #ef5350; font-weight: 600;">${sig.sl.toFixed(2)}</span></div>
-                <div>TP: <span style="color: #00bcd4; font-weight: 600;">${sig.tp.toFixed(2)}</span></div>
-                <div>Conf: <span style="color: #f9a825; font-weight: 600;">${sig.confidence}%</span></div>
-            </div>
-            <div style="font-size: 10px; color: #787b86; margin-top: 4px; font-style: italic;">${sig.reason || ''}</div>
-        `;
-        return div;
-    }
-
-    updateProgressDisplay(progress, candle) {
-        const progressBar = document.getElementById('candle-progress');
-        if (!progressBar) {
-            const statsBar = document.getElementById('statsBar');
-            if (statsBar) {
-                const progressHtml = `
-                    <div id="candle-progress-container" style="margin-top: 8px; padding: 8px; background: #2a2e39; border-radius: 4px;">
-                        <div style="font-size: 11px; color: #787b86; margin-bottom: 4px;">
-                            Current Candle Progress: ${candle.type === 'volume' ? 'Volume' : 'Price Changes'}
-                        </div>
-                        <div style="background: #363c4b; border-radius: 4px; overflow: hidden;">
-                            <div id="candle-progress-bar" style="width: ${progress}%; background: #00bcd4; height: 8px; transition: width 0.3s;"></div>
-                        </div>
-                        <div style="font-size: 12px; margin-top: 4px;">
-                            ${progress.toFixed(1)}% complete
-                            ${candle.type === 'volume' ? 
-                                `(${candle.volume?.toLocaleString() || 0} / ${candle.targetVolume?.toLocaleString() || 0} units)` : 
-                                `(${candle.currentTicks || 0} / ${candle.targetTicks || 0} price changes)`}
-                        </div>
-                    </div>
-                `;
-                let existing = document.getElementById('candle-progress-container');
-                if (existing) existing.remove();
-                statsBar.insertAdjacentHTML('afterend', progressHtml);
-            }
-        } else {
-            const bar = document.getElementById('candle-progress-bar');
-            if (bar) bar.style.width = `${progress}%`;
-            const text = document.querySelector('#candle-progress-container div:last-child');
-            if (text) {
-                text.innerHTML = `${progress.toFixed(1)}% complete
-                    ${candle.type === 'volume' ? 
-                        `(${candle.volume?.toLocaleString() || 0} / ${candle.targetVolume?.toLocaleString() || 0} units)` : 
-                        `(${candle.currentTicks || 0} / ${candle.targetTicks || 0} price changes)`}`;
-            }
-        }
     }
     
     initCharts() {
@@ -393,7 +304,6 @@ class MarketChart {
             crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
         });
 
-        // Candlestick series (top pane)
         this.candleSeries = this.chart.addSeries(LightweightCharts.CandlestickSeries, {
             upColor: '#26a69a',
             downColor: '#ef5350',
@@ -401,17 +311,14 @@ class MarketChart {
             priceScaleId: 'right'
         });
 
-        // Histogram series (bottom pane)
         this.bottomSeries = this.chart.addSeries(LightweightCharts.HistogramSeries, {
             color: '#00bcd4',
             priceFormat: { type: 'volume' },
             priceScaleId: 'bottom'
         });
 
-        // Initialize Indicator Series
         this.indicators.initSeries();
 
-        // Configure bottom pane
         this.chart.priceScale('bottom').applyOptions({
             scaleMargins: { top: 0.75, bottom: 0.05 },
             borderColor: '#2a2e39',
@@ -421,19 +328,16 @@ class MarketChart {
 
         this.isInitialized = true;
 
-        // Hide old bottom chart element if exists
         const oldBottom = document.getElementById('bottom-chart');
         if (oldBottom) oldBottom.style.display = 'none';
 
         this.addBottomPaneLabel();
-        this.addSmaToggleButtons();   // Add buttons for SMA visibility
+        this.addSmaToggleButtons();   
         
-        // Initialize Interactive Drawings Layer
         this.drawings = new ChartDrawings(this);
 
         this.updateCharts();
 
-        // Safe drawing re-positioning during timescale changes (pans/zooms)
         this.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
             this.drawings?.render();
         });
@@ -445,7 +349,6 @@ class MarketChart {
     }
 
     addSmaToggleButtons() {
-        // Find or create a container for indicator toggles
         let container = document.getElementById('indicator-toggles');
         if (!container) {
             const toolbar = document.querySelector('.draw-toolbar');
@@ -455,7 +358,6 @@ class MarketChart {
                 container.style.cssText = 'display: inline-flex; gap: 8px; margin-left: 20px; align-items: center;';
                 toolbar.appendChild(container);
             } else {
-                // fallback: append to drawing toolbar area
                 const parent = document.querySelector('.draw-tools') || document.body;
                 container = document.createElement('div');
                 container.id = 'indicator-toggles';
@@ -464,10 +366,8 @@ class MarketChart {
             }
         }
         
-        // Clear existing
         container.innerHTML = '';
         
-        // SMA 9 toggle
         const btn9 = document.createElement('button');
         btn9.className = 'sma-toggle-btn';
         btn9.dataset.sma = '9';
@@ -480,7 +380,6 @@ class MarketChart {
         });
         container.appendChild(btn9);
         
-        // SMA 21 toggle
         const btn21 = document.createElement('button');
         btn21.className = 'sma-toggle-btn';
         btn21.dataset.sma = '21';
@@ -493,7 +392,6 @@ class MarketChart {
         });
         container.appendChild(btn21);
 
-        // EMA 20 toggle
         const btn20 = document.createElement('button');
         btn20.className = 'sma-toggle-btn';
         btn20.dataset.sma = '20';
@@ -520,7 +418,6 @@ class MarketChart {
             bottomData.push({ time: c.time, value: val, color: '#00bcd4' });
         }
 
-        // Set historical datasets
         this.candleSeries.setData(chartData);
         this.bottomSeries.setData(bottomData);
         this.indicators.setFullHistory(chartData);
@@ -551,50 +448,38 @@ class MarketChart {
         }
     }
 
-    updateLiveCandle(liveCandle) {
-        const newCandle = this.convertToChartCandle(liveCandle);
-        if (!newCandle) return;
-        const barNum = newCandle.barNumber;
-        let existingIndex = -1;
-        if (barNum !== undefined && barNum !== null) {
-            existingIndex = this.candles.findIndex(c => c.barNumber === barNum);
-        }
-        
-        if (existingIndex >= 0) {
-            // Keep the exact same timestamp originally assigned to this barNumber
-            // to prevent creating a duplicate "comb" of thin candles.
-            newCandle.time = this.candles[existingIndex].time;
-            this.candles[existingIndex] = newCandle;
+    updateLiveCandle(normalizedCandle) {
+        const ohlc = this.convertToChartCandle(normalizedCandle);
+        if (!ohlc) return;
+
+        // Feed live tick prices directly into our trade tracker module for real-time risk updates
+        this.tracker.tracker.updateLivePrice(normalizedCandle.instrument, normalizedCandle.close, normalizedCandle.type);
+
+        if (!this.isInitialized) return;
+
+        // Merge live progress updates into candle array
+        const lastIdx = this.candles.length - 1;
+        if (lastIdx >= 0 && this.candles[lastIdx].time === ohlc.time) {
+            this.candles[lastIdx] = ohlc;
         } else {
-            // Ensure strictly increasing times for new candles
-            const last = this.candles[this.candles.length - 1];
-            if (last && newCandle.time <= last.time) {
-                newCandle.time = last.time + 5;
+            this.candles.push(ohlc);
+            if (this.candles.length > this.maxRecentCandlesPerInstrument) {
+                this.candles.shift();
             }
-            this.candles.push(newCandle);
-            if (this.candles.length > 500) this.candles = this.candles.slice(-500);
         }
 
-        // Real-time continuous updating on the candle and bottom histogram
-        this.candleSeries.update({
-            time: newCandle.time,
-            open: newCandle.open,
-            high: newCandle.high,
-            low: newCandle.low,
-            close: newCandle.close
-        });
-
-        const bottomVal = (this.currentType === 'volume')
-            ? (newCandle.priceChanges || newCandle.transactions || 0)
-            : (newCandle.volume || 0);
+        this.candleSeries.update(ohlc);
+        
+        const volumeVal = (this.currentType === 'volume')
+            ? (ohlc.priceChanges || ohlc.transactions || 0)
+            : (ohlc.volume || 0);
 
         this.bottomSeries.update({
-            time: newCandle.time,
-            value: bottomVal,
+            time: ohlc.time,
+            value: volumeVal,
             color: '#00bcd4'
         });
 
-        // Performant sliding updates for indicator levels
         const chartData = this.candles.map(c => ({
             time: c.time,
             open: c.open,
@@ -602,12 +487,21 @@ class MarketChart {
             low: c.low,
             close: c.close
         }));
-        this.indicators.updateLatestPoint(chartData);
 
-        this.drawings?.render();
+        this.indicators.setFullHistory(chartData);
+        this.updateStatsPane(normalizedCandle);
+    }
 
-        this.updateProgressDisplay(liveCandle.progress || 0, liveCandle);
-        this.updateStatsFromCandle(newCandle);
+    updateStatsPane(candle) {
+        const statsElem = document.getElementById('statsPane');
+        if (!statsElem) return;
+
+        const progress = candle.progress || 0;
+        statsElem.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 6px; color: #fff;">${this.getInstrumentName(candle.instrument)}</div>
+            <div style="font-size: 12px; margin-bottom: 4px;">Last Price: <span style="font-weight: bold; color: #00bcd4;">₹${candle.close.toFixed(2)}</span></div>
+            <div style="font-size: 11px; color: #787b86;">Bar #${candle.barNumber} Progress: ${progress.toFixed(1)}%</div>
+        `;
     }
 
     resetZoom() {
@@ -623,7 +517,6 @@ class MarketChart {
         const barNum = candle.barNumber;
         const existingIndex = barNum ? this.candles.findIndex(c => c.barNumber === barNum) : -1;
         if (existingIndex >= 0) {
-            // Keep the same timestamp key for finalized candles to prevent gaps
             candle.time = this.candles[existingIndex].time;
             this.candles[existingIndex] = candle;
         } else {
@@ -653,59 +546,11 @@ class MarketChart {
         if (!statsBar) return;
         const change = candle.close - candle.open;
         const changePercent = (change / candle.open) * 100;
-        const color = change >= 0 ? '#26a69a' : '#ef5350';
-        const candleTime = new Date(candle.time * 1000);
-        const timeStr = candleTime.toLocaleString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-        let additionalStats = '';
-        if (this.currentType === 'volume') {
-            additionalStats = `<div class="stat"><span class="stat-label">Price Changes:</span><span class="stat-value">${candle.priceChanges || candle.transactions || 0}</span></div>`;
-        } else {
-            additionalStats = `<div class="stat"><span class="stat-label">Traded Qty:</span><span class="stat-value">${(candle.volume || 0).toLocaleString()}</span></div>`;
-        }
-        statsBar.innerHTML = `
-            <div class="stat"><span class="stat-label">Time (IST):</span><span class="stat-value">${timeStr}</span></div>
-            <div class="stat"><span class="stat-label">Open:</span><span class="stat-value">${candle.open.toFixed(2)}</span></div>
-            <div class="stat"><span class="stat-label">High:</span><span class="stat-value">${candle.high.toFixed(2)}</span></div>
-            <div class="stat"><span class="stat-label">Low:</span><span class="stat-value">${candle.low.toFixed(2)}</span></div>
-            <div class="stat"><span class="stat-label">Close:</span><span class="stat-value">${candle.close.toFixed(2)}</span></div>
-            ${additionalStats}
-            <div class="stat"><span class="stat-label">Change:</span><span class="stat-value" style="color: ${color}">${changePercent.toFixed(2)}%</span></div>
-            <div class="stat"><span class="stat-label">Bar #:</span><span class="stat-value">${candle.barNumber || '-'}</span></div>
-        `;
-    }
-    
-    setupEventListeners() {
-        document.querySelectorAll('.type-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.currentType = btn.dataset.type;
-                this.loadCandlesForCurrentInstrument();
-                this.subscribeToCandles();
-                this.updateBottomChartLabel();
-            });
-        });
+        const color = change >= 0 ? '🟢' : '🔴';
+        const formattedType = candle.type ? candle.type.toUpperCase() : 'VOLUME';
 
-        // Clear active drawings
-        document.getElementById('clear-drawings-btn')?.addEventListener('click', () => {
-            this.drawings?.clearAll();
-        });
-
-        // Set toolbars
-        document.querySelectorAll('.draw-tool-btn').forEach(btn => {
-            if (btn.id === 'clear-drawings-btn') return;
-            btn.addEventListener('click', () => {
-                this.drawings?.setTool(btn.dataset.tool);
-            });
-        });
+        console.log(`🕯️ [${formattedType} BAR] Completed: Bar #${candle.barNumber} | O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close} | Vol: ${candle.volume}`);
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.marketChart = new MarketChart();
-});
+module.exports = ChartServer;
