@@ -565,6 +565,73 @@ class ChartServer {
         this.io.emit('candle_update', candleData);
     }
     
+    // Add this diagnostic check inside your candle_closed event handler in chartServer.js
+    runLiveStrategyDiagnostics(instrumentKey, candlesArray, strategyFunction) {
+        console.log(`\n=================== 🕵️ Strategy Diagnostics: ${instrumentKey} ===================`);
+        
+        // 1. Check Array Size
+        console.log(`📊 Candles Array Length: ${candlesArray.length}`);
+        if (candlesArray.length < 20) {
+            console.warn(`⚠️ WARNING: Array length (${candlesArray.length}) is less than 20. EMA-20 cannot stabilize!`);
+        }
+
+        // 2. Inspect Data Types and Keys of the Last Completed Candle
+        if (candlesArray.length > 0) {
+            const lastCandle = candlesArray[candlesArray.length - 1];
+            console.log(`📝 Last Candle Keys & Types:`);
+            Object.keys(lastCandle).forEach(key => {
+                console.log(`   - ${key}: ${lastCandle[key]} (type: ${typeof lastCandle[key]})`);
+            });
+
+            // Check if any critical field is a string
+            const hasStringFields = ['open', 'high', 'low', 'close', 'volume'].some(
+                field => typeof lastCandle[field] === 'string'
+            );
+            if (hasStringFields) {
+                console.error(`🚨 CRITICAL ERROR: Candle fields are Strings, not Numbers! This will cause NaN in EMA math.`);
+            }
+        }
+
+        // 3. Execute Strategy and Inspect Output
+        try {
+            const signals = strategyFunction(candlesArray);
+            console.log(`🎯 Total Signals Returned by Strategy: ${signals ? signals.length : 0}`);
+
+            if (signals && signals.length > 0) {
+                // Log the last 3 signals generated to see if they are matching older indices
+                const lastFewSignals = signals.slice(-3);
+                console.log(`📋 Last 3 Generated Signals:`, JSON.stringify(lastFewSignals, null, 2));
+
+                // Check if any signal has an index close to the end of our array
+                const latestIndex = candlesArray.length - 1;
+                console.log(`🔍 Checking for Match near Latest Index (${latestIndex}):`);
+                
+                lastFewSignals.forEach(sig => {
+                    const indexDifference = latestIndex - sig.index;
+                    console.log(`   - Signal index: ${sig.index} (Difference from latest: ${indexDifference} bars)`);
+                    
+                    if (indexDifference === 0) {
+                        console.log(`     ✅ Exact Match on the newly closed candle (index ${latestIndex})!`);
+                    } else if (indexDifference > 0) {
+                        console.log(`     ⚠️ This signal was generated on an older candle (${indexDifference} bars ago). If your live handler only checks the last index, this signal was ignored!`);
+                    }
+                });
+            } else {
+                console.log(`❌ No signals returned. Running EMA Math Sanity Check:`);
+                // Check if EMA calculations are resulting in NaN
+                const sampleCloses = candlesArray.map(c => Number(c.close));
+                const hasNaNClose = sampleCloses.some(isNaN);
+                if (hasNaNClose) {
+                    console.error(`   - 🚨 Close prices contain NaN values!`);
+                } else {
+                    console.log(`   - Close prices are clean numerical values.`);
+                }
+            }
+        } catch (err) {
+            console.error(`🚨 EXCEPTION thrown during strategy run:`, err);
+        }
+        console.log(`========================================================================\n`);
+    }
     broadcastLiveCandle(instrumentKey, liveCandle, type) {
         const candleData = {
             ...liveCandle,

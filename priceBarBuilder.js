@@ -321,15 +321,34 @@ class PriceBarBuilder extends EventEmitter {
             timestamp: b.timestamp
         }));
 
+        console.log(`\n🕵️ [Strategy Diagnostics - ${bar.name}]`);
+        console.log(`   - Completed bars count in history: ${strategyCandles.length}`);
+
         if (strategyCandles.length >= 32) {
             try {
                 const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
+                
+                // Diagnostic Run 1: Standard confidence threshold (45)
                 const signals = twoLeggedPullback(strategyCandles, { tickSize: tickSize });
+                
+                // Diagnostic Run 2: Zero confidence threshold to check raw strategy output
+                const rawSignals = twoLeggedPullback(strategyCandles, { tickSize: tickSize, minConfidenceThreshold: 0 });
+
+                console.log(`   - Signals (minConfidenceThreshold: 45): ${signals.length}`);
+                console.log(`   - Raw Signals (minConfidenceThreshold: 0): ${rawSignals.length}`);
+
+                if (rawSignals.length > 0) {
+                    const latestRaw = rawSignals[rawSignals.length - 1];
+                    console.log(`   - Latest Raw Signal: Index=${latestRaw.index}, Type=${latestRaw.type}, Reason=${latestRaw.reason}`);
+                    console.log(`   - Newly completed bar index in strategy array: ${strategyCandles.length - 1}`);
+                }
+
                 if (signals && signals.length > 0) {
                     const latestSignal = signals[signals.length - 1];
+                    const newlyClosedIndex = strategyCandles.length - 1;
                     
                     // Match last completed index
-                    if (latestSignal.index === strategyCandles.length - 1) {
+                    if (latestSignal.index === newlyClosedIndex) {
                         if (bar.lastSignalBarNumber !== bar.barNumber) {
                             bar.lastSignalBarNumber = bar.barNumber;
                             
@@ -353,14 +372,22 @@ class PriceBarBuilder extends EventEmitter {
                                 bar_type: 'price' // Explicit dimension marker
                             };
                             
+                            console.log(`   ✅ [SIGNAL EMITTED] Bar #${bar.barNumber} | Type: ${latestSignal.type} | Entry: ${latestSignal.triggerPrice}`);
                             this.emit('trade_signal', signalEvent);
+                        } else {
+                            console.log(`   ℹ️ Signal ignored: Already processed bar #${bar.barNumber}`);
                         }
+                    } else {
+                        console.log(`   ℹ️ Signal skipped: Latest signal is on index ${latestSignal.index}, but newly closed bar is index ${newlyClosedIndex}`);
                     }
                 }
             } catch (err) {
-                console.error(`Error processing price-based signal rules for ${bar.name}:`, err.message);
+                console.error(`❌ Error processing price-based signal rules for ${bar.name}:`, err.message);
             }
+        } else {
+            console.log(`   ℹ️ Sidelined: Need at least 32 completed candles to evaluate EMA trend (current: ${strategyCandles.length})`);
         }
+        console.log(`--------------------------------------------------------\n`);
         
         // Reset bar state completely for the next live candle
         const isExactClose = bar.currentTicks === bar.targetTicks;
