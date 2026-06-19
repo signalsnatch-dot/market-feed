@@ -1,4 +1,4 @@
-// PriceBarBuilder.js
+// priceBarBuilder.js
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
@@ -58,7 +58,7 @@ class PriceBarBuilder extends EventEmitter {
                 bars: [],
                 barNumber: 0,
                 lastEmittedProgress: 0,
-                lastSignalBarNumber: 0
+                lastSignalBarNumbers: {} // FIX: Track signals per version
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
@@ -311,8 +311,6 @@ class PriceBarBuilder extends EventEmitter {
         console.log(`   Volume: ${bar.volume.toLocaleString()} units`);
         console.log(`   Duration: ${completedBar.durationSeconds}s\n`);
 
-        // --- RUN SIGNAL STRATEGY NOW ON COMPLETED BARS ---
-        // --- RUN SIGNAL STRATEGY NOW ON COMPLETED BARS ---
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
             high: b.high,
@@ -322,7 +320,6 @@ class PriceBarBuilder extends EventEmitter {
             timestamp: b.timestamp
         }));
 
-        // Inside closeBar() in both volumeBarBuilder.js and priceBarBuilder.js:
         if (strategyCandles.length >= 32) {
             try {
                 const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
@@ -340,8 +337,9 @@ class PriceBarBuilder extends EventEmitter {
                                 const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
                                 if (confMatch) confidence = parseInt(confMatch[1]);
                                 
+                                // FIX: Exclude scoping "this.type" and hardcode direct dimensions
                                 const signalEvent = {
-                                    version: versionName, // Track version
+                                    version: versionName, 
                                     instrument: instrumentKey,
                                     name: bar.name,
                                     type: latestSignal.type,
@@ -349,10 +347,10 @@ class PriceBarBuilder extends EventEmitter {
                                     sl: latestSignal.stopLoss,
                                     tp: latestSignal.takeProfit,
                                     confidence: confidence,
-                                    reason: latestSignal.reason.replace('Conf:', `${this.type === 'price_bar' ? 'Price' : 'Volume'}, Conf:`),
+                                    reason: latestSignal.reason.replace('Conf:', 'Price, Conf:'),
                                     timestamp: completedBar.timestamp,
                                     barNumber: bar.barNumber,
-                                    bar_type: this.type === 'price_bar' ? 'price' : 'volume'
+                                    bar_type: 'price' // Hardcoded type dimension
                                 };
                                 this.emit('trade_signal', signalEvent);
                             }
@@ -387,7 +385,7 @@ class PriceBarBuilder extends EventEmitter {
             bars: bar.bars,
             barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
             lastEmittedProgress: 0,
-            lastSignalBarNumber: bar.lastSignalBarNumber
+            lastSignalBarNumbers: bar.lastSignalBarNumbers // FIX: Carry forward plural tracking map
         });
     }
     

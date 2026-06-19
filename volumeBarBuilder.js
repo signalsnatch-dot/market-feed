@@ -58,7 +58,7 @@ class VolumeBarBuilder extends EventEmitter {
                 bars: [],
                 barNumber: 0,
                 lastEmittedProgress: 0,
-                lastSignalBarNumber: 0
+                lastSignalBarNumbers: {}
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
@@ -402,7 +402,6 @@ class VolumeBarBuilder extends EventEmitter {
             instrument_key: bar.instrument_key,
             name: bar.name,
             targetVolume: bar.targetVolume,
-
             currentVolume: 0,
             open: nextOhlc,
             high: nextOhlc,
@@ -414,11 +413,10 @@ class VolumeBarBuilder extends EventEmitter {
             lastUpdateTimestamp: nextOhlc !== null ? bar.lastUpdateTimestamp : null,
             transactions: 0,
             priceChanges: 0,
-
             bars: bar.bars,
             barNumber: nextBarNumber,
             lastEmittedProgress: 0,
-            lastSignalBarNumber: bar.lastSignalBarNumber
+            lastSignalBarNumbers: bar.lastSignalBarNumbers // FIX: Carry forward plural tracking map
         });
     }
     
