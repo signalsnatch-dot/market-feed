@@ -2,7 +2,7 @@
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
-const { STRATEGIES } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategy'); // FIX: Ensure strategy versions are imported
 
 class DualCandleBuilder extends EventEmitter {
     constructor(config) {
@@ -43,6 +43,7 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
+        // Ensure listeners are assigned once here to completely avoid MaxListenersExceeded Warnings
         this.priceBuilder.on('live_candle_update', (candle) => {
             this.emit('live_candle_update', {
                 ...candle,
@@ -81,7 +82,6 @@ class DualCandleBuilder extends EventEmitter {
     }
 
     processIncomingSignal(signal, barType) {
-        // FIX: Track overlapping signals per strategy version
         const key = `${signal.instrument}_${barType}_${signal.version}`;
         const hasActive = this.activeTrades.has(key);
         const hasPending = this.pendingOrders.has(key);
@@ -95,7 +95,6 @@ class DualCandleBuilder extends EventEmitter {
             exitReason: isOverlapping ? 'overlapping' : null
         };
 
-        // If it is overlapping, we broadcast it immediately as cancelled, bypassing execution maps
         if (!isOverlapping) {
             this.pendingOrders.set(key, {
                 ...trackedSignal,
@@ -108,7 +107,6 @@ class DualCandleBuilder extends EventEmitter {
 
     setupStateTracking() {
         this.on('bar_close', (bar) => {
-            // FIX: Evaluate state machine transitions across all strategies in parallel
             for (const versionName of Object.keys(STRATEGIES)) {
                 const key = `${bar.instrument}_${bar.type}_${versionName}`;
 

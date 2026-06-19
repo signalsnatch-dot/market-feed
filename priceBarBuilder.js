@@ -2,7 +2,7 @@
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
-const { twoLeggedPullback } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategy');
 
 class PriceBarBuilder extends EventEmitter {
     constructor(config) {

@@ -20,15 +20,16 @@ class LiveTradeTracker {
             
             container.innerHTML = `
                 <!-- Dropdown version selection panel -->
-                <div id="strategy-selector-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between;">
-                    <span style="font-size: 11px; font-weight: bold; color: #b2b5be;">ACTIVE STRATEGY:</span>
-                    <select id="strategy-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; font-weight: bold;">
-                        <option value="V1: Double Traps">V1: Double Traps</option>
-                        <option value="V2: EMA Pullback">V2: EMA Pullback</option>
-                        <option value="V3: High Confidence">V3: High Confidence</option>
-                        <option value="V4: Aggressive">V4: Aggressive</option>
-                    </select>
-                </div>
+                  <div id="strategy-selector-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 11px; font-weight: bold; color: #b2b5be;">ACTIVE STRATEGY:</span>
+                        <select id="strategy-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; font-weight: bold;">
+                            <option value="V1: Double Traps">V1: Double Traps</option>
+                            <option value="V2: EMA Pullback">V2: EMA Pullback</option>
+                            <option value="V3: High Confidence">V3: High Confidence</option>
+                            <option value="V4: Aggressive">V4: Aggressive</option>
+                            <option value="V5: Wade Structural">V5: Wade Structural</option> <!-- FIX: Added Wade Structural -->
+                        </select>
+                    </div>
                 
                 <div id="volume-signals-section" style="height: 70%; display: flex; flex-direction: column; border-bottom: 2px solid #2a2e39; box-sizing: border-box; overflow: hidden;">
                     <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">

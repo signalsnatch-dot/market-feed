@@ -1,6 +1,6 @@
 /**
- * Price Action Strategy — Thomas Wade 2-Legged Pullback & Double Traps
- * Multi-Version Parallel Strategy Module
+ * Price Action Strategy Versions Module
+ * Houses 5 independent versions of the Thomas Wade 2-Legged Pullback strategy.
  */
 
 const DEFAULT_PARAMS = {
@@ -40,7 +40,7 @@ const DEFAULT_PARAMS = {
     // === Confluence Overlays ===
     enableFVGConfluence: true,          // Evaluates Fair Value Gaps for scoring
     fvgLookback: 15,                    // Bars to look back for active FVGs acting as support/resistance
-    enableLiquiditySweeps: true,         // Evaluates structural swing sweeps for scoring
+    enableLiquiditySweeps: true,        // Evaluates structural swing sweeps for scoring
     sweepLookback: 15,                  // Bars back to check for swept highs/lows
     
     // === Confidence Filter ===
@@ -55,7 +55,7 @@ const DEFAULT_PARAMS = {
 };
 
 // ============================================================
-// CORE MATHEMATICAL UTILITIES
+// SHARED STRATEGY MATHEMATICAL UTILITIES
 // ============================================================
 
 function calculateEMA(candles, period = 20) {
@@ -171,7 +171,6 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
     const body = Math.abs(sBar.close - sBar.open);
     const bodyRatio = body / range;
 
-    // 1. Trend & Slope Alignment (Max 25 pts)
     const slope = (ema[i] - ema[i - 5]) / ema[i - 5];
     const absSlope = Math.abs(slope);
     
@@ -181,7 +180,6 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
     const alignedBody = type === 'BUY' ? (sBar.close > sBar.open) : (sBar.close < sBar.open);
     if (alignedBody) score += 10;
 
-    // 2. Signal Bar Quality (Max 25 pts)
     const closeRatio = type === 'BUY' ? (sBar.close - sBar.low) / range : (sBar.high - sBar.close) / range;
     if (closeRatio >= 0.80) {
         score += 15;
@@ -195,19 +193,12 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
         score += 5;
     }
 
-    // 3. Liquidity Sweep Confluence (Max 20 pts)
     const hasSweep = checkLiquiditySweep(candles, i, type === 'BUY' ? 'BUY' : 'SELL', p.sweepLookback);
-    if (hasSweep) {
-        score += 20;
-    }
+    if (hasSweep) score += 20;
 
-    // 4. FVG Retest Confluence (Max 15 pts)
     const hasFVG = checkFVGConfluence(candles, i, type === 'BUY' ? 'BUY' : 'SELL', p.fvgLookback);
-    if (hasFVG) {
-        score += 15;
-    }
+    if (hasFVG) score += 15;
 
-    // 5. EMA Touch Precision (Max 15 pts)
     const extreme = type === 'BUY' ? sBar.low : sBar.high;
     const distanceToEMA = Math.abs(extreme - ema[i]);
     const ticksToEMA = distanceToEMA / p.tickSize;
@@ -370,7 +361,7 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
 }
 
 // ============================================================
-// PARAMETERIZED CENTRAL CORE ENGINE
+// CORE PIPELINE WITH ADAPTIVE STRUCTURAL TARGETING SUPPORT
 // ============================================================
 
 function twoLeggedPullbackCore(candles, params = {}) {
@@ -420,19 +411,32 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const triggerPrice = sBar.high + (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
                             
-                            signals.push({
-                                index: i,
-                                type: 'BUY_STOP',
-                                triggerPrice,
-                                stopLoss,
-                                takeProfit: triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio,
-                                timestamp: sBar.timestamp,
-                                reason: p.enableConfidenceScoring 
-                                    ? `H2 Pullback (Conf: ${score}/100)`
-                                    : `H2 Signal Bar (Close: ${sBar.close})`
-                            });
-                            lastPullbackSignalIdx = i;
-                            signalFound = true;
+                            // Dynamically evaluate target price based on structural peaks if enabled (Wade Structural Target)
+                            let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
+                            if (p.useStructuralTarget && swingHighIdx !== null) {
+                                takeProfit = candles[swingHighIdx].high + (p.triggerOffsetTicks * p.tickSize);
+                            }
+
+                            const risk = Math.abs(triggerPrice - stopLoss);
+                            const reward = Math.abs(takeProfit - triggerPrice);
+                            const rrr = risk > 0 ? reward / risk : 0;
+
+                            // Skip setups that fail Wade's reward restrictions (not worth taking (< 1.0) or too far (> 2.2))
+                            if (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2)) {
+                                signals.push({
+                                    index: i,
+                                    type: 'BUY_STOP',
+                                    triggerPrice,
+                                    stopLoss,
+                                    takeProfit,
+                                    timestamp: sBar.timestamp,
+                                    reason: p.enableConfidenceScoring 
+                                        ? `H2 Pullback (Conf: ${score}/100)`
+                                        : `H2 Signal Bar (Close: ${sBar.close})`
+                                });
+                                lastPullbackSignalIdx = i;
+                                signalFound = true;
+                            }
                         }
                     }
                 }
@@ -461,19 +465,30 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const triggerPrice = sBar.low - (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
 
-                            signals.push({
-                                index: i,
-                                type: 'SELL_STOP',
-                                triggerPrice,
-                                stopLoss,
-                                takeProfit: triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio,
-                                timestamp: sBar.timestamp,
-                                reason: p.enableConfidenceScoring
-                                    ? `L2 Pullback (Conf: ${score}/100)`
-                                    : `L2 Signal Bar (Close: ${sBar.close})`
-                            });
-                            lastPullbackSignalIdx = i;
-                            signalFound = true;
+                            let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
+                            if (p.useStructuralTarget && swingLowIdx !== null) {
+                                takeProfit = candles[swingLowIdx].low - (p.triggerOffsetTicks * p.tickSize);
+                            }
+
+                            const risk = Math.abs(triggerPrice - stopLoss);
+                            const reward = Math.abs(takeProfit - triggerPrice);
+                            const rrr = risk > 0 ? reward / risk : 0;
+
+                            if (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2)) {
+                                signals.push({
+                                    index: i,
+                                    type: 'SELL_STOP',
+                                    triggerPrice,
+                                    stopLoss,
+                                    takeProfit,
+                                    timestamp: sBar.timestamp,
+                                    reason: p.enableConfidenceScoring
+                                        ? `L2 Pullback (Conf: ${score}/100)`
+                                        : `L2 Signal Bar (Close: ${sBar.close})`
+                                });
+                                lastPullbackSignalIdx = i;
+                                signalFound = true;
+                            }
                         }
                     }
                 }
@@ -507,15 +522,24 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     if (passesScore) {
                                         const triggerPrice = structureHigh + (p.triggerOffsetTicks * p.tickSize);
                                         const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
-                                        const risk = triggerPrice - stopLoss;
+                                        
+                                        let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
+                                        const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
+                                        if (p.useStructuralTarget && swingHighIdx !== null) {
+                                            takeProfit = candles[swingHighIdx].high + (p.triggerOffsetTicks * p.tickSize);
+                                        }
 
-                                        if (risk > 0) {
+                                        const risk = Math.abs(triggerPrice - stopLoss);
+                                        const reward = Math.abs(takeProfit - triggerPrice);
+                                        const rrr = risk > 0 ? reward / risk : 0;
+
+                                        if (risk > 0 && (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2))) {
                                             signals.push({
                                                 index: i,
                                                 type: 'BUY_STOP',
                                                 triggerPrice,
                                                 stopLoss,
-                                                takeProfit: triggerPrice + risk * p.rewardRatio,
+                                                takeProfit,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_BUY (Conf: ${score}/100)`
@@ -558,15 +582,24 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     if (passesScore) {
                                         const triggerPrice = structureLow - (p.triggerOffsetTicks * p.tickSize);
                                         const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
-                                        const risk = stopLoss - triggerPrice;
+                                        
+                                        let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
+                                        const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
+                                        if (p.useStructuralTarget && swingLowIdx !== null) {
+                                            takeProfit = candles[swingLowIdx].low - (p.triggerOffsetTicks * p.tickSize);
+                                        }
 
-                                        if (risk > 0) {
+                                        const risk = Math.abs(triggerPrice - stopLoss);
+                                        const reward = Math.abs(takeProfit - triggerPrice);
+                                        const rrr = risk > 0 ? reward / risk : 0;
+
+                                        if (risk > 0 && (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2))) {
                                             signals.push({
                                                 index: i,
                                                 type: 'SELL_STOP',
                                                 triggerPrice,
                                                 stopLoss,
-                                                takeProfit: triggerPrice - risk * p.rewardRatio,
+                                                takeProfit,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_SELL (Conf: ${score}/100)`
@@ -591,7 +624,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
 }
 
 // ============================================================
-// STRATEGY VERSIONS MAP (PARALLEL CONFIGS)
+// PARALLEL CONFIGURATIONS STRATEGY INDEX
 // ============================================================
 
 const STRATEGIES = {
@@ -602,7 +635,8 @@ const STRATEGIES = {
             enableConfidenceScoring: true,
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45
+            minConfidenceThreshold: 45,
+            useStructuralTarget: false
         });
     },
     "V2: EMA Pullback": (candles, params = {}) => {
@@ -611,7 +645,8 @@ const STRATEGIES = {
             enableTraps: false,
             enableConfidenceScoring: false,
             enableFVGConfluence: false,
-            enableLiquiditySweeps: false
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false
         });
     },
     "V3: High Confidence": (candles, params = {}) => {
@@ -621,7 +656,8 @@ const STRATEGIES = {
             enableConfidenceScoring: true,
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
-            minConfidenceThreshold: 60
+            minConfidenceThreshold: 60,
+            useStructuralTarget: false
         });
     },
     "V4: Aggressive": (candles, params = {}) => {
@@ -632,13 +668,25 @@ const STRATEGIES = {
             enableGiantBarFilter: false,
             enableWhipsawFilter: false,
             enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50
+            minSignalBarCloseRatio: 0.50,
+            useStructuralTarget: false
+        });
+    },
+    "V5: Wade Structural": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: true // Calculates TP targets using structural extremes
         });
     }
 };
 
 // ============================================================
-// SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
+// BACKTEST SIMULATOR
 // ============================================================
 
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
@@ -668,7 +716,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     for (let i = p.emaPeriod + p.minTrendBars; i < candles.length; i++) {
         const bar = candles[i];
 
-        // 1. Process active trade exits
         if (position) {
             let exitPrice = null;
             let exitReason = null;
@@ -730,7 +777,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             }
         }
 
-        // 2. Check and execute pending Stop Orders on the next bar
         if (!position && pendingOrder) {
             let triggered = false;
             let entryPrice = 0;
@@ -829,7 +875,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             pendingOrder = null;
         }
 
-        // 3. Scan lookup map for signals
         if (!position && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
             if (signalMap.has(i)) {
                 const signal = signalMap.get(i);
@@ -865,7 +910,7 @@ module.exports = {
     calculateEMA, 
     evaluateH2Setup, 
     evaluateL2Setup, 
-    STRATEGIES,
-    twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Fallback export for backward-compatibility
+    STRATEGIES, // FIX: Export STRATEGIES map explicitly
+    twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Backward-compatibility
     runPriceActionBacktest 
 };
