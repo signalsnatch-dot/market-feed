@@ -15,6 +15,9 @@ class MarketChart {
         this.initialDataLoaded = false;
         this.lastSubscription = null;
         
+        // FIX: Shared translation map to resolve time duplication crashes
+        this.timeMap = new Map();
+        
         this.indicators = new ChartIndicators(this);
         this.drawings = null; 
         
@@ -46,6 +49,7 @@ class MarketChart {
         this.currentInstrument = key;
         this.setActiveInstrument(key);
         this.initialDataLoaded = false;
+        this.timeMap.clear(); // Flush key mappings on instrument swaps
         this.loadCandlesForCurrentInstrument();
         this.subscribeToCandles();
         this.updateBottomChartLabel();
@@ -87,14 +91,9 @@ class MarketChart {
     }
 
     convertToChartCandle(candleData) {
-        let timestamp = candleData.startTime || candleData.timestamp || candleData.end_time;
-        if (!timestamp) return null;
-        if (typeof timestamp === 'string') {
-            timestamp = new Date(timestamp).getTime();
-        }
-        const timeInSeconds = Math.floor(timestamp / 1000);
-        if (timeInSeconds < 1577836800 || timeInSeconds > 1893456000) return null;
-        
+        const barNum = parseInt(candleData.barNumber);
+        if (isNaN(barNum) || barNum <= 0) return null;
+
         const open = parseFloat(candleData.open);
         const high = parseFloat(candleData.high);
         const low = parseFloat(candleData.low);
@@ -107,15 +106,30 @@ class MarketChart {
         } else {
             bottomValue = parseFloat(candleData.volume) || 0;
         }
+
+        // FIX: Construct a synthetic strictly increasing time to prevent duplicate epoch crashes
+        const syntheticTime = 1600000000 + (barNum * 60);
+
+        // Store the real timestamp translation inside our map
+        let realTime = candleData.startTime || candleData.timestamp || candleData.end_time;
+        if (realTime) {
+            if (typeof realTime === 'string') {
+                realTime = new Date(realTime).getTime();
+            }
+            const d = new Date(realTime);
+            const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            this.instruments.set(`${this.currentInstrument}_${candleData.barNumber}`, timeStr);
+            this.timeMap.set(syntheticTime, timeStr);
+        }
         
         return {
-            time: timeInSeconds,
+            time: syntheticTime,
             open: open,
             high: high,
             low: low,
             close: close,
             volume: parseFloat(candleData.volume || candleData.targetVolume || 0),
-            barNumber: candleData.barNumber,
+            barNumber: barNum,
             progress: candleData.progress,
             bottomValue: bottomValue,
             priceChanges: candleData.priceChanges,
@@ -128,7 +142,6 @@ class MarketChart {
             const volumeRes = await fetch('/api/recent/volume?limit=500');
             if (volumeRes.ok) {
                 this.volume_candles = await volumeRes.json();
-                console.log(`Loaded ${this.volume_candles.length} volume candles`);
                 this.volume_candles.forEach(candle => {
                     const instKey = candle.instrument || candle.instrument_key;
                     if (instKey && !this.instruments.has(instKey)) {
@@ -144,7 +157,6 @@ class MarketChart {
             const priceRes = await fetch('/api/recent/price?limit=500');
             if (priceRes.ok) {
                 this.price_candles = await priceRes.json();
-                console.log(`Loaded ${this.price_candles.length} price candles`);
                 this.price_candles.forEach(candle => {
                     const instKey = candle.instrument || candle.instrument_key;
                     if (instKey && !this.instruments.has(instKey)) {
@@ -224,7 +236,6 @@ class MarketChart {
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
 
-            // Set up strategy versions dynamically from backend parameters
             if (data.strategies) {
                 this.tracker.setupStrategyVersions(data.strategies);
             }
@@ -242,7 +253,7 @@ class MarketChart {
             const candleInst = normalizedCandle.instrument;
             if (candleInst === this.currentInstrument && liveCandle.type === this.currentType) {
                 this.updateLiveCandle(normalizedCandle);
-                this.updateProgressBar(normalizedCandle); // Updates bottom progress bar
+                this.updateProgressBar(normalizedCandle);
             }
         });
         
@@ -287,14 +298,13 @@ class MarketChart {
             timeScale: {
                 timeVisible: true,
                 secondsVisible: true,
+                // FIX: Translates synthetic time codes back to real-world timestamps inside x-axis formatter
                 tickMarkFormatter: (time) => {
+                    if (this.timeMap && this.timeMap.has(time)) {
+                        return this.timeMap.get(time);
+                    }
                     const date = new Date(time * 1000);
-                    return date.toLocaleString('en-IN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    });
+                    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
                 }
             },
             rightPriceScale: {
@@ -332,9 +342,13 @@ class MarketChart {
         if (oldBottom) oldBottom.style.display = 'none';
 
         this.addBottomPaneLabel();
+        this.addSmaToggleButtons();   
         
-        // FIX: Removed buttons and SMA9, SMA21, EMA20 overlay labels to clean up chart layout
-        
+        // FIX: Retain SMA Toggle buttons but dynamically remove SMA9, SMA21, EMA20 text legends
+        if (this.indicators.sma9Series) this.indicators.sma9Series.applyOptions({ title: '' });
+        if (this.indicators.sma21Series) this.indicators.sma21Series.applyOptions({ title: '' });
+        if (this.indicators.ema20Series) this.indicators.ema20Series.applyOptions({ title: '' });
+
         this.drawings = new ChartDrawings(this);
 
         this.updateCharts();
@@ -347,6 +361,63 @@ class MarketChart {
             this.chart?.applyOptions({ width: chartElement.clientWidth });
             this.drawings?.render();
         });
+    }
+
+    addSmaToggleButtons() {
+        let container = document.getElementById('indicator-toggles');
+        if (!container) {
+            const toolbar = document.querySelector('.draw-toolbar');
+            if (toolbar) {
+                container = document.createElement('div');
+                container.id = 'indicator-toggles';
+                container.style.cssText = 'display: inline-flex; gap: 8px; margin-left: 20px; align-items: center;';
+                toolbar.appendChild(container);
+            } else {
+                const parent = document.querySelector('.draw-tools') || document.body;
+                container = document.createElement('div');
+                container.id = 'indicator-toggles';
+                container.style.cssText = 'position: absolute; top: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; background: #2a2e39; padding: 4px 8px; border-radius: 6px;';
+                parent.appendChild(container);
+            }
+        }
+        
+        container.innerHTML = '';
+        
+        const btn9 = document.createElement('button');
+        btn9.className = 'sma-toggle-btn';
+        btn9.dataset.sma = '9';
+        btn9.innerHTML = this.indicators.sma9Visible ? '👁️ SMA9' : '👁️‍🗨️ SMA9';
+        btn9.style.cssText = 'background: #2a2e39; border: 1px solid #4a4e5a; color: #d1d4dc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;';
+        btn9.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.indicators.toggleVisibility('sma9');
+            btn9.innerHTML = this.indicators.sma9Visible ? '👁️ SMA9' : '👁️‍🗨️ SMA9';
+        });
+        container.appendChild(btn9);
+        
+        const btn21 = document.createElement('button');
+        btn21.className = 'sma-toggle-btn';
+        btn21.dataset.sma = '21';
+        btn21.innerHTML = this.indicators.sma21Visible ? '👁️ SMA21' : '👁️‍🗨️ SMA21';
+        btn21.style.cssText = 'background: #2a2e39; border: 1px solid #4a4e5a; color: #d1d4dc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;';
+        btn21.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.indicators.toggleVisibility('sma21');
+            btn21.innerHTML = this.indicators.sma21Visible ? '👁️ SMA21' : '👁️‍🗨️ SMA21';
+        });
+        container.appendChild(btn21);
+
+        const btn20 = document.createElement('button');
+        btn20.className = 'sma-toggle-btn';
+        btn20.dataset.sma = '20';
+        btn20.innerHTML = this.indicators.ema20Visible ? '👁️ EMA20' : '👁️‍🗨️ EMA20';
+        btn20.style.cssText = 'background: #2a2e39; border: 1px solid #4a4e5a; color: #d1d4dc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;';
+        btn20.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.indicators.toggleVisibility('ema20');
+            btn20.innerHTML = this.indicators.ema20Visible ? '👁️ EMA20' : '👁️‍🗨️ EMA20';
+        });
+        container.appendChild(btn20);
     }
 
     updateCharts() {
@@ -383,7 +454,7 @@ class MarketChart {
         if (existing) existing.remove();
         const label = document.createElement('div');
         label.id = 'bottom-pane-label';
-        label.style.cssText = 'position: absolute; bottom: 45px; right: 70px; font-size: 11px; color: #787b86; background: rgba(30,34,45,0.8); padding: 2px 8px; border-radius: 4px; z-index: 10; font-family: monospace;';
+        label.style.cssText = 'position: absolute; bottom: 40px; right: 70px; font-size: 11px; color: #787b86; background: rgba(30,34,45,0.8); padding: 2px 8px; border-radius: 4px; z-index: 10; font-family: monospace;';
         label.textContent = this.currentType === 'volume' ? '📊 PRICE CHANGES' : '💰 TRADED VOLUME';
         const container = document.getElementById('main-chart');
         if (container) {
@@ -400,7 +471,7 @@ class MarketChart {
 
         if (!this.isInitialized) return;
 
-        // FIX: Added guard logic to ensure timestamp keys strictly increase
+        // FIX: Strict chronological time guard to prevent out-of-order crashes
         const lastIdx = this.candles.length - 1;
         if (lastIdx >= 0) {
             const lastCandle = this.candles[lastIdx];

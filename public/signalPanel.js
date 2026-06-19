@@ -108,7 +108,6 @@ class LiveTradeTracker {
         document.head.appendChild(style);
     }
 
-    // FIX: Populates options dynamically on handshake from the server configurations
     setupStrategyVersions(versions) {
         if (!Array.isArray(versions) || versions.length === 0) return;
         
@@ -131,7 +130,6 @@ class LiveTradeTracker {
             }
             select.value = this.currentVersion;
             
-            // Clean dynamic listener binding
             select.onchange = (e) => {
                 this.currentVersion = e.target.value;
                 this.renderFilteredSignals();
@@ -154,13 +152,19 @@ class LiveTradeTracker {
         if (volList) volList.innerHTML = '';
         if (priceList) priceList.innerHTML = '';
 
-        const filtered = this.allSignals.filter(sig => sig.version === this.currentVersion);
+        // FIX: Implement a version fallback (sig.version || "V1: Double Traps") to ensure legacy price-based trades are displayed correctly
+        const filtered = this.allSignals.filter(sig => {
+            const sigVersion = sig.version || "V1: Double Traps";
+            return sigVersion === this.currentVersion;
+        });
+
         const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
         
         sorted.forEach(sig => {
             this.addCardToDOM(sig, 'append');
             if (sig.status === 'active') {
-                const key = `${sig.instrument}_${sig.bar_type}_${sig.version}`;
+                const sigVersion = sig.version || "V1: Double Traps";
+                const key = `${sig.instrument}_${sig.bar_type}_${sigVersion}`;
                 this.activeTrades.set(key, sig);
             }
         });
@@ -169,30 +173,34 @@ class LiveTradeTracker {
     }
 
     handleIncomingSignal(sig) {
+        const sigVersion = sig.version || "V1: Double Traps";
+        
         const exists = this.allSignals.some(s => 
             s.instrument === sig.instrument &&
             s.bar_type === sig.bar_type &&
             s.barNumber === sig.barNumber &&
             s.type === sig.type &&
-            s.version === sig.version
+            (s.version || "V1: Double Traps") === sigVersion
         );
         if (exists) return;
 
         this.allSignals.push(sig);
         
-        if (sig.version === this.currentVersion) {
+        if (sigVersion === this.currentVersion) {
             this.addCardToDOM(sig, 'prepend');
             this.updateCounts();
         }
     }
 
     handleStatusUpdate(update) {
+        const updateVersion = update.version || "V1: Double Traps";
+
         const match = this.allSignals.find(s => 
             s.instrument === update.instrument &&
             s.bar_type === update.bar_type &&
             s.barNumber === update.barNumber &&
             s.type === update.type &&
-            s.version === update.version
+            (s.version || "V1: Double Traps") === updateVersion
         );
 
         if (match) {
@@ -202,7 +210,7 @@ class LiveTradeTracker {
                 match.exitPrice = update.exitPrice;
             }
 
-            const key = `${match.instrument}_${match.bar_type}_${match.version}`;
+            const key = `${match.instrument}_${match.bar_type}_${updateVersion}`;
             if (update.status === 'active') {
                 this.activeTrades.set(key, match);
             } else {
@@ -234,7 +242,8 @@ class LiveTradeTracker {
             pnlAmount = quantity * (active.entry - currentPrice);
         }
 
-        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.barNumber}-${active.version.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const sigVersion = active.version || "V1: Double Traps";
+        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const pnlTextEl = document.getElementById(`${cardId}-live-pnl`);
         if (pnlTextEl) {
             const color = pnlAmount >= 0 ? '#26a69a' : '#ef5350';
@@ -249,7 +258,8 @@ class LiveTradeTracker {
         const container = document.getElementById(listId);
         if (!container) return;
 
-        const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.barNumber}-${sig.version.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const sigVersion = sig.version || "V1: Double Traps";
+        const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
         
         const oldCard = document.getElementById(cardId);
         if (oldCard) oldCard.remove();
@@ -364,10 +374,10 @@ class LiveTradeTracker {
         const priceCount = document.getElementById('price-signals-count');
         
         if (volCount) {
-            volCount.textContent = this.allSignals.filter(s => s.bar_type === 'volume' && s.version === this.currentVersion).length;
+            volCount.textContent = this.allSignals.filter(s => s.bar_type === 'volume' && (s.version || "V1: Double Traps") === this.currentVersion).length;
         }
         if (priceCount) {
-            priceCount.textContent = this.allSignals.filter(s => s.bar_type === 'price' && s.version === this.currentVersion).length;
+            priceCount.textContent = this.allSignals.filter(s => s.bar_type === 'price' && (s.version || "V1: Double Traps") === this.currentVersion).length;
         }
     }
 }
