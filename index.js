@@ -55,6 +55,10 @@ candleBuilder.on('trade_signal', (signal) => {
     chartServer.broadcastTradeSignal(signal);
 });
 
+// FIX: Add missing forwarder to bridge trade status changes (Pending -> Active -> Completed/Cancelled)
+candleBuilder.on('trade_status_update', (update) => {
+    chartServer.broadcastTradeStatusUpdate(update);
+});
 // Real-time progress monitoring
 candleBuilder.on('tick_processed', (data) => {
     // Only log occasionally to avoid spam

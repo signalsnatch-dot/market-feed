@@ -48,6 +48,21 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
+        // FIX: Register live candle update forwarding ONLY ONCE in the constructor
+        this.priceBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', {
+                ...candle,
+                instrument: candle.instrument_key || candle.instrument
+            });
+        });
+        
+        this.volumeBuilder.on('live_candle_update', (candle) => {
+            this.emit('live_candle_update', {
+                ...candle,
+                instrument: candle.instrument_key || candle.instrument
+            });
+        });
+
         // Intercept signals to track active statuses and flag overlaps
         this.volumeBuilder.on('trade_signal', (signal) => {
             this.processIncomingSignal(signal, 'volume');
@@ -98,7 +113,45 @@ class DualCandleBuilder extends EventEmitter {
         this.on('bar_close', (bar) => {
             const key = `${bar.instrument}_${bar.type}`;
 
-            // 1. Evaluate SL/TP Exits for Active Trades (On bar close)
+            // 1. Evaluate Pending Order Activation (on bar close)
+            if (this.pendingOrders.has(key)) {
+                const pending = this.pendingOrders.get(key);
+                let triggered = false;
+
+                if (pending.type === 'BUY_STOP') {
+                    if (bar.high >= pending.entry) {
+                        triggered = true;
+                    }
+                } else if (pending.type === 'SELL_STOP') {
+                    if (bar.low <= pending.entry) {
+                        triggered = true;
+                    }
+                }
+
+                if (triggered) {
+                    const activeTrade = {
+                        instrument: pending.instrument,
+                        name: pending.name,
+                        bar_type: pending.bar_type,
+                        barNumber: pending.barNumber,
+                        type: pending.type,
+                        entry: pending.entry, // Standard entry price
+                        sl: pending.sl,
+                        tp: pending.tp,
+                        direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
+                        timestamp: bar.timestamp,
+                        status: 'active'
+                    };
+
+                    this.activeTrades.set(key, activeTrade);
+                    this.pendingOrders.delete(key);
+
+                    // Forward state update to index -> server -> frontend
+                    this.emit('trade_status_update', activeTrade);
+                }
+            }
+
+            // 2. Evaluate SL/TP Exits for Active Trades (on bar close)
             if (this.activeTrades.has(key)) {
                 const trade = this.activeTrades.get(key);
                 let exitPrice = null;
@@ -151,7 +204,7 @@ class DualCandleBuilder extends EventEmitter {
                 }
             }
 
-            // 2. Evaluate Pending Order Expirations (On next bar close if not yet triggered)
+            // 3. Evaluate Pending Order Expirations (if still pending and not triggered)
             if (this.pendingOrders.has(key)) {
                 const pending = this.pendingOrders.get(key);
                 if (bar.barNumber >= pending.expiryBarNumber) {
@@ -172,11 +225,10 @@ class DualCandleBuilder extends EventEmitter {
     }
     
     /**
-     * Process incoming tick through both builders
+     * Highly optimized processTick with zero real-time trigger evaluation and zero listener leaks.
      */
     processTick(tickData) {
         const { instrument_key, last_traded_quantity, ltp } = tickData;
-        const price = parseFloat(ltp);
         
         // Update comparison stats
         const stats = this.comparisonStats.get(instrument_key);
@@ -185,63 +237,6 @@ class DualCandleBuilder extends EventEmitter {
             stats.totalVolume += parseInt(last_traded_quantity) || 0;
             this.comparisonStats.set(instrument_key, stats);
         }
-
-        // --- TICK-BY-TICK PENDING TRIGGER EVALUATION ---
-        if (price) {
-            for (const barType of ['volume', 'price']) {
-                const key = `${instrument_key}_${barType}`;
-                if (this.pendingOrders.has(key)) {
-                    const pending = this.pendingOrders.get(key);
-                    let triggered = false;
-
-                    if (pending.type === 'BUY_STOP') {
-                        if (price >= pending.entry) {
-                            triggered = true;
-                        }
-                    } else if (pending.type === 'SELL_STOP') {
-                        if (price <= pending.entry) {
-                            triggered = true;
-                        }
-                    }
-
-                    if (triggered) {
-                        const activeTrade = {
-                            instrument: pending.instrument,
-                            name: pending.name,
-                            bar_type: pending.bar_type,
-                            barNumber: pending.barNumber,
-                            type: pending.type,
-                            entry: price, // Fill price mapped to execution tick
-                            sl: pending.sl,
-                            tp: pending.tp,
-                            direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
-                            timestamp: Date.now(),
-                            status: 'active'
-                        };
-
-                        this.activeTrades.set(key, activeTrade);
-                        this.pendingOrders.delete(key);
-
-                        this.emit('trade_status_update', activeTrade);
-                    }
-                }
-            }
-        }
-        
-        // Forward live candle tracking from both builders
-        this.priceBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', {
-                ...candle,
-                instrument: candle.instrument  
-            });
-        });
-        
-        this.volumeBuilder.on('live_candle_update', (candle) => {
-            this.emit('live_candle_update', {
-                ...candle,
-                instrument: candle.instrument  
-            });
-        });
         
         // Process through both builders
         this.priceBuilder.processTick(tickData);

@@ -1,6 +1,3 @@
-// public/signalPanel.js
-// Handles split layout (Volume vs Price), live state tracking, tick trigger evaluation, and exits.
-
 class LiveTradeTracker {
     constructor(chartServer) {
         this.chartServer = chartServer;
@@ -11,118 +8,53 @@ class LiveTradeTracker {
     }
 
     initializeUI() {
-        // Find or create layout containers
-        const signalsTodayContainer = document.getElementById('signals-container');
-        if (!signalsTodayContainer) { // Fixed typo: changed from signalsFileContainer to signalsTodayContainer
-            const container = document.getElementById('signalsList');
-            if (container) {
-                container.innerHTML = `
-                    <div id="volume-signals-section" style="height: 70%; display: flex; flex-direction: column; border-bottom: 2px solid #2a2e39; box-sizing: border-box; overflow: hidden;">
-                        <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
-                            <span>📊 VOLUME BARS (70%)</span>
-                            <span id="volume-signals-count" style="color: #787b86;">0</span>
-                        </div>
-                        <div id="volume-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
+        const container = document.getElementById('signalsList');
+        if (container) {
+            // FIX: Force container styles to handle full containment height & hide overflow
+            container.style.height = '100%';
+            container.style.overflow = 'hidden';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.boxSizing = 'border-box';
+            
+            container.innerHTML = `
+                <div id="volume-signals-section" style="height: 70%; display: flex; flex-direction: column; border-bottom: 2px solid #2a2e39; box-sizing: border-box; overflow: hidden;">
+                    <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
+                        <span>📊 VOLUME BARS (70%)</span>
+                        <span id="volume-signals-count" style="color: #787b86;">0</span>
                     </div>
-                    <div id="price-signals-section" style="height: 30%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
-                        <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #26a69a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
-                            <span>💰 PRICE BARS (30%)</span>
-                            <span id="price-signals-count" style="color: #787b86;">0</span>
-                        </div>
-                        <div id="price-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
+                    <div id="volume-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+                <div id="price-signals-section" style="height: 30%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
+                    <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #26a69a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
+                        <span>💰 PRICE BARS (30%)</span>
+                        <span id="price-signals-count" style="color: #787b86;">0</span>
                     </div>
-                `;
-            }
+                    <div id="price-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+            `;
         }
         this.injectCSS();
     }
 
-    injectCSS() {
-        const styleId = 'live-tracker-styles';
-        if (document.getElementById(styleId)) return;
-
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            .signal-item {
-                background: #1e222d;
-                border: 1px solid #2a2e39;
-                border-radius: 6px;
-                padding: 10px;
-                color: #d1d4dc;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                transition: all 0.25s ease;
-                font-size: 12px;
-                box-sizing: border-box;
-            }
-            .signal-item.pending {
-                border-left: 4px solid #f9a825;
-            }
-            .signal-item.active {
-                border-left: 4px solid #00bcd4;
-                box-shadow: 0 0 6px rgba(0, 188, 212, 0.15);
-                animation: active-glow 2s infinite alternate;
-            }
-            .signal-item.completed-win {
-                border-left: 4px solid #26a69a;
-            }
-            .signal-item.completed-loss {
-                border-left: 4px solid #ef5350;
-            }
-            .signal-item.cancelled {
-                border-left: 4px solid #4a4e5a;
-                opacity: 0.55;
-            }
-            .signal-badge {
-                font-size: 9px;
-                font-weight: bold;
-                padding: 2px 6px;
-                border-radius: 3px;
-                text-transform: uppercase;
-                display: inline-block;
-            }
-            .badge-pending { background: #5d4037; color: #ffb74d; }
-            .badge-active { background: #006064; color: #80deea; }
-            .badge-win { background: #1b5e20; color: #a5d6a7; }
-            .badge-loss { background: #b71c1c; color: #ef9a9a; }
-            .badge-cancelled { background: #37474f; color: #b0bec5; }
-            
-            .metric-row {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 4px;
-                font-size: 11px;
-                color: #b2b5be;
-                margin-top: 6px;
-            }
-            .metric-val {
-                color: #fff;
-                font-weight: 600;
-            }
-            
-            @keyframes active-glow {
-                from { box-shadow: 0 0 4px rgba(0, 188, 212, 0.1); }
-                to { box-shadow: 0 0 10px rgba(0, 188, 212, 0.3); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
+    injectCSS() { ... } // (keep your existing injectCSS implementation unchanged)
 
     renderSignals(signals) {
         this.tradeSignals = signals;
         this.activeTrades.clear();
 
-        // Clear panel containers
+        // Clear panel lists
         const volList = document.getElementById('volume-signals-list');
         const priceList = document.getElementById('price-signals-list');
         if (volList) volList.innerHTML = '';
         if (priceList) priceList.innerHTML = '';
 
-        // Add back in chronological sorted blocks
+        // FIX: Sort descending so the most recent trades sit consistently at the top
         const sorted = [...signals].sort((a, b) => b.timestamp - a.timestamp);
         
         sorted.forEach(sig => {
-            this.addCardToDOM(sig);
+            // FIX: Append historical cards sequentially when rebuilding lists on launch
+            this.addCardToDOM(sig, 'append');
             if (sig.status === 'active') {
                 const key = `${sig.instrument}_${sig.bar_type}`;
                 this.activeTrades.set(key, sig);
@@ -133,7 +65,6 @@ class LiveTradeTracker {
     }
 
     handleIncomingSignal(sig) {
-        // Prevent duplication checks
         const exists = this.tradeSignals.some(s => 
             s.instrument === sig.instrument &&
             s.bar_type === sig.bar_type &&
@@ -143,7 +74,8 @@ class LiveTradeTracker {
         if (exists) return;
 
         this.tradeSignals.push(sig);
-        this.addCardToDOM(sig);
+        // FIX: Prepend fresh live signals to the top of the UI
+        this.addCardToDOM(sig, 'prepend');
         this.updateCounts();
     }
 
@@ -169,52 +101,21 @@ class LiveTradeTracker {
                 this.activeTrades.delete(key);
             }
 
-            // Re-render to reflect modified status
+            // Re-render list to propagate changes gracefully
             this.renderSignals(this.tradeSignals);
         }
     }
 
-    handleTickPriceUpdate(instrument, barType, currentPrice) {
-        const key = `${instrument}_${barType}`;
-        const active = this.activeTrades.get(key);
-        if (!active) return;
+    handleTickPriceUpdate(instrument, barType, currentPrice) { ... } // (keep unchanged)
 
-        // Calculate quantity based on standard 1% risk allocation (Capital: ₹100,000)
-        const initialCapital = 100000;
-        const riskAmount = initialCapital * 0.01; // ₹1,000 risk
-        const riskPerUnit = Math.abs(active.entry - active.sl);
-        const quantity = riskPerUnit > 0 ? riskAmount / riskPerUnit : 0;
-
-        let returnPct = 0;
-        let pnlAmount = 0;
-
-        if (active.type.toUpperCase().includes('BUY')) {
-            returnPct = ((currentPrice - active.entry) / active.entry) * 100;
-            pnlAmount = quantity * (currentPrice - active.entry);
-        } else {
-            returnPct = ((active.entry - currentPrice) / active.entry) * 100;
-            pnlAmount = quantity * (active.entry - currentPrice);
-        }
-
-        // Live update values inside DOM elements directly
-        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.barNumber}`;
-        const pnlTextEl = document.getElementById(`${cardId}-live-pnl`);
-        if (pnlTextEl) {
-            const color = pnlAmount >= 0 ? '#26a69a' : '#ef5350';
-            const sign = pnlAmount >= 0 ? '+' : '';
-            pnlTextEl.style.color = color;
-            pnlTextEl.textContent = `${sign}₹${pnlAmount.toFixed(2)} (${sign}${returnPct.toFixed(2)}%)`;
-        }
-    }
-
-    addCardToDOM(sig) {
+    // FIX: Add position parameter to control card placement rules (prepend for live, append for sorting)
+    addCardToDOM(sig, position = 'prepend') {
         const listId = sig.bar_type === 'volume' ? 'volume-signals-list' : 'price-signals-list';
         const container = document.getElementById(listId);
         if (!container) return;
 
         const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.barNumber}`;
         
-        // Remove existing element if present to avoid duplication
         const oldCard = document.getElementById(cardId);
         if (oldCard) oldCard.remove();
 
@@ -248,7 +149,7 @@ class LiveTradeTracker {
         const rrrVal = risk > 0 ? (reward / risk).toFixed(2) : '1.50';
         const rrrStr = `1 : ${rrrVal}`;
 
-        // Compute quantity for floating or final metrics
+        // Compute quantity metrics
         const initialCapital = 100000;
         const riskAmount = initialCapital * 0.01;
         const quantity = risk > 0 ? riskAmount / risk : 0;
@@ -316,18 +217,12 @@ class LiveTradeTracker {
             </div>
         `;
 
-        container.insertBefore(card, container.firstChild);
+        if (position === 'append') {
+            container.appendChild(card);
+        } else {
+            container.insertBefore(card, container.firstChild);
+        }
     }
 
-    updateCounts() {
-        const volCount = document.getElementById('volume-signals-count');
-        const priceCount = document.getElementById('price-signals-count');
-        
-        if (volCount) {
-            volCount.textContent = this.tradeSignals.filter(s => s.bar_type === 'volume').length;
-        }
-        if (priceCount) {
-            priceCount.textContent = this.tradeSignals.filter(s => s.bar_type === 'price').length;
-        }
-    }
+    updateCounts() { ... } // (keep unchanged)
 }
