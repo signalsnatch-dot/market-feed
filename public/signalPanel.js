@@ -37,8 +37,76 @@ class LiveTradeTracker {
         this.injectCSS();
     }
 
-    injectCSS() { ... } // (keep your existing injectCSS implementation unchanged)
+    injectCSS() {
+        const styleId = 'live-tracker-styles';
+        if (document.getElementById(styleId)) return;
 
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            .signal-item {
+                background: #1e222d;
+                border: 1px solid #2a2e39;
+                border-radius: 6px;
+                padding: 10px;
+                color: #d1d4dc;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                transition: all 0.25s ease;
+                font-size: 12px;
+                box-sizing: border-box;
+            }
+            .signal-item.pending {
+                border-left: 4px solid #f9a825;
+            }
+            .signal-item.active {
+                border-left: 4px solid #00bcd4;
+                box-shadow: 0 0 6px rgba(0, 188, 212, 0.15);
+                animation: active-glow 2s infinite alternate;
+            }
+            .signal-item.completed-win {
+                border-left: 4px solid #26a69a;
+            }
+            .signal-item.completed-loss {
+                border-left: 4px solid #ef5350;
+            }
+            .signal-item.cancelled {
+                border-left: 4px solid #4a4e5a;
+                opacity: 0.55;
+            }
+            .signal-badge {
+                font-size: 9px;
+                font-weight: bold;
+                padding: 2px 6px;
+                border-radius: 3px;
+                text-transform: uppercase;
+                display: inline-block;
+            }
+            .badge-pending { background: #5d4037; color: #ffb74d; }
+            .badge-active { background: #006064; color: #80deea; }
+            .badge-win { background: #1b5e20; color: #a5d6a7; }
+            .badge-loss { background: #b71c1c; color: #ef9a9a; }
+            .badge-cancelled { background: #37474f; color: #b0bec5; }
+            
+            .metric-row {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 4px;
+                font-size: 11px;
+                color: #b2b5be;
+                margin-top: 6px;
+            }
+            .metric-val {
+                color: #fff;
+                font-weight: 600;
+            }
+            
+            @keyframes active-glow {
+                from { box-shadow: 0 0 4px rgba(0, 188, 212, 0.1); }
+                to { box-shadow: 0 0 10px rgba(0, 188, 212, 0.3); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
     renderSignals(signals) {
         this.tradeSignals = signals;
         this.activeTrades.clear();
@@ -106,7 +174,38 @@ class LiveTradeTracker {
         }
     }
 
-    handleTickPriceUpdate(instrument, barType, currentPrice) { ... } // (keep unchanged)
+    handleTickPriceUpdate(instrument, barType, currentPrice) {
+        const key = `${instrument}_${barType}`;
+        const active = this.activeTrades.get(key);
+        if (!active) return;
+
+        // Calculate quantity based on standard 1% risk allocation (Capital: ₹100,000)
+        const initialCapital = 100000;
+        const riskAmount = initialCapital * 0.01; // ₹1,000 risk
+        const riskPerUnit = Math.abs(active.entry - active.sl);
+        const quantity = riskPerUnit > 0 ? riskAmount / riskPerUnit : 0;
+
+        let returnPct = 0;
+        let pnlAmount = 0;
+
+        if (active.type.toUpperCase().includes('BUY')) {
+            returnPct = ((currentPrice - active.entry) / active.entry) * 100;
+            pnlAmount = quantity * (currentPrice - active.entry);
+        } else {
+            returnPct = ((active.entry - currentPrice) / active.entry) * 100;
+            pnlAmount = quantity * (active.entry - currentPrice);
+        }
+
+        // Live update values inside DOM elements directly
+        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.barNumber}`;
+        const pnlTextEl = document.getElementById(`${cardId}-live-pnl`);
+        if (pnlTextEl) {
+            const color = pnlAmount >= 0 ? '#26a69a' : '#ef5350';
+            const sign = pnlAmount >= 0 ? '+' : '';
+            pnlTextEl.style.color = color;
+            pnlTextEl.textContent = `${sign}₹${pnlAmount.toFixed(2)} (${sign}${returnPct.toFixed(2)}%)`;
+        }
+    }
 
     // FIX: Add position parameter to control card placement rules (prepend for live, append for sorting)
     addCardToDOM(sig, position = 'prepend') {
@@ -224,5 +323,19 @@ class LiveTradeTracker {
         }
     }
 
-    updateCounts() { ... } // (keep unchanged)
+    updateCounts() {
+        const volCount = document.getElementById('volume-signals-count');
+        const priceCount = document.getElementById('price-signals-count');
+        
+        if (volCount) {
+            volCount.textContent = this.tradeSignals.filter(s => s.bar_type === 'volume').length;
+        }
+        if (priceCount) {
+            priceCount.textContent = this.tradeSignals.filter(s => s.bar_type === 'price').length;
+        if (position === 'append') {
+            container.appendChild(card);
+        } else {
+            container.insertBefore(card, container.firstChild);
+        }
+    }
 }
