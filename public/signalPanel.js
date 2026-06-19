@@ -332,10 +332,6 @@ class LiveTradeTracker {
         }
         if (priceCount) {
             priceCount.textContent = this.tradeSignals.filter(s => s.bar_type === 'price').length;
-        if (position === 'append') {
-            container.appendChild(card);
-        } else {
-            container.insertBefore(card, container.firstChild);
         }
     }
 }
