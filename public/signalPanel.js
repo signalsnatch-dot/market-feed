@@ -2,13 +2,12 @@
 class LiveTradeTracker {
     constructor(chartServer) {
         this.chartServer = chartServer;
-        this.allSignals = [];          // Master signal cache across all versions
-        this.currentVersion = "V1: Double Traps"; // Selected version
-        this.activeTrades = new Map(); // key: `${instrument}_${bar_type}_${version}`
+        this.allSignals = [];          
+        this.currentVersion = "V1: Double Traps"; 
+        this.activeTrades = new Map(); 
         
         this.initializeUI();
     }
-
 
     initializeUI() {
         const container = document.getElementById('signalsList');
@@ -20,17 +19,13 @@ class LiveTradeTracker {
             container.style.boxSizing = 'border-box';
             
             container.innerHTML = `
-                <!-- Dropdown version selection panel -->
-                  <div id="strategy-selector-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-size: 11px; font-weight: bold; color: #b2b5be;">ACTIVE STRATEGY:</span>
-                        <select id="strategy-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; font-weight: bold;">
-                            <option value="V1: Double Traps">V1: Double Traps</option>
-                            <option value="V2: EMA Pullback">V2: EMA Pullback</option>
-                            <option value="V3: High Confidence">V3: High Confidence</option>
-                            <option value="V4: Aggressive">V4: Aggressive</option>
-                            <option value="V5: Wade Structural">V5: Wade Structural</option> <!-- FIX: Added Wade Structural -->
-                        </select>
-                    </div>
+                <!-- Select Dropdown Menu (Populated dynamically on handshake) -->
+                <div id="strategy-selector-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 11px; font-weight: bold; color: #b2b5be;">ACTIVE STRATEGY:</span>
+                    <select id="strategy-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; font-weight: bold;">
+                        <!-- Options generated dynamically on websocket handshake -->
+                    </select>
+                </div>
                 
                 <div id="volume-signals-section" style="height: 70%; display: flex; flex-direction: column; border-bottom: 2px solid #2a2e39; box-sizing: border-box; overflow: hidden;">
                     <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
@@ -47,15 +42,6 @@ class LiveTradeTracker {
                     <div id="price-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
                 </div>
             `;
-            
-            const select = document.getElementById('strategy-version-select');
-            if (select) {
-                select.value = this.currentVersion;
-                select.addEventListener('change', (e) => {
-                    this.currentVersion = e.target.value;
-                    this.renderFilteredSignals();
-                });
-            }
         }
         this.injectCSS();
     }
@@ -122,6 +108,39 @@ class LiveTradeTracker {
         document.head.appendChild(style);
     }
 
+    // FIX: Populates options dynamically on handshake from the server configurations
+    setupStrategyVersions(versions) {
+        if (!Array.isArray(versions) || versions.length === 0) return;
+        
+        const select = document.getElementById('strategy-version-select');
+        if (select) {
+            const prevValue = this.currentVersion;
+            select.innerHTML = ''; 
+            
+            versions.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                select.appendChild(opt);
+            });
+            
+            if (versions.includes(prevValue)) {
+                this.currentVersion = prevValue;
+            } else {
+                this.currentVersion = versions[0];
+            }
+            select.value = this.currentVersion;
+            
+            // Clean dynamic listener binding
+            select.onchange = (e) => {
+                this.currentVersion = e.target.value;
+                this.renderFilteredSignals();
+            };
+
+            this.renderFilteredSignals();
+        }
+    }
+
     renderSignals(signals) {
         this.allSignals = signals;
         this.renderFilteredSignals();
@@ -135,7 +154,6 @@ class LiveTradeTracker {
         if (volList) volList.innerHTML = '';
         if (priceList) priceList.innerHTML = '';
 
-        // Filter and sort signal cards sequentially (newest on top)
         const filtered = this.allSignals.filter(sig => sig.version === this.currentVersion);
         const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
         
@@ -231,7 +249,6 @@ class LiveTradeTracker {
         const container = document.getElementById(listId);
         if (!container) return;
 
-        // Uniquely key the card ID using both bar numbers and version string to avoid collisions
         const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.barNumber}-${sig.version.replace(/[^a-zA-Z0-9]/g, '_')}`;
         
         const oldCard = document.getElementById(cardId);
@@ -351,32 +368,6 @@ class LiveTradeTracker {
         }
         if (priceCount) {
             priceCount.textContent = this.allSignals.filter(s => s.bar_type === 'price' && s.version === this.currentVersion).length;
-        }
-    }
-
-    setupStrategyVersions(versions) {
-        if (!Array.isArray(versions) || versions.length === 0) return;
-        
-        const select = document.getElementById('strategy-version-select');
-        if (select) {
-            const prevValue = this.currentVersion;
-            select.innerHTML = ''; // Wipe hardcoded markup
-            
-            versions.forEach(v => {
-                const opt = document.createElement('option');
-                opt.value = v;
-                opt.textContent = v;
-                select.appendChild(opt);
-            });
-            
-            // Restore selection or fall back to the first item
-            if (versions.includes(prevValue)) {
-                this.currentVersion = prevValue;
-            } else {
-                this.currentVersion = versions[0];
-            }
-            select.value = this.currentVersion;
-            this.renderFilteredSignals();
         }
     }
 }
