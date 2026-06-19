@@ -294,18 +294,15 @@ class ChartServer {
      * This populates client charts with trade indicators immediately on startup.
      */
     generateHistoricalSignals() {
-        console.log('⚡ Generating trade signals on historical candles...');
+        console.log('⚡ Generating trade signals on historical candles across all versions...');
         
-        // Track unique keys to avoid duplicate insertion
         const seenSignals = new Set();
         this.tradeSignals.forEach(sig => {
-            const key = `${sig.instrument}_${sig.bar_type}_${sig.barNumber}_${sig.type}`;
+            const key = `${sig.instrument}_${sig.bar_type}_${sig.barNumber}_${sig.type}_${sig.version}`;
             seenSignals.add(key);
         });
 
-        // Helper to process standard instruments
         const processStrategyOnHistory = (candles, barType) => {
-            // Group the flat loaded candles list by instrument key
             const grouped = {};
             candles.forEach(c => {
                 const key = c.instrument || c.instrument_key;
@@ -317,40 +314,43 @@ class ChartServer {
                 if (list.length < 32) continue;
                 try {
                     const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
-                    const signals = twoLeggedPullback(list, { tickSize });
                     
-                    signals.forEach(sig => {
-                        const candle = list[sig.index];
-                        if (!candle) return;
+                    // Generate historical elements for all configured strategies
+                    for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
+                        const signals = strategyFn(list, { tickSize });
+                        
+                        signals.forEach(sig => {
+                            const candle = list[sig.index];
+                            if (!candle) return;
 
-                        let confidence = 50;
-                        const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
-                        if (confMatch) {
-                            confidence = parseInt(confMatch[1]);
-                        }
+                            let confidence = 50;
+                            const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
+                            if (confMatch) confidence = parseInt(confMatch[1]);
 
-                        const signalEvent = {
-                            instrument: instKey,
-                            name: this.getInstrumentName(instKey),
-                            type: sig.type,
-                            entry: sig.triggerPrice,
-                            sl: sig.stopLoss,
-                            tp: sig.takeProfit,
-                            confidence: confidence,
-                            reason: sig.reason.replace('Conf:', `${barType === 'volume' ? 'Volume' : 'Price'}, Conf:`),
-                            timestamp: candle.timestamp,
-                            barNumber: candle.barNumber,
-                            bar_type: barType,
-                            status: 'cancelled', // Defaults historical signals to cancelled status
-                            overlapping: false
-                        };
+                            const signalEvent = {
+                                version: versionName,
+                                instrument: instKey,
+                                name: this.getInstrumentName(instKey),
+                                type: sig.type,
+                                entry: sig.triggerPrice,
+                                sl: sig.stopLoss,
+                                tp: sig.takeProfit,
+                                confidence: confidence,
+                                reason: sig.reason.replace('Conf:', `${barType === 'volume' ? 'Volume' : 'Price'}, Conf:`),
+                                timestamp: candle.timestamp,
+                                barNumber: candle.barNumber,
+                                bar_type: barType,
+                                status: 'cancelled', 
+                                overlapping: false
+                            };
 
-                        const uniqueKey = `${instKey}_${barType}_${candle.barNumber}_${sig.type}`;
-                        if (!seenSignals.has(uniqueKey)) {
-                            seenSignals.add(uniqueKey);
-                            this.tradeSignals.push(signalEvent);
-                        }
-                    });
+                            const uniqueKey = `${instKey}_${barType}_${candle.barNumber}_${sig.type}_${versionName}`;
+                            if (!seenSignals.has(uniqueKey)) {
+                                seenSignals.add(uniqueKey);
+                                this.tradeSignals.push(signalEvent);
+                            }
+                        });
+                    }
                 } catch (err) {
                     console.error(`Error processing historical signals for ${instKey}:`, err.message);
                 }
@@ -360,16 +360,14 @@ class ChartServer {
         processStrategyOnHistory(this.recentCandles.volume_bars, 'volume');
         processStrategyOnHistory(this.recentCandles.price_bars, 'price');
 
-        // Keep list sorted chronologically
         this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
 
-        // Limit in-memory database to maximum of 200 signals
-        if (this.tradeSignals.length > 200) {
-            this.tradeSignals = this.tradeSignals.slice(-200);
+        if (this.tradeSignals.length > 800) {
+            this.tradeSignals = this.tradeSignals.slice(-800);
         }
 
         this.saveSignalsToDisk();
-        console.log(`✅ Ready: Calculated ${this.tradeSignals.length} total trade signals (including historical detections)`);
+        console.log(`✅ Calculated ${this.tradeSignals.length} historical trade signals across all versions`);
     }
 
     loadSavedSignals() {
@@ -668,39 +666,37 @@ class ChartServer {
     }
 
     broadcastTradeSignal(signalData) {
-        // Prevent duplicate broadcast/disk entry
+        // FIX: Prevent duplicate cache entries by validating key parameters + strategy version
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
             sig.bar_type === signalData.bar_type &&
             sig.barNumber === signalData.barNumber &&
-            sig.type === signalData.type
+            sig.type === signalData.type &&
+            sig.version === signalData.version
         );
         
-        if (isDuplicate) {
-            console.log(`ℹ️ [Server] Duplicate signal ignored for ${signalData.instrument} Bar #${signalData.barNumber}`);
-            return;
-        }
+        if (isDuplicate) return;
 
         signalData.status = signalData.status || 'pending';
-
         this.tradeSignals.push(signalData);
         
-        // Cache maximum of 200 historical signals in-memory
-        if (this.tradeSignals.length > 200) {
+        if (this.tradeSignals.length > 800) {
             this.tradeSignals.shift();
         }
         
-        this.saveSignalsToDisk(); // Save updated cache to disk
+        this.saveSignalsToDisk();
         this.io.emit('trade_signal', signalData);
-        console.log(`🚀 [Server] Trade signal logged & broadcasted: ${signalData.instrument} | Bar #${signalData.barNumber} | status: ${signalData.status}`);
+        console.log(`🚀 Broadcasted: ${signalData.version} | ${signalData.instrument} | Bar #${signalData.barNumber}`);
     }
 
     broadcastTradeStatusUpdate(updateData) {
+        // FIX: Update status mapping specifically matched to active strategy version
         const matchIndex = this.tradeSignals.findIndex(sig => 
             sig.instrument === updateData.instrument &&
             sig.bar_type === updateData.bar_type &&
             sig.barNumber === updateData.barNumber &&
-            sig.type === updateData.type
+            sig.type === updateData.type &&
+            sig.version === updateData.version
         );
 
         if (matchIndex !== -1) {
@@ -711,12 +707,10 @@ class ChartServer {
                 this.tradeSignals[matchIndex].exitPrice = updateData.exitPrice;
             }
 
-            console.log(`ℹ️ [Server] Status transition: ${updateData.instrument} Bar #${updateData.barNumber} -> ${updateData.status}`);
+            console.log(`ℹ️ Transition: ${updateData.version} | ${updateData.instrument} Bar #${updateData.barNumber} -> ${updateData.status}`);
             
             this.saveSignalsToDisk();
             this.io.emit('trade_status_update', this.tradeSignals[matchIndex]);
-        } else {
-            console.warn(`⚠️ [Server] Failed to locate signal for status update: ${updateData.instrument} Bar #${updateData.barNumber}`);
         }
     }
     

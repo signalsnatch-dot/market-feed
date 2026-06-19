@@ -322,46 +322,45 @@ class PriceBarBuilder extends EventEmitter {
             timestamp: b.timestamp
         }));
 
+        // Inside closeBar() in both volumeBarBuilder.js and priceBarBuilder.js:
         if (strategyCandles.length >= 32) {
             try {
                 const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
-                const signals = twoLeggedPullback(strategyCandles, { tickSize: tickSize });
+                if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
                 
-                if (signals && signals.length > 0) {
-                    const latestSignal = signals[signals.length - 1];
-                    
-                    // Match last completed index
-                    if (latestSignal.index === strategyCandles.length - 1) {
-                        if (bar.lastSignalBarNumber !== bar.barNumber) {
-                            bar.lastSignalBarNumber = bar.barNumber;
-                            
-                            let confidence = 50;
-                            const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
-                            if (confMatch) {
-                                confidence = parseInt(confMatch[1]);
+                for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
+                    const signals = strategyFn(strategyCandles, { tickSize });
+                    if (signals && signals.length > 0) {
+                        const latestSignal = signals[signals.length - 1];
+                        if (latestSignal.index === strategyCandles.length - 1) {
+                            if (bar.lastSignalBarNumbers[versionName] !== bar.barNumber) {
+                                bar.lastSignalBarNumbers[versionName] = bar.barNumber;
+                                
+                                let confidence = 50;
+                                const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
+                                if (confMatch) confidence = parseInt(confMatch[1]);
+                                
+                                const signalEvent = {
+                                    version: versionName, // Track version
+                                    instrument: instrumentKey,
+                                    name: bar.name,
+                                    type: latestSignal.type,
+                                    entry: latestSignal.triggerPrice,
+                                    sl: latestSignal.stopLoss,
+                                    tp: latestSignal.takeProfit,
+                                    confidence: confidence,
+                                    reason: latestSignal.reason.replace('Conf:', `${this.type === 'price_bar' ? 'Price' : 'Volume'}, Conf:`),
+                                    timestamp: completedBar.timestamp,
+                                    barNumber: bar.barNumber,
+                                    bar_type: this.type === 'price_bar' ? 'price' : 'volume'
+                                };
+                                this.emit('trade_signal', signalEvent);
                             }
-                            
-                            const signalEvent = {
-                                instrument: instrumentKey,
-                                name: bar.name,
-                                type: latestSignal.type,
-                                entry: latestSignal.triggerPrice,
-                                sl: latestSignal.stopLoss,
-                                tp: latestSignal.takeProfit,
-                                confidence: confidence,
-                                reason: latestSignal.reason.replace('Conf:', 'Price, Conf:'), // Infuse source details into signal reason
-                                timestamp: completedBar.timestamp,
-                                barNumber: bar.barNumber,
-                                bar_type: 'price' // Explicit dimension marker
-                            };
-                            
-                            console.log(`🎯 [SIGNAL DETECTED] ${bar.name} Bar #${bar.barNumber} | Type: ${latestSignal.type} | Entry: ${latestSignal.triggerPrice}`);
-                            this.emit('trade_signal', signalEvent);
                         }
                     }
                 }
             } catch (err) {
-                console.error(`Error processing price-based signal rules for ${bar.name}:`, err.message);
+                console.error(`Error processing signals:`, err.message);
             }
         }
         // Reset bar state completely for the next live candle

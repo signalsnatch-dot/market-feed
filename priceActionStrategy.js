@@ -1,7 +1,6 @@
 /**
  * Price Action Strategy — Thomas Wade 2-Legged Pullback & Double Traps
- * Fully Optimized with Dynamic Pinbar Exemptions, Slope-Adaptive Whipsaw Filters,
- * Uncoupled Cooldowns, and a Confluence-Based Confidence Scoring Filter.
+ * Multi-Version Parallel Strategy Module
  */
 
 const DEFAULT_PARAMS = {
@@ -38,24 +37,21 @@ const DEFAULT_PARAMS = {
     enableTraps: true,                  // Enables Failed Second Entry (Trap) signals
     trapMaxLookback: 3,                 // Maximum bars allowed for the setup to fail and trigger the trap
     
-    // === Confluence Overlays (Adaptive Confidence Inputs) ===
-    enableFVGConfluence: true,         // Evaluates Fair Value Gaps for scoring
+    // === Confluence Overlays ===
+    enableFVGConfluence: true,          // Evaluates Fair Value Gaps for scoring
     fvgLookback: 15,                    // Bars to look back for active FVGs acting as support/resistance
-    
-    enableLiquiditySweeps: true,        // Evaluates structural swing sweeps for scoring
+    enableLiquiditySweeps: true,         // Evaluates structural swing sweeps for scoring
     sweepLookback: 15,                  // Bars back to check for swept highs/lows
     
     // === Confidence Filter ===
     minConfidenceThreshold: 45,         // Only execute setups that score >= 45/100 on the Confluence Matrix
+    enableConfidenceScoring: true,      // Toggles scoring calculations
     
     // === Risk Management ===
     maxRiskPerTrade: 0.01,              // Risk 1% of equity per trade
-    maxConsecutiveLosses: 3,           // Cool-down after consecutive losses
+    maxConsecutiveLosses: 3,            // Cool-down after consecutive losses
     maxDailyLoss: 0.03,                 // Max daily loss limit (3%)
     minBarsBetweenSignals: 3,           // Minimum candles to wait before scanning new setups
-    
-    // === Backtest Specific ===
-    allowOverlappingTrades: false,      // If true, takes all concurrent signals (matches live signal list)
 };
 
 // ============================================================
@@ -124,7 +120,7 @@ function assessTrend(candles, ema, i, params) {
 }
 
 // ============================================================
-// HIGH-PROBABILITY CONFLUENCE SCANNER
+// CONFLUENCE MATRIX SCORING UTILITIES
 // ============================================================
 
 function checkFVGConfluence(candles, i, type, lookback) {
@@ -166,10 +162,6 @@ function checkLiquiditySweep(candles, i, type, lookback) {
     }
 }
 
-// ============================================================
-// CONFLUENCE MATRIX CONFIDENCE SCORING ENGINE
-// ============================================================
-
 function calculateConfidenceScore(candles, ema, i, type, p) {
     let score = 0;
     const sBar = candles[i];
@@ -183,7 +175,6 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
     const slope = (ema[i] - ema[i - 5]) / ema[i - 5];
     const absSlope = Math.abs(slope);
     
-    // Scale slope up to 15 points
     const slopePoints = Math.min(15, Math.round(absSlope * 150000)); 
     score += slopePoints;
 
@@ -193,13 +184,13 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
     // 2. Signal Bar Quality (Max 25 pts)
     const closeRatio = type === 'BUY' ? (sBar.close - sBar.low) / range : (sBar.high - sBar.close) / range;
     if (closeRatio >= 0.80) {
-        score += 15; // Outstanding pinbar
+        score += 15;
     } else if (closeRatio >= 0.65) {
-        score += 10; // Standard rejection bar
+        score += 10;
     }
 
     if (bodyRatio >= 0.40) {
-        score += 10; // Strong momentum body
+        score += 10;
     } else if (bodyRatio >= 0.20) {
         score += 5;
     }
@@ -221,7 +212,7 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
     const distanceToEMA = Math.abs(extreme - ema[i]);
     const ticksToEMA = distanceToEMA / p.tickSize;
     if (ticksToEMA <= 1.0) {
-        score += 15; // Perfect touch
+        score += 15;
     } else if (ticksToEMA <= 2.0) {
         score += 10;
     } else if (ticksToEMA <= p.emaTouchTicks) {
@@ -230,10 +221,6 @@ function calculateConfidenceScore(candles, ema, i, type, p) {
 
     return score;
 }
-
-// ============================================================
-// DYNAMIC SIGNAL BAR & TREND-SLOPE VALIDATION
-// ============================================================
 
 function validateSignalBar(sBar, type, p) {
     const range = sBar.high - sBar.low;
@@ -293,7 +280,7 @@ function isWhipsawing(candles, ema, i, p) {
 }
 
 // ============================================================
-// STRUCTURAL PRICE ACTION LEG COUNTING ENGINES
+// PRICE ACTION LEG COUNTING ENGINE
 // ============================================================
 
 function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
@@ -383,17 +370,16 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
 }
 
 // ============================================================
-// COMPREHENSIVE SIGNAL SCANNING (PULLBACKS & TRAPS)
+// PARAMETERIZED CENTRAL CORE ENGINE
 // ============================================================
 
-function twoLeggedPullback(candles, params = {}) {
+function twoLeggedPullbackCore(candles, params = {}) {
     const p = { ...DEFAULT_PARAMS, ...params };
     const signals = [];
     if (candles.length < p.emaPeriod + p.minTrendBars) return signals;
 
     const ema = calculateEMA(candles, p.emaPeriod);
     
-    // Uncoupled tracking trackers to prevent signal lockout conflicts
     let lastPullbackSignalIdx = -Infinity;
     let lastTrapSignalIdx = -Infinity;
 
@@ -412,9 +398,7 @@ function twoLeggedPullback(candles, params = {}) {
 
         let signalFound = false;
 
-        // ============================================================
         // 1. STANDARD SECOND ENTRY LONG (H2)
-        // ============================================================
         if (trend.bullish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
             if (swingHighIdx !== null) {
@@ -424,10 +408,15 @@ function twoLeggedPullback(candles, params = {}) {
                     const passesSignalBarCheck = validateSignalBar(sBar, 'BUY', p);
 
                     if (touchEMA && passesSignalBarCheck) {
-                        const score = calculateConfidenceScore(candles, ema, i, 'BUY', p);
+                        let score = 100;
+                        let passesScore = true;
                         
-                        // Enforce the Confidence filter
-                        if (score >= p.minConfidenceThreshold) {
+                        if (p.enableConfidenceScoring) {
+                            score = calculateConfidenceScore(candles, ema, i, 'BUY', p);
+                            passesScore = score >= p.minConfidenceThreshold;
+                        }
+
+                        if (passesScore) {
                             const triggerPrice = sBar.high + (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
                             
@@ -438,7 +427,9 @@ function twoLeggedPullback(candles, params = {}) {
                                 stopLoss,
                                 takeProfit: triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio,
                                 timestamp: sBar.timestamp,
-                                reason: `H2 Pullback (Conf: ${score}/100)`
+                                reason: p.enableConfidenceScoring 
+                                    ? `H2 Pullback (Conf: ${score}/100)`
+                                    : `H2 Signal Bar (Close: ${sBar.close})`
                             });
                             lastPullbackSignalIdx = i;
                             signalFound = true;
@@ -448,9 +439,7 @@ function twoLeggedPullback(candles, params = {}) {
             }
         }
 
-        // ============================================================
         // 2. STANDARD SECOND ENTRY SHORT (L2)
-        // ============================================================
         if (trend.bearish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
             if (swingLowIdx !== null) {
@@ -460,9 +449,15 @@ function twoLeggedPullback(candles, params = {}) {
                     const passesSignalBarCheck = validateSignalBar(sBar, 'SELL', p);
 
                     if (touchEMA && passesSignalBarCheck) {
-                        const score = calculateConfidenceScore(candles, ema, i, 'SELL', p);
+                        let score = 100;
+                        let passesScore = true;
 
-                        if (score >= p.minConfidenceThreshold) {
+                        if (p.enableConfidenceScoring) {
+                            score = calculateConfidenceScore(candles, ema, i, 'SELL', p);
+                            passesScore = score >= p.minConfidenceThreshold;
+                        }
+
+                        if (passesScore) {
                             const triggerPrice = sBar.low - (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
 
@@ -473,7 +468,9 @@ function twoLeggedPullback(candles, params = {}) {
                                 stopLoss,
                                 takeProfit: triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio,
                                 timestamp: sBar.timestamp,
-                                reason: `L2 Pullback (Conf: ${score}/100)`
+                                reason: p.enableConfidenceScoring
+                                    ? `L2 Pullback (Conf: ${score}/100)`
+                                    : `L2 Signal Bar (Close: ${sBar.close})`
                             });
                             lastPullbackSignalIdx = i;
                             signalFound = true;
@@ -483,9 +480,7 @@ function twoLeggedPullback(candles, params = {}) {
             }
         }
 
-        // ============================================================
         // 3. FAILED SECOND ENTRY TRAPS (DOUBLE TRAP METHOD)
-        // ============================================================
         if (p.enableTraps && (i - lastTrapSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             // --- Long Trap Setup (Failed L2 in an Uptrend) ---
             if (trend.bullish) {
@@ -501,9 +496,15 @@ function twoLeggedPullback(candles, params = {}) {
                             if (triggeredShort) {
                                 const structureHigh = Math.max(candles[L].high, candles[L + 1].high);
                                 if (sBar.high >= structureHigh) {
-                                    const score = calculateConfidenceScore(candles, ema, i, 'BUY', p);
+                                    let score = 100;
+                                    let passesScore = true;
 
-                                    if (score >= p.minConfidenceThreshold) {
+                                    if (p.enableConfidenceScoring) {
+                                        score = calculateConfidenceScore(candles, ema, i, 'BUY', p);
+                                        passesScore = score >= p.minConfidenceThreshold;
+                                    }
+
+                                    if (passesScore) {
                                         const triggerPrice = structureHigh + (p.triggerOffsetTicks * p.tickSize);
                                         const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
                                         const risk = triggerPrice - stopLoss;
@@ -516,7 +517,9 @@ function twoLeggedPullback(candles, params = {}) {
                                                 stopLoss,
                                                 takeProfit: triggerPrice + risk * p.rewardRatio,
                                                 timestamp: sBar.timestamp,
-                                                reason: `DOUBLE_TRAP_BUY (Conf: ${score}/100)`
+                                                reason: p.enableConfidenceScoring
+                                                    ? `DOUBLE_TRAP_BUY (Conf: ${score}/100)`
+                                                    : `DOUBLE_TRAP_BUY: Failed L2 Short Setup`
                                             });
                                             lastTrapSignalIdx = i;
                                             signalFound = true;
@@ -544,9 +547,15 @@ function twoLeggedPullback(candles, params = {}) {
                             if (triggeredLong) {
                                 const structureLow = Math.min(candles[L].low, candles[L + 1].low);
                                 if (sBar.low <= structureLow) {
-                                    const score = calculateConfidenceScore(candles, ema, i, 'SELL', p);
+                                    let score = 100;
+                                    let passesScore = true;
 
-                                    if (score >= p.minConfidenceThreshold) {
+                                    if (p.enableConfidenceScoring) {
+                                        score = calculateConfidenceScore(candles, ema, i, 'SELL', p);
+                                        passesScore = score >= p.minConfidenceThreshold;
+                                    }
+
+                                    if (passesScore) {
                                         const triggerPrice = structureLow - (p.triggerOffsetTicks * p.tickSize);
                                         const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
                                         const risk = stopLoss - triggerPrice;
@@ -559,7 +568,9 @@ function twoLeggedPullback(candles, params = {}) {
                                                 stopLoss,
                                                 takeProfit: triggerPrice - risk * p.rewardRatio,
                                                 timestamp: sBar.timestamp,
-                                                reason: `DOUBLE_TRAP_SELL (Conf: ${score}/100)`
+                                                reason: p.enableConfidenceScoring
+                                                    ? `DOUBLE_TRAP_SELL (Conf: ${score}/100)`
+                                                    : `DOUBLE_TRAP_SELL: Failed H2 Long Setup`
                                             });
                                             lastTrapSignalIdx = i;
                                             signalFound = true;
@@ -580,12 +591,58 @@ function twoLeggedPullback(candles, params = {}) {
 }
 
 // ============================================================
+// STRATEGY VERSIONS MAP (PARALLEL CONFIGS)
+// ============================================================
+
+const STRATEGIES = {
+    "V1: Double Traps": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45
+        });
+    },
+    "V2: EMA Pullback": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false
+        });
+    },
+    "V3: High Confidence": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 60
+        });
+    },
+    "V4: Aggressive": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableGiantBarFilter: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false,
+            minSignalBarCloseRatio: 0.50
+        });
+    }
+};
+
+// ============================================================
 // SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
 // ============================================================
 
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
     const p = { ...DEFAULT_PARAMS, ...params };
-    const allowOverlapping = p.allowOverlappingTrades || false;
     
     let startingCapital = parseFloat(initialCapital);
     if (isNaN(startingCapital) || typeof startingCapital !== 'number') {
@@ -593,15 +650,13 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     }
     
     let equity = startingCapital;
-    let activePositions = []; // Tracks multiple concurrent positions if allowOverlapping is true
-    let position = null;      // Standard single position
+    let position = null;
     let pendingOrder = null; 
     const trades = [];
     
     let consecutiveLosses = 0;
     let dailyPnL = 0;
     const maxDailyLoss = equity * p.maxDailyLoss;
-    let lastTradeDay = null;
 
     const signalMap = new Map();
     if (Array.isArray(signals)) {
@@ -613,92 +668,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     for (let i = p.emaPeriod + p.minTrendBars; i < candles.length; i++) {
         const bar = candles[i];
 
-        // 0. Detect Day Boundary to Reset Daily Limits
-        if (bar.timestamp) {
-            const dateObj = new Date(bar.timestamp);
-            const currentDay = dateObj.getUTCDate();
-            if (lastTradeDay !== null && currentDay !== lastTradeDay) {
-                dailyPnL = 0;
-                consecutiveLosses = 0; // Reset consecutive loss counters daily
-            }
-            lastTradeDay = currentDay;
-        }
-
         // 1. Process active trade exits
-        if (allowOverlapping) {
-            const remainingPositions = [];
-            for (const pos of activePositions) {
-                let exitPrice = null;
-                let exitReason = null;
-
-                if (pos.direction === 'long') {
-                    const stoppedOut = bar.low <= pos.stopLoss;
-                    const tpReached = bar.high >= pos.takeProfit;
-
-                    if (stoppedOut && tpReached) {
-                        exitPrice = pos.stopLoss;
-                        exitReason = 'stop_loss';
-                    } else if (stoppedOut) {
-                        exitPrice = pos.stopLoss;
-                        exitReason = 'stop_loss';
-                    } else if (tpReached) {
-                        exitPrice = pos.takeProfit;
-                        exitReason = 'take_profit';
-                    }
-                } else {
-                    const stoppedOut = bar.high >= pos.stopLoss;
-                    const tpReached = bar.low <= pos.takeProfit;
-
-                    if (stoppedOut && tpReached) {
-                        exitPrice = pos.stopLoss;
-                        exitReason = 'stop_loss';
-                    } else if (stoppedOut) {
-                        exitPrice = pos.stopLoss;
-                        exitReason = 'stop_loss';
-                    } else if (tpReached) {
-                        exitPrice = pos.takeProfit;
-                        exitReason = 'take_profit';
-                    }
-                }
-
-                if (exitPrice !== null) {
-                    const pnlAmount = pos.direction === 'long'
-                        ? pos.quantity * (exitPrice - pos.entry)
-                        : pos.quantity * (pos.entry - exitPrice);
-                    
-                    equity += pnlAmount;
-
-                    if (pnlAmount < 0) {
-                        consecutiveLosses++;
-                        dailyPnL += pnlAmount;
-                    } else {
-                        consecutiveLosses = 0;
-                    }
-
-                    trades.push({
-                        entryIndex: pos.entryIndex,
-                        exitIndex: i,
-                        entryPrice: pos.entry,
-                        exitPrice,
-                        stopLoss: pos.stopLoss,
-                        takeProfit: pos.takeProfit,
-                        pnl: pos.direction === 'long' 
-                            ? ((exitPrice - pos.entry) / pos.entry) * 100 
-                            : ((pos.entry - exitPrice) / pos.entry) * 100,
-                        pnlPercentage: pos.direction === 'long' 
-                            ? ((exitPrice - pos.entry) / pos.entry) * 100 
-                            : ((pos.entry - exitPrice) / pos.entry) * 100,
-                        pnlAmount,
-                        exitReason,
-                        direction: pos.direction,
-                        metadata: pos.metadata
-                    });
-                } else {
-                    remainingPositions.push(pos);
-                }
-            }
-            activePositions = remainingPositions;
-        } else if (position) {
+        if (position) {
             let exitPrice = null;
             let exitReason = null;
 
@@ -733,10 +704,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             }
 
             if (exitPrice !== null) {
-                const pnlAmount = position.direction === 'long'
-                    ? position.quantity * (exitPrice - position.entry)
-                    : position.quantity * (position.entry - exitPrice);
-                
+                const pnlAmount = position.quantity * (exitPrice - position.entry) * (position.direction === 'long' ? 1 : -1);
                 equity += pnlAmount;
 
                 if (pnlAmount < 0) {
@@ -751,14 +719,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     exitIndex: i,
                     entryPrice: position.entry,
                     exitPrice,
-                    stopLoss: position.stopLoss,         
-                    takeProfit: position.takeProfit,     
-                    pnl: position.direction === 'long' 
-                        ? ((exitPrice - position.entry) / position.entry) * 100 
-                        : ((position.entry - exitPrice) / position.entry) * 100,
-                    pnlPercentage: position.direction === 'long' 
-                        ? ((exitPrice - position.entry) / position.entry) * 100 
-                        : ((position.entry - exitPrice) / position.entry) * 100,
+                    pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100,
                     pnlAmount,
                     exitReason,
                     direction: position.direction,
@@ -770,8 +731,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
         }
 
         // 2. Check and execute pending Stop Orders on the next bar
-        const hasCapacity = allowOverlapping || !position;
-        if (hasCapacity && pendingOrder) {
+        if (!position && pendingOrder) {
             let triggered = false;
             let entryPrice = 0;
 
@@ -793,7 +753,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     const riskAmount = equity * p.maxRiskPerTrade;
                     const quantity = riskAmount / risk;
 
-                    const newPos = {
+                    position = {
                         direction: pendingOrder.type === 'BUY_STOP' ? 'long' : 'short',
                         entry: entryPrice,
                         quantity,
@@ -805,52 +765,41 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         metadata: pendingOrder.metadata
                     };
 
-                    if (allowOverlapping) {
-                        activePositions.push(newPos);
-                    } else {
-                        position = newPos;
-                    }
-
-                    // Check if it triggers and exits on the exact same bar
                     let exitPrice = null;
                     let exitReason = null;
-                    const checkPos = allowOverlapping ? activePositions[activePositions.length - 1] : position;
 
-                    if (checkPos.direction === 'long') {
-                        const stoppedOut = bar.low <= checkPos.stopLoss;
-                        const tpReached = bar.high >= checkPos.takeProfit;
+                    if (position.direction === 'long') {
+                        const stoppedOut = bar.low <= position.stopLoss;
+                        const tpReached = bar.high >= position.takeProfit;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = checkPos.stopLoss;
+                            exitPrice = position.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = checkPos.stopLoss;
+                            exitPrice = position.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = checkPos.takeProfit;
+                            exitPrice = position.takeProfit;
                             exitReason = 'take_profit';
                         }
                     } else {
-                        const stoppedOut = bar.high >= checkPos.stopLoss;
-                        const tpReached = bar.low <= checkPos.takeProfit;
+                        const stoppedOut = bar.high >= position.stopLoss;
+                        const tpReached = bar.low <= position.takeProfit;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = checkPos.stopLoss;
+                            exitPrice = position.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = checkPos.stopLoss;
+                            exitPrice = position.stopLoss;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = checkPos.takeProfit;
+                            exitPrice = position.takeProfit;
                             exitReason = 'take_profit';
                         }
                     }
 
                     if (exitPrice !== null) {
-                        const pnlAmount = checkPos.direction === 'long'
-                            ? checkPos.quantity * (exitPrice - checkPos.entry)
-                            : checkPos.quantity * (checkPos.entry - exitPrice);
-                        
+                        const pnlAmount = position.quantity * (exitPrice - position.entry) * (position.direction === 'long' ? 1 : -1);
                         equity += pnlAmount;
 
                         if (pnlAmount < 0) {
@@ -861,29 +810,18 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         }
 
                         trades.push({
-                            entryIndex: checkPos.entryIndex,
+                            entryIndex: position.entryIndex,
                             exitIndex: i,
-                            entryPrice: checkPos.entry,
+                            entryPrice: position.entry,
                             exitPrice,
-                            stopLoss: checkPos.stopLoss,     
-                            takeProfit: checkPos.takeProfit, 
-                            pnl: checkPos.direction === 'long' 
-                                ? ((exitPrice - checkPos.entry) / checkPos.entry) * 100 
-                                : ((checkPos.entry - exitPrice) / checkPos.entry) * 100,
-                            pnlPercentage: checkPos.direction === 'long' 
-                                ? ((exitPrice - checkPos.entry) / checkPos.entry) * 100 
-                                : ((checkPos.entry - exitPrice) / checkPos.entry) * 100,
+                            pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100,
                             pnlAmount,
                             exitReason,
-                            direction: checkPos.direction,
-                            metadata: checkPos.metadata
+                            direction: position.direction,
+                            metadata: position.metadata
                         });
 
-                        if (allowOverlapping) {
-                            activePositions.pop();
-                        } else {
-                            position = null;
-                        }
+                        position = null;
                     }
                 }
             }
@@ -891,32 +829,24 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             pendingOrder = null;
         }
 
-        // 3. Scan lookup map for pre-generated signals that ended on this bar
-        const canTakeNewTrade = allowOverlapping || (!position && activePositions.length === 0);
-        if (canTakeNewTrade && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
+        // 3. Scan lookup map for signals
+        if (!position && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
             if (signalMap.has(i)) {
                 const signal = signalMap.get(i);
                 pendingOrder = {
                     type: signal.type,
                     triggerPrice: signal.triggerPrice,
                     stopLoss: signal.stopLoss,
-                    metadata: { setupType: signal.type, signalBarIndex: i, reason: signal.reason }
+                    metadata: { setupType: signal.type, signalBarIndex: i }
                 };
             }
         }
     }
 
-    // Report Summary
     const totalTrades = trades.length;
-    const wins = trades.filter(t => t.pnlAmount > 0).length;
-    const losses = trades.filter(t => t.pnlAmount <= 0).length;
+    const wins = trades.filter(t => t.exitReason === 'take_profit').length;
+    const losses = trades.filter(t => t.exitReason === 'stop_loss').length;
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
-
-    console.log(`=== Thomas Wade PA Backtest Summary ===`);
-    console.log(`Total Trades: ${totalTrades} | Wins: ${wins} | Losses: ${losses}`);
-    console.log(`Win Rate: ${winRate.toFixed(2)}%`);
-    console.log(`Final Equity: ${equity.toFixed(2)} (Initial: ${startingCapital.toFixed(2)})`);
-    console.log(`=======================================`);
 
     return {
         trades,
@@ -926,10 +856,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             wins,
             losses,
             winRate,
-            win_rate: winRate,
-            "Win Rate": winRate,
-            pnlPercentage: ((equity - startingCapital) / startingCapital) * 100,
-            pnl: ((equity - startingCapital) / startingCapital) * 100
         }
     };
 }
@@ -939,6 +865,7 @@ module.exports = {
     calculateEMA, 
     evaluateH2Setup, 
     evaluateL2Setup, 
-    twoLeggedPullback, 
+    STRATEGIES,
+    twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Fallback export for backward-compatibility
     runPriceActionBacktest 
 };

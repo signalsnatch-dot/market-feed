@@ -2,15 +2,15 @@
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
+const { STRATEGIES } = require('./priceActionStrategy');
 
 class DualCandleBuilder extends EventEmitter {
     constructor(config) {
         super();
         
-        this.pendingOrders = new Map(); // key: `${instrument}_${bar_type}` -> pending order
-        this.activeTrades = new Map();  // key: `${instrument}_${bar_type}` -> active trade
+        this.pendingOrders = new Map(); // key: `${instrument}_${bar_type}_${version}` -> pending order
+        this.activeTrades = new Map();  // key: `${instrument}_${bar_type}_${version}` -> active trade
         
-        // Initialize both builders with same config
         this.priceBuilder = new PriceBarBuilder({
             instruments: config.instruments,
             dataDir: config.candlesDataDir || './candles_data/price_bars',
@@ -23,12 +23,9 @@ class DualCandleBuilder extends EventEmitter {
             rawDataDir: config.rawDataDir || './raw_ticks_data'
         });
         
-        // Forward bar_close events, normalize instrument fields, and increment completed stats
         this.priceBuilder.on('bar_close', (bar) => {
             const stats = this.comparisonStats.get(bar.instrument_key);
-            if (stats) {
-                stats.priceBarsCompleted++;
-            }
+            if (stats) stats.priceBarsCompleted++;
             this.emit('bar_close', {
                 ...bar,
                 instrument: bar.instrument_key,
@@ -38,9 +35,7 @@ class DualCandleBuilder extends EventEmitter {
         
         this.volumeBuilder.on('bar_close', (bar) => {
             const stats = this.comparisonStats.get(bar.instrument_key);
-            if (stats) {
-                stats.volumeBarsCompleted++;
-            }
+            if (stats) stats.volumeBarsCompleted++;
             this.emit('bar_close', {
                 ...bar,
                 instrument: bar.instrument_key,
@@ -48,7 +43,6 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
-        // FIX: Register live candle update forwarding ONLY ONCE in the constructor
         this.priceBuilder.on('live_candle_update', (candle) => {
             this.emit('live_candle_update', {
                 ...candle,
@@ -63,7 +57,6 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
-        // Intercept signals to track active statuses and flag overlaps
         this.volumeBuilder.on('trade_signal', (signal) => {
             this.processIncomingSignal(signal, 'volume');
         });
@@ -72,12 +65,9 @@ class DualCandleBuilder extends EventEmitter {
             this.processIncomingSignal(signal, 'price');
         });
 
-        // Setup real-time order execution & tracking state machine
         this.setupStateTracking();
 
-        // Track statistics for comparison
         this.comparisonStats = new Map();
-        
         config.instruments.forEach(instr => {
             this.comparisonStats.set(instr.key, {
                 instrument: instr.name,
@@ -91,154 +81,156 @@ class DualCandleBuilder extends EventEmitter {
     }
 
     processIncomingSignal(signal, barType) {
-        const key = `${signal.instrument}_${barType}`;
+        // FIX: Track overlapping signals per strategy version
+        const key = `${signal.instrument}_${barType}_${signal.version}`;
         const hasActive = this.activeTrades.has(key);
+        const hasPending = this.pendingOrders.has(key);
+
+        const isOverlapping = hasActive || hasPending;
 
         const trackedSignal = {
             ...signal,
-            overlapping: hasActive,
-            status: 'pending' // Initial status
+            overlapping: isOverlapping,
+            status: isOverlapping ? 'cancelled' : 'pending',
+            exitReason: isOverlapping ? 'overlapping' : null
         };
 
-        // Cache as pending order with 1-bar expiration rule
-        this.pendingOrders.set(key, {
-            ...trackedSignal,
-            expiryBarNumber: signal.barNumber + 1
-        });
+        // If it is overlapping, we broadcast it immediately as cancelled, bypassing execution maps
+        if (!isOverlapping) {
+            this.pendingOrders.set(key, {
+                ...trackedSignal,
+                expiryBarNumber: signal.barNumber + 1
+            });
+        }
 
         this.emit('trade_signal', trackedSignal);
     }
 
     setupStateTracking() {
         this.on('bar_close', (bar) => {
-            const key = `${bar.instrument}_${bar.type}`;
+            // FIX: Evaluate state machine transitions across all strategies in parallel
+            for (const versionName of Object.keys(STRATEGIES)) {
+                const key = `${bar.instrument}_${bar.type}_${versionName}`;
 
-            // 1. Evaluate Pending Order Activation (on bar close)
-            if (this.pendingOrders.has(key)) {
-                const pending = this.pendingOrders.get(key);
-                let triggered = false;
+                // 1. Evaluate Pending Activation
+                if (this.pendingOrders.has(key)) {
+                    const pending = this.pendingOrders.get(key);
+                    let triggered = false;
 
-                if (pending.type === 'BUY_STOP') {
-                    if (bar.high >= pending.entry) {
-                        triggered = true;
+                    if (pending.type === 'BUY_STOP') {
+                        if (bar.high >= pending.entry) triggered = true;
+                    } else if (pending.type === 'SELL_STOP') {
+                        if (bar.low <= pending.entry) triggered = true;
                     }
-                } else if (pending.type === 'SELL_STOP') {
-                    if (bar.low <= pending.entry) {
-                        triggered = true;
-                    }
-                }
 
-                if (triggered) {
-                    const activeTrade = {
-                        instrument: pending.instrument,
-                        name: pending.name,
-                        bar_type: pending.bar_type,
-                        barNumber: pending.barNumber,
-                        type: pending.type,
-                        entry: pending.entry, // Standard entry price
-                        sl: pending.sl,
-                        tp: pending.tp,
-                        direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
-                        timestamp: bar.timestamp,
-                        status: 'active'
-                    };
+                    if (triggered) {
+                        const activeTrade = {
+                            version: versionName,
+                            instrument: pending.instrument,
+                            name: pending.name,
+                            bar_type: pending.bar_type,
+                            barNumber: pending.barNumber,
+                            type: pending.type,
+                            entry: pending.entry,
+                            sl: pending.sl,
+                            tp: pending.tp,
+                            direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
+                            timestamp: bar.timestamp,
+                            status: 'active'
+                        };
 
-                    this.activeTrades.set(key, activeTrade);
-                    this.pendingOrders.delete(key);
+                        this.activeTrades.set(key, activeTrade);
+                        this.pendingOrders.delete(key);
 
-                    // Forward state update to index -> server -> frontend
-                    this.emit('trade_status_update', activeTrade);
-                }
-            }
-
-            // 2. Evaluate SL/TP Exits for Active Trades (on bar close)
-            if (this.activeTrades.has(key)) {
-                const trade = this.activeTrades.get(key);
-                let exitPrice = null;
-                let exitReason = null;
-
-                if (trade.direction === 'long') {
-                    const stoppedOut = bar.low <= trade.sl;
-                    const tpReached = bar.high >= trade.tp;
-
-                    if (stoppedOut && tpReached) {
-                        exitPrice = trade.sl;
-                        exitReason = 'stop_loss';
-                    } else if (stoppedOut) {
-                        exitPrice = trade.sl;
-                        exitReason = 'stop_loss';
-                    } else if (tpReached) {
-                        exitPrice = trade.tp;
-                        exitReason = 'take_profit';
-                    }
-                } else {
-                    const stoppedOut = bar.high >= trade.sl;
-                    const tpReached = bar.low <= trade.tp;
-
-                    if (stoppedOut && tpReached) {
-                        exitPrice = trade.sl;
-                        exitReason = 'stop_loss';
-                    } else if (stoppedOut) {
-                        exitPrice = trade.sl;
-                        exitReason = 'stop_loss';
-                    } else if (tpReached) {
-                        exitPrice = trade.tp;
-                        exitReason = 'take_profit';
+                        this.emit('trade_status_update', activeTrade);
                     }
                 }
 
-                if (exitPrice !== null) {
-                    const statusUpdate = {
-                        instrument: trade.instrument,
-                        bar_type: trade.bar_type,
-                        barNumber: trade.barNumber,
-                        type: trade.type,
-                        exitReason: exitReason,
-                        exitPrice: exitPrice,
-                        timestamp: bar.timestamp,
-                        status: 'completed'
-                    };
+                // 2. Evaluate Active Exits
+                if (this.activeTrades.has(key)) {
+                    const trade = this.activeTrades.get(key);
+                    let exitPrice = null;
+                    let exitReason = null;
 
-                    this.activeTrades.delete(key);
-                    this.emit('trade_status_update', statusUpdate);
+                    if (trade.direction === 'long') {
+                        const stoppedOut = bar.low <= trade.sl;
+                        const tpReached = bar.high >= trade.tp;
+
+                        if (stoppedOut && tpReached) {
+                            exitPrice = trade.sl;
+                            exitReason = 'stop_loss';
+                        } else if (stoppedOut) {
+                            exitPrice = trade.sl;
+                            exitReason = 'stop_loss';
+                        } else if (tpReached) {
+                            exitPrice = trade.tp;
+                            exitReason = 'take_profit';
+                        }
+                    } else {
+                        const stoppedOut = bar.high >= trade.sl;
+                        const tpReached = bar.low <= trade.tp;
+
+                        if (stoppedOut && tpReached) {
+                            exitPrice = trade.sl;
+                            exitReason = 'stop_loss';
+                        } else if (stoppedOut) {
+                            exitPrice = trade.sl;
+                            exitReason = 'stop_loss';
+                        } else if (tpReached) {
+                            exitPrice = trade.tp;
+                            exitReason = 'take_profit';
+                        }
+                    }
+
+                    if (exitPrice !== null) {
+                        const statusUpdate = {
+                            version: versionName,
+                            instrument: trade.instrument,
+                            bar_type: trade.bar_type,
+                            barNumber: trade.barNumber,
+                            type: trade.type,
+                            exitReason: exitReason,
+                            exitPrice: exitPrice,
+                            timestamp: bar.timestamp,
+                            status: 'completed'
+                        };
+
+                        this.activeTrades.delete(key);
+                        this.emit('trade_status_update', statusUpdate);
+                    }
                 }
-            }
 
-            // 3. Evaluate Pending Order Expirations (if still pending and not triggered)
-            if (this.pendingOrders.has(key)) {
-                const pending = this.pendingOrders.get(key);
-                if (bar.barNumber >= pending.expiryBarNumber) {
-                    const expiredSignal = {
-                        instrument: pending.instrument,
-                        bar_type: pending.bar_type,
-                        barNumber: pending.barNumber,
-                        type: pending.type,
-                        status: 'cancelled',
-                        timestamp: bar.timestamp
-                    };
+                // 3. Evaluate Expirations
+                if (this.pendingOrders.has(key)) {
+                    const pending = this.pendingOrders.get(key);
+                    if (bar.barNumber >= pending.expiryBarNumber) {
+                        const expiredSignal = {
+                            version: versionName,
+                            instrument: pending.instrument,
+                            bar_type: pending.bar_type,
+                            barNumber: pending.barNumber,
+                            type: pending.type,
+                            status: 'cancelled',
+                            timestamp: bar.timestamp
+                        };
 
-                    this.pendingOrders.delete(key);
-                    this.emit('trade_status_update', expiredSignal);
+                        this.pendingOrders.delete(key);
+                        this.emit('trade_status_update', expiredSignal);
+                    }
                 }
             }
         });
     }
     
-    /**
-     * Highly optimized processTick with zero real-time trigger evaluation and zero listener leaks.
-     */
     processTick(tickData) {
-        const { instrument_key, last_traded_quantity, ltp } = tickData;
+        const { instrument_key, last_traded_quantity } = tickData;
         
-        // Update comparison stats
         const stats = this.comparisonStats.get(instrument_key);
         if (stats) {
             stats.totalTicks++;
             stats.totalVolume += parseInt(last_traded_quantity) || 0;
-            this.comparisonStats.set(instrument_key, stats);
         }
         
-        // Process through both builders
         this.priceBuilder.processTick(tickData);
         this.volumeBuilder.processTick(tickData);
         
@@ -249,9 +241,6 @@ class DualCandleBuilder extends EventEmitter {
         });
     }
     
-    /**
-     * Get comparison statistics
-     */
     getComparisonStats() {
         const stats = [];
         for (const [key, data] of this.comparisonStats.entries()) {
@@ -272,9 +261,6 @@ class DualCandleBuilder extends EventEmitter {
         return stats;
     }
     
-    /**
-     * Get detailed comparison
-     */
     async getDetailedComparison() {
         const priceStats = this.priceBuilder.getGlobalStats();
         const volumeStats = this.volumeBuilder.getGlobalStats();
@@ -294,9 +280,6 @@ class DualCandleBuilder extends EventEmitter {
         };
     }
     
-    /**
-     * Save comparison report
-     */
     saveComparisonReport() {
         const reportDir = './candles_data/comparison';
         const fs = require('fs');
