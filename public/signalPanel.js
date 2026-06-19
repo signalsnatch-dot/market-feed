@@ -9,6 +9,7 @@ class LiveTradeTracker {
         this.initializeUI();
     }
 
+
     initializeUI() {
         const container = document.getElementById('signalsList');
         if (container) {
@@ -350,6 +351,32 @@ class LiveTradeTracker {
         }
         if (priceCount) {
             priceCount.textContent = this.allSignals.filter(s => s.bar_type === 'price' && s.version === this.currentVersion).length;
+        }
+    }
+
+    setupStrategyVersions(versions) {
+        if (!Array.isArray(versions) || versions.length === 0) return;
+        
+        const select = document.getElementById('strategy-version-select');
+        if (select) {
+            const prevValue = this.currentVersion;
+            select.innerHTML = ''; // Wipe hardcoded markup
+            
+            versions.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                select.appendChild(opt);
+            });
+            
+            // Restore selection or fall back to the first item
+            if (versions.includes(prevValue)) {
+                this.currentVersion = prevValue;
+            } else {
+                this.currentVersion = versions[0];
+            }
+            select.value = this.currentVersion;
+            this.renderFilteredSignals();
         }
     }
 }

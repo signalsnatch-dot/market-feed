@@ -55,7 +55,7 @@ const DEFAULT_PARAMS = {
 };
 
 // ============================================================
-// SHARED STRATEGY MATHEMATICAL UTILITIES
+// CORE MATHEMATICAL UTILITIES
 // ============================================================
 
 function calculateEMA(candles, period = 20) {
@@ -271,7 +271,7 @@ function isWhipsawing(candles, ema, i, p) {
 }
 
 // ============================================================
-// PRICE ACTION LEG COUNTING ENGINE
+// STRUCTURAL LEG COUNTING ENGINES
 // ============================================================
 
 function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
@@ -361,7 +361,7 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
 }
 
 // ============================================================
-// CORE PIPELINE WITH ADAPTIVE STRUCTURAL TARGETING SUPPORT
+// CORE EVALUATION PIPELINE WITH DYNAMIC RISK FILTERS
 // ============================================================
 
 function twoLeggedPullbackCore(candles, params = {}) {
@@ -411,7 +411,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const triggerPrice = sBar.high + (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
                             
-                            // Dynamically evaluate target price based on structural peaks if enabled (Wade Structural Target)
+                            // Target previous peak for structural exits (V5)
                             let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
                             if (p.useStructuralTarget && swingHighIdx !== null) {
                                 takeProfit = candles[swingHighIdx].high + (p.triggerOffsetTicks * p.tickSize);
@@ -421,7 +421,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const reward = Math.abs(takeProfit - triggerPrice);
                             const rrr = risk > 0 ? reward / risk : 0;
 
-                            // Skip setups that fail Wade's reward restrictions (not worth taking (< 1.0) or too far (> 2.2))
+                            // Skip setups that fail Wade's target rules (RRR < 1.0 or RRR > 2.2)
                             if (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2)) {
                                 signals.push({
                                     index: i,
@@ -497,7 +497,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
         // 3. FAILED SECOND ENTRY TRAPS (DOUBLE TRAP METHOD)
         if (p.enableTraps && (i - lastTrapSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
-            // --- Long Trap Setup (Failed L2 in an Uptrend) ---
             if (trend.bullish) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
@@ -557,7 +556,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 }
             }
 
-            // --- Short Trap Setup (Failed H2 in a Downtrend) ---
             if (trend.bearish && !signalFound) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
@@ -624,21 +622,22 @@ function twoLeggedPullbackCore(candles, params = {}) {
 }
 
 // ============================================================
-// PARALLEL CONFIGURATIONS STRATEGY INDEX
+// CONCURRENT STRATEGY VERSIONS DEFINITION
 // ============================================================
 
 const STRATEGIES = {
+    // V1: Double Traps (from Prompt 1 - Traps enabled, confluence layers off)
     "V1: Double Traps": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
             enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
             useStructuralTarget: false
         });
     },
+    // V2: EMA Pullback (from Prompt 2 - Clean pullback with no traps/confluences)
     "V2: EMA Pullback": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -649,6 +648,7 @@ const STRATEGIES = {
             useStructuralTarget: false
         });
     },
+    // V3: High Confidence (from Prompt 3 - Full traps, scoring, sweeps, and gaps)
     "V3: High Confidence": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -656,10 +656,11 @@ const STRATEGIES = {
             enableConfidenceScoring: true,
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
-            minConfidenceThreshold: 60,
+            minConfidenceThreshold: 45,
             useStructuralTarget: false
         });
     },
+    // V4: Aggressive (from Prompt 3 - Relaxed parameters, disabled filters)
     "V4: Aggressive": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -672,6 +673,7 @@ const STRATEGIES = {
             useStructuralTarget: false
         });
     },
+    // V5: Wade Structural (Calculates target TP dynamically based on peaks/valleys)
     "V5: Wade Structural": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -680,7 +682,7 @@ const STRATEGIES = {
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
             minConfidenceThreshold: 45,
-            useStructuralTarget: true // Calculates TP targets using structural extremes
+            useStructuralTarget: true // Active Wade Structural Target
         });
     }
 };
@@ -910,7 +912,7 @@ module.exports = {
     calculateEMA, 
     evaluateH2Setup, 
     evaluateL2Setup, 
-    STRATEGIES, // FIX: Export STRATEGIES map explicitly
+    STRATEGIES,
     twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Backward-compatibility
     runPriceActionBacktest 
 };

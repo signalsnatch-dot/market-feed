@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Import the strategy directly for historical lookup
-const { twoLeggedPullback } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategy');
 
 class ChartServer {
     constructor(port = 3001, candlesDataDir = './candles_data', options = {}) {
@@ -152,6 +152,10 @@ class ChartServer {
             const instruments = this.getInstrumentsFromFiles();
             res.json(instruments);
         });
+
+        this.app.get('/api/strategies', (req, res) => {
+            res.json(Object.keys(STRATEGIES));
+        });
         
         // API endpoint for historical candles
         this.app.get('/api/historical/:instrument/:type', (req, res) => {
@@ -202,12 +206,13 @@ class ChartServer {
         this.io.on('connection', (socket) => {
             console.log(`Client connected: ${socket.id} from ${socket.handshake.address}`);
             
-            // Send historical data and active trade signals
+            // Emit historical parameters, signals, and strategy lists on handshake
             socket.emit('historical_candles', {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
-                trade_signals: this.tradeSignals // Client now populates complete historical list instantly
+                trade_signals: this.tradeSignals,
+                strategies: Object.keys(STRATEGIES) // FIX: Served dynamically from backend
             });
             
             socket.on('subscribe', (data) => {

@@ -227,6 +227,10 @@ class MarketChart {
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
 
+            // Setup strategy versions dynamically from backend emit list
+            if (data.strategies) {
+                this.tracker.setupStrategyVersions(data.strategies);
+            }
             // Delegate load of prior signals to live tracker module
             if (data.trade_signals) {
                 this.tracker.renderSignals(data.trade_signals);
@@ -241,6 +245,8 @@ class MarketChart {
             const candleInst = normalizedCandle.instrument;
             if (candleInst === this.currentInstrument && liveCandle.type === this.currentType) {
                 this.updateLiveCandle(normalizedCandle);
+                this.updateProgressBar(normalizedCandle); // FIX: Updates the bottom progress bar
+
             }
         });
         
@@ -270,6 +276,41 @@ class MarketChart {
             document.getElementById('wsStatus').textContent = 'Disconnected';
             document.getElementById('wsStatus').className = 'status-badge disconnected';
         });
+    }
+
+     updateProgressBar(candle) {
+        const chartContainer = document.getElementById('main-chart');
+        if (!chartContainer) return;
+
+        let progressBarContainer = document.getElementById('chart-progress-bar-container');
+        if (!progressBarContainer) {
+            progressBarContainer = document.createElement('div');
+            progressBarContainer.id = 'chart-progress-bar-container';
+            progressBarContainer.style.cssText = 'position: absolute; bottom: 8px; left: 12px; right: 12px; height: 32px; background: rgba(30, 34, 45, 0.95); border: 1px solid #2a2e39; border-radius: 6px; display: flex; align-items: center; padding: 0 12px; z-index: 99; font-family: monospace; font-size: 11px; color: #d1d4dc; box-sizing: border-box; justify-content: space-between;';
+            chartContainer.style.position = 'relative';
+            chartContainer.appendChild(progressBarContainer);
+        }
+
+        const progress = candle.progress || 0;
+        const isVolume = candle.type === 'volume';
+        const label = isVolume ? 'VOLUME BAR' : 'PRICE TICK BAR';
+        const current = isVolume ? (candle.volume || 0).toLocaleString() : (candle.currentTicks || 0);
+        const target = isVolume ? (candle.targetVolume || 0).toLocaleString() : (candle.targetTicks || 0);
+        const barColor = isVolume ? '#00bcd4' : '#26a69a';
+
+        progressBarContainer.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; width: 45%;">
+                <span style="font-weight: bold; color: ${barColor}; letter-spacing: 0.5px;">${label} #${candle.barNumber}</span>
+                <div style="flex: 1; height: 6px; background: #2a2e39; border-radius: 3px; overflow: hidden; position: relative;">
+                    <div style="width: ${Math.min(100, progress)}%; height: 100%; background: ${barColor}; border-radius: 3px; transition: width 0.2s ease;"></div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span>Progress: <strong style="color: #fff;">${progress.toFixed(1)}%</strong></span>
+                <span>Current: <strong style="color: #fff;">${current}</strong></span>
+                <span>Target: <strong style="color: #fff;">${target}</strong></span>
+            </div>
+        `;
     }
     
     initCharts() {
