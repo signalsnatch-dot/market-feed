@@ -11,7 +11,7 @@ const DEFAULT_PARAMS = {
     rewardRatio: 1.5,                   // Target reward-to-risk ratio (Typically 1:1 to 1:1.5)
     
     // === Tick-Based Configurations for NSE ===
-    tickSize: 0.05,                     // NSE minimum tick size (0.05 paisa/points)
+    tickSize: 0.05,                     // Fallback minimum tick size (0.05 paisa/points)
     emaTouchTicks: 4,                   // Maximum ticks from EMA to consider it a valid test
     triggerOffsetTicks: 1,              // Enter 1 tick beyond signal bar high/low
     stopOffsetTicks: 1,                 // Stop placed 1 tick beyond signal bar opposite extreme
@@ -53,6 +53,20 @@ const DEFAULT_PARAMS = {
     maxDailyLoss: 0.03,                 // Max daily loss limit (3%)
     minBarsBetweenSignals: 3,           // Minimum candles to wait before scanning new setups
 };
+
+// FIX: Central dynamic tick size helper shared by both the backtester and live server
+function getTickSize(instrumentKey) {
+    if (!instrumentKey) return 0.05;
+    if (instrumentKey.includes('MCX_FO')) {
+        // Natural Gas
+        if (instrumentKey.includes('504265') || instrumentKey.includes('487465')) return 0.10;
+        // Base Metals (Zinc, Lead, Copper, Aluminium)
+        if (instrumentKey.includes('552708') || instrumentKey.includes('552711') || instrumentKey.includes('552709') || instrumentKey.includes('552706') || instrumentKey.includes('Bulldex')) return 0.05;
+        // Crude Oil, Silver, Gold
+        return 1.0;
+    }
+    return 0.05; // NSE Standard
+}
 
 // ============================================================
 // CORE MATHEMATICAL UTILITIES
@@ -271,7 +285,7 @@ function isWhipsawing(candles, ema, i, p) {
 }
 
 // ============================================================
-// STRUCTURAL LEG COUNTING ENGINES
+// STRUCTURAL PRICE ACTION LEG COUNTING ENGINE
 // ============================================================
 
 function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
@@ -361,11 +375,17 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
 }
 
 // ============================================================
-// CORE EVALUATION PIPELINE WITH DYNAMIC RISK FILTERS
+// CENTRAL STRATEGY EVALUATION MODULE
 // ============================================================
 
 function twoLeggedPullbackCore(candles, params = {}) {
-    const p = { ...DEFAULT_PARAMS, ...params };
+    // FIX: Dynamically resolve minimum tick specifications to align strategy inputs with live updates
+    const sampleCandle = candles[0];
+    const resolvedTickSize = params.tickSize !== undefined 
+        ? params.tickSize 
+        : getTickSize(sampleCandle?.instrument || sampleCandle?.instrument_key);
+
+    const p = { ...DEFAULT_PARAMS, tickSize: resolvedTickSize, ...params };
     const signals = [];
     if (candles.length < p.emaPeriod + p.minTrendBars) return signals;
 
@@ -411,7 +431,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const triggerPrice = sBar.high + (p.triggerOffsetTicks * p.tickSize);
                             const stopLoss = sBar.low - (p.stopOffsetTicks * p.tickSize);
                             
-                            // Target previous peak for structural exits (V5)
                             let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
                             if (p.useStructuralTarget && swingHighIdx !== null) {
                                 takeProfit = candles[swingHighIdx].high + (p.triggerOffsetTicks * p.tickSize);
@@ -421,7 +440,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const reward = Math.abs(takeProfit - triggerPrice);
                             const rrr = risk > 0 ? reward / risk : 0;
 
-                            // Skip setups that fail Wade's target rules (RRR < 1.0 or RRR > 2.2)
                             if (!p.useStructuralTarget || (rrr >= 1.0 && rrr <= 2.2)) {
                                 signals.push({
                                     index: i,
@@ -497,6 +515,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
         // 3. FAILED SECOND ENTRY TRAPS (DOUBLE TRAP METHOD)
         if (p.enableTraps && (i - lastTrapSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
+            // --- Long Trap Setup ---
             if (trend.bullish) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
@@ -556,6 +575,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 }
             }
 
+            // --- Short Trap Setup ---
             if (trend.bearish && !signalFound) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
@@ -622,7 +642,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
 }
 
 // ============================================================
-// CONCURRENT STRATEGY VERSIONS DEFINITION
+// STRATEGY VERSIONS MAP (PARALLEL CONFIGS)
 // ============================================================
 
 const STRATEGIES = {
@@ -637,7 +657,7 @@ const STRATEGIES = {
             useStructuralTarget: false
         });
     },
-    // V2: EMA Pullback (from Prompt 2 - Clean pullback with no traps/confluences)
+    // V2: EMA Pullback (from Prompt 2 - Clean standard pullback, traps/confluences disabled)
     "V2: EMA Pullback": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -673,7 +693,7 @@ const STRATEGIES = {
             useStructuralTarget: false
         });
     },
-    // V5: Wade Structural (Calculates target TP dynamically based on peaks/valleys)
+    // V5: Wade Structural (Targets dynamic structural peaks/valleys)
     "V5: Wade Structural": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
@@ -682,13 +702,13 @@ const STRATEGIES = {
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
             minConfidenceThreshold: 45,
-            useStructuralTarget: true // Active Wade Structural Target
+            useStructuralTarget: true // Calculates TP targets using structural extremes
         });
     }
 };
 
 // ============================================================
-// BACKTEST SIMULATOR
+// SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
 // ============================================================
 
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
@@ -718,6 +738,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     for (let i = p.emaPeriod + p.minTrendBars; i < candles.length; i++) {
         const bar = candles[i];
 
+        // 1. Process active trade exits
         if (position) {
             let exitPrice = null;
             let exitReason = null;
@@ -768,6 +789,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     exitIndex: i,
                     entryPrice: position.entry,
                     exitPrice,
+                    stopLoss: position.stopLoss,         
+                    takeProfit: position.takeProfit,     
                     pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100,
                     pnlAmount,
                     exitReason,
@@ -779,6 +802,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             }
         }
 
+        // 2. Check and execute pending Stop Orders on the next bar
         if (!position && pendingOrder) {
             let triggered = false;
             let entryPrice = 0;
@@ -862,6 +886,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             exitIndex: i,
                             entryPrice: position.entry,
                             exitPrice,
+                            stopLoss: position.stopLoss,         
+                            takeProfit: position.takeProfit,     
                             pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100,
                             pnlAmount,
                             exitReason,
@@ -877,6 +903,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             pendingOrder = null;
         }
 
+        // 3. Scan lookup map for signals
         if (!position && consecutiveLosses < p.maxConsecutiveLosses && dailyPnL > -maxDailyLoss) {
             if (signalMap.has(i)) {
                 const signal = signalMap.get(i);
@@ -903,6 +930,10 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
             wins,
             losses,
             winRate,
+            win_rate: winRate,
+            "Win Rate": winRate,
+            pnlPercentage: ((equity - startingCapital) / startingCapital) * 100,
+            pnl: ((equity - startingCapital) / startingCapital) * 100
         }
     };
 }
@@ -913,6 +944,6 @@ module.exports = {
     evaluateH2Setup, 
     evaluateL2Setup, 
     STRATEGIES,
-    twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Backward-compatibility
+    twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Fallback
     runPriceActionBacktest 
 };

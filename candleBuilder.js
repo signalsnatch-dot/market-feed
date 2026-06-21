@@ -2,7 +2,7 @@
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
-const { STRATEGIES } = require('./priceActionStrategy'); // FIX: Ensure strategy versions are imported
+const { STRATEGIES } = require('./priceActionStrategy');
 
 class DualCandleBuilder extends EventEmitter {
     constructor(config) {
@@ -43,7 +43,6 @@ class DualCandleBuilder extends EventEmitter {
             });
         });
 
-        // Ensure listeners are assigned once here to completely avoid MaxListenersExceeded Warnings
         this.priceBuilder.on('live_candle_update', (candle) => {
             this.emit('live_candle_update', {
                 ...candle,
@@ -122,6 +121,14 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (triggered) {
+                        // FIX: Slippage / Gap-fill protection logic to align live executions with your backtest model
+                        let fillPrice = pending.entry;
+                        if (pending.type === 'BUY_STOP' && bar.open > pending.entry) {
+                            fillPrice = bar.open;
+                        } else if (pending.type === 'SELL_STOP' && bar.open < pending.entry) {
+                            fillPrice = bar.open;
+                        }
+
                         const activeTrade = {
                             version: versionName,
                             instrument: pending.instrument,
@@ -129,7 +136,7 @@ class DualCandleBuilder extends EventEmitter {
                             bar_type: pending.bar_type,
                             barNumber: pending.barNumber,
                             type: pending.type,
-                            entry: pending.entry,
+                            entry: fillPrice, // Slippage-aligned execution fill
                             sl: pending.sl,
                             tp: pending.tp,
                             direction: pending.type === 'BUY_STOP' ? 'long' : 'short',

@@ -1,17 +1,302 @@
 [
     {
-      "instrument_key": "NSE_FO|62329",
-      "name": "NSE Future 62329",
-      "thresholds": [3250, 5700, 7500]
+        "instrument_key": "NSE_FO|62329",
+        "name": "Nifty 50 Future",
+        "thresholds": [5700]
     },
     {
         "instrument_key": "NSE_FO|62326",
-        "name": "NSE Future 62329",
-        "thresholds": [1800, 2600, 3000]
+        "name": "Nifty Bank Future",
+        "thresholds": [2600]
     },
     {
-      "instrument_key": "MCX_FO|504265",
-      "name": "NSE Future 62329",
-      "thresholds": [27000, 34000, 45000]
+        "instrument_key": "NSE_FO|62327",
+        "name": "Fin Nifty Future",
+        "thresholds": [1800]
+    },
+    {
+        "instrument_key": "NSE_FO|62328",
+        "name": "Midcap Nifty Future",
+        "thresholds": [1400]
+    },
+    {
+        "instrument_key": "NSE_FO|62802",
+        "name": "Reliance Future",
+        "thresholds": [12500]
+    },
+    {
+        "instrument_key": "NSE_FO|62804",
+        "name": "HDFC Bank Future",
+        "thresholds": [27500]
+    },
+    {
+        "instrument_key": "NSE_FO|62810",
+        "name": "ICICI Bank Future",
+        "thresholds": [18000]
+    },
+    {
+        "instrument_key": "NSE_FO|62846",
+        "name": "SBI Future",
+        "thresholds": [45000]
+    },
+    {
+        "instrument_key": "NSE_FO|62852",
+        "name": "TCS Future",
+        "thresholds": [4500]
+    },
+    {
+        "instrument_key": "NSE_FO|62854",
+        "name": "Infosys Future",
+        "thresholds": [11200]
+    },
+    {
+        "instrument_key": "NSE_FO|62856",
+        "name": "ITC Future",
+        "thresholds": [32000]
+    },
+    {
+        "instrument_key": "NSE_FO|62809",
+        "name": "Bharti Airtel Future",
+        "thresholds": [14000]
+    },
+    {
+        "instrument_key": "NSE_FO|62811",
+        "name": "Axis Bank Future",
+        "thresholds": [16000]
+    },
+    {
+        "instrument_key": "NSE_FO|62814",
+        "name": "L&T Future",
+        "thresholds": [6200]
+    },
+    {
+        "instrument_key": "NSE_FO|62815",
+        "name": "Tata Steel Future",
+        "thresholds": [65000]
+    },
+    {
+        "instrument_key": "NSE_FO|62816",
+        "name": "Tata Motors Future",
+        "thresholds": [35000]
+    },
+    {
+        "instrument_key": "NSE_FO|62812",
+        "name": "Bajaj Finance Future",
+        "thresholds": [4800]
+    },
+    {
+        "instrument_key": "NSE_FO|62813",
+        "name": "Kotak Bank Future",
+        "thresholds": [11000]
+    },
+    {
+        "instrument_key": "NSE_FO|62820",
+        "name": "Sun Pharma Future",
+        "thresholds": [10500]
+    },
+    {
+        "instrument_key": "NSE_FO|62850",
+        "name": "JSW Steel Future",
+        "thresholds": [13500]
+    },
+    {
+        "instrument_key": "NSE_FO|62819",
+        "name": "Coal India Future",
+        "thresholds": [28000]
+    },
+    {
+        "instrument_key": "NSE_FO|62821",
+        "name": "Adani Enterprises Future",
+        "thresholds": [12000]
+    },
+    {
+        "instrument_key": "NSE_FO|62822",
+        "name": "Adani Ports Future",
+        "thresholds": [15000]
+    },
+    {
+        "instrument_key": "NSE_FO|62823",
+        "name": "Hindalco Future",
+        "thresholds": [24000]
+    },
+    {
+        "instrument_key": "NSE_FO|62824",
+        "name": "Apollo Hospitals Future",
+        "thresholds": [3500]
+    },
+    {
+        "instrument_key": "MCX_FO|504265",
+        "name": "Natural Gas Future",
+        "thresholds": [27000]
+    },
+    {
+        "instrument_key": "MCX_FO|499095",
+        "name": "Crude Oil June Future",
+        "thresholds": [2000]
+    },
+    {
+        "instrument_key": "MCX_FO|464150",
+        "name": "Silver June Future",
+        "thresholds": [150]
+    },
+    {
+        "instrument_key": "MCX_FO|464151",
+        "name": "Silver Mini June Future",
+        "thresholds": [45]
+    },
+    {
+        "instrument_key": "MCX_FO|477177",
+        "name": "Silver Micro June Future",
+        "thresholds": [20]
+    },
+    {
+        "instrument_key": "MCX_FO|552708",
+        "name": "Copper June Future",
+        "thresholds": [15000]
+    },
+    {
+        "instrument_key": "MCX_FO|552711",
+        "name": "Zinc June Future",
+        "thresholds": [15000]
+    },
+    {
+        "instrument_key": "MCX_FO|552709",
+        "name": "Lead June Future",
+        "thresholds": [10000]
+    },
+    {
+        "instrument_key": "MCX_FO|552706",
+        "name": "Aluminium June Future",
+        "thresholds": [10000]
+    },
+    {
+        "instrument_key": "MCX_FO|466583",
+        "name": "Gold June Future",
+        "thresholds": [3]
+    },
+    {
+        "instrument_key": "MCX_FO|510764",
+        "name": "Gold Mini June Future",
+        "thresholds": [700]
+    },
+    {
+        "instrument_key": "MCX_FO|510464",
+        "name": "Gold Petal June Future",
+        "thresholds": [15]
+    },
+    {
+        "instrument_key": "MCX_FO|565898",
+        "name": "Bulldex June Future",
+        "thresholds": [150]
+    },
+    {
+        "instrument_key": "NSE_FO|62329",
+        "name": "Nifty 50 Future",
+        "thresholds": [5700]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE002A01018",
+        "name": "Reliance",
+        "thresholds": [50000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE040A01034",
+        "name": "HDFC Bank",
+        "thresholds": [150000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE090A01021",
+        "name": "ICICI Bank",
+        "thresholds": [100000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE062A01020",
+        "name": "SBI",
+        "thresholds": [120000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE467B01029",
+        "name": "TCS",
+        "thresholds": [20000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE009A01021",
+        "name": "Infosys",
+        "thresholds": [60000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE154A01025",
+        "name": "ITC",
+        "thresholds": [100000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE397D01024",
+        "name": "Bharti Airtel",
+        "thresholds": [40000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE238A01034",
+        "name": "Axis Bank",
+        "thresholds": [60000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE018A01030",
+        "name": "L&T",
+        "thresholds": [25000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE081A01020",
+        "name": "Tata Steel",
+        "thresholds": [250000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE155A01022",
+        "name": "Tata Motors",
+        "thresholds": [80000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE296A01032",
+        "name": "Bajaj Finance",
+        "thresholds": [150000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE237A01028",
+        "name": "Kotak Bank",
+        "thresholds": [35000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE044A01036",
+        "name": "Sun Pharma",
+        "thresholds": [30000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE019A01038",
+        "name": "JSW Steel",
+        "thresholds": [25000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE522F01014",
+        "name": "Coal India",
+        "thresholds": [100000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE423A01024",
+        "name": "Adani Enterprises",
+        "thresholds": [18000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE742F01042",
+        "name": "Adani Ports",
+        "thresholds": [40000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE038A01020",
+        "name": "Hindalco",
+        "thresholds": [70000]
+    },
+    {
+        "instrument_key": "NSE_EQ|INE437A01024",
+        "name": "Apollo Hospitals",
+        "thresholds": [10000]
     }
 ]

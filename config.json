@@ -6,291 +6,303 @@
             "priceBarTicks": 7,
             "volumePerBar": 27000,
             "exchange": "MCX_FO",
-            "notes": "Volume: 27,000 units | Retained original config thresholds"
+            "notes": "Winner | Balanced 0.23% price swing and 21.6-lot volume."
         },
         {
             "key": "MCX_FO|499095",
             "name": "Crude Oil June Future",
-            "priceBarTicks": 2,
-            "volumePerBar": 300,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 10,
+            "volumePerBar": 2000,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 10 ticks (₹10 range) filters bid-ask noise; 2,000 units (20 lots) slows down candle printing."
         },
         {
             "key": "MCX_FO|464150",
             "name": "Silver June Future",
-            "priceBarTicks": 3,
-            "volumePerBar": 80,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 50,
+            "volumePerBar": 150,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | Standard Silver needs at least 50 ticks (₹50 range) to clear standard spreads; 150 kg (5 lots) is optimal."
         },
         {
             "key": "MCX_FO|464151",
             "name": "Silver Mini June Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 48,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 40,
+            "volumePerBar": 45,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 40 ticks clears standard mini spreads; 45 kg (9 lots) gives a balanced chart."
         },
         {
             "key": "MCX_FO|477177",
             "name": "Silver Micro June Future",
             "priceBarTicks": 13,
             "volumePerBar": 20,
-            "exchange": "MCX_FO"
+            "exchange": "MCX_FO",
+            "notes": "Winner | 13 ticks and 20 lots perfectly filters noise for retail-driven micro swings."
         },
         {
             "key": "MCX_FO|552708",
             "name": "Copper June Future",
-            "priceBarTicks": 3,
-            "volumePerBar": 9000,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 14,
+            "volumePerBar": 15000,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 14 ticks (₹0.70 range) is 0.08% of price; 15k kg (6 lots) aligns volume with NG."
         },
         {
             "key": "MCX_FO|552711",
             "name": "Zinc June Future",
-            "priceBarTicks": 2,
-            "volumePerBar": 15,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 8,
+            "volumePerBar": 15000,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 8 ticks (₹0.40 range) and 15,000 kg (3 lots) avoids micro-noise."
         },
         {
             "key": "MCX_FO|552709",
             "name": "Lead June Future",
-            "priceBarTicks": 1,
-            "volumePerBar": 5,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 6,
+            "volumePerBar": 10000,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 6 ticks (₹0.30 range) and 10,000 kg (2 lots) prevents pure tick chart behavior."
         },
         {
             "key": "MCX_FO|552706",
             "name": "Aluminium June Future",
-            "priceBarTicks": 2,
-            "volumePerBar": 12,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 8,
+            "volumePerBar": 10000,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 8 ticks (₹0.40 range) and 10,000 kg (2 lots) ensures structural candles."
         },
         {
             "key": "MCX_FO|466583",
             "name": "Gold June Future",
-            "priceBarTicks": 3,
-            "volumePerBar": 4,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 40,
+            "volumePerBar": 3,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | Standard Gold needs at least 40 ticks (₹40 range) to filter the bid-ask bounce."
         },
         {
             "key": "MCX_FO|510764",
             "name": "Gold Mini June Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 1000,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 30,
+            "volumePerBar": 700,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 30 ticks (₹30 range) prevents high-frequency noise; 700g (7 lots) for volume."
         },
         {
             "key": "MCX_FO|510464",
             "name": "Gold Petal June Future",
-            "priceBarTicks": 6,
-            "volumePerBar": 23,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 10,
+            "volumePerBar": 15,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 10 ticks (₹10 range) and 15g prevents retail noise on this ultra-small contract."
         },
         {
             "key": "MCX_FO|565898",
             "name": "Bulldex June Future",
-            "priceBarTicks": 8,
-            "volumePerBar": 1500,
-            "exchange": "MCX_FO"
+            "priceBarTicks": 15,
+            "volumePerBar": 150,
+            "exchange": "MCX_FO",
+            "notes": "Calibrated | 15 ticks (15 points range) and 150 units creates clean index-like pullbacks."
         },
         {
             "key": "NSE_FO|62329",
             "name": "Nifty 50 Future",
-            "priceBarTicks": 8,
+            "priceBarTicks": 80,
             "volumePerBar": 5700,
             "exchange": "NSE_FO",
-            "notes": "Volume: 5,700 units | Retained original config thresholds"
+            "notes": "Calibrated | 80 ticks (₹4.00 range) is 0.017% of price; completely filters out index bid-ask noise."
         },
         {
             "key": "NSE_FO|62326",
             "name": "Nifty Bank Future",
-            "priceBarTicks": 7,
+            "priceBarTicks": 150,
             "volumePerBar": 2600,
             "exchange": "NSE_FO",
-            "notes": "Volume: 2,600 units | Retained original config thresholds"
+            "notes": "Calibrated | 150 ticks (₹7.50 range) is 0.015% of price; filters out Bank Nifty's massive bid-ask variance."
         },
         {
             "key": "NSE_FO|62327",
             "name": "Fin Nifty Future",
-            "priceBarTicks": 6,
+            "priceBarTicks": 80,
             "volumePerBar": 1800,
             "exchange": "NSE_FO",
-            "notes": "Fin Nifty Future | Verified active June 2026 Monthly Expiry"
+            "notes": "Calibrated | 80 ticks (₹4.00 range) is 0.018% of price; filters noise for clean 2-legged pullbacks."
         },
         {
             "key": "NSE_FO|62328",
             "name": "Midcap Nifty Future",
-            "priceBarTicks": 6,
+            "priceBarTicks": 50,
             "volumePerBar": 1400,
             "exchange": "NSE_FO",
-            "notes": "Midcap Nifty Future | Verified active June 2026 Monthly Expiry"
+            "notes": "Calibrated | 50 ticks (₹2.50 range) is 0.02% of price; stabilizes candle generation rate."
         },
         {
             "key": "NSE_EQ|INE002A01018",
             "name": "Reliance",
-            "priceBarTicks": 7,
+            "priceBarTicks": 29,
             "volumePerBar": 50000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (5.0M) / 100 = 50,000"
+            "notes": "Calibrated | 29 ticks (₹1.45 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE040A01034",
             "name": "HDFC Bank",
-            "priceBarTicks": 8,
+            "priceBarTicks": 16,
             "volumePerBar": 150000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (15.0M) / 100 = 150,000"
+            "notes": "Calibrated | 16 ticks (₹0.80 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE090A01021",
             "name": "ICICI Bank",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 100000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE062A01020",
             "name": "SBI",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 120000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (12.0M) / 100 = 120,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE467B01029",
             "name": "TCS",
-            "priceBarTicks": 8,
+            "priceBarTicks": 38,
             "volumePerBar": 20000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (2.0M) / 100 = 20,000"
+            "notes": "Calibrated | 38 ticks (₹1.90 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE009A01021",
             "name": "Infosys",
-            "priceBarTicks": 8,
+            "priceBarTicks": 15,
             "volumePerBar": 60000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (6.0M) / 100 = 60,000"
+            "notes": "Calibrated | 15 ticks (₹0.75 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE154A01025",
             "name": "ITC",
-            "priceBarTicks": 6,
+            "priceBarTicks": 12,
             "volumePerBar": 100000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE397D01024",
             "name": "Bharti Airtel",
-            "priceBarTicks": 7,
+            "priceBarTicks": 14,
             "volumePerBar": 40000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (4.0M) / 100 = 40,000"
+            "notes": "Calibrated | 14 ticks (₹0.70 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE238A01034",
             "name": "Axis Bank",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 60000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (6.0M) / 100 = 60,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE018A01030",
             "name": "L&T",
-            "priceBarTicks": 8,
+            "priceBarTicks": 35,
             "volumePerBar": 25000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (2.5M) / 100 = 25,000"
+            "notes": "Calibrated | 35 ticks (₹1.75 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE081A01020",
             "name": "Tata Steel",
-            "priceBarTicks": 6,
+            "priceBarTicks": 12,
             "volumePerBar": 250000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (25.0M) / 100 = 250,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE155A01022",
             "name": "Tata Motors",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 80000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (8.0M) / 100 = 80,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE296A01032",
             "name": "Bajaj Finance",
-            "priceBarTicks": 8,
+            "priceBarTicks": 71,
             "volumePerBar": 150000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (15.0M) / 100 = 150,000"
+            "notes": "Calibrated | 71 ticks (₹3.55 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE237A01028",
             "name": "Kotak Bank",
-            "priceBarTicks": 7,
+            "priceBarTicks": 18,
             "volumePerBar": 35000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (3.5M) / 100 = 35,000"
+            "notes": "Calibrated | 18 ticks (₹0.90 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE044A01036",
             "name": "Sun Pharma",
-            "priceBarTicks": 7,
+            "priceBarTicks": 15,
             "volumePerBar": 30000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (3.0M) / 100 = 30,000"
+            "notes": "Calibrated | 15 ticks (₹0.75 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE019A01038",
             "name": "JSW Steel",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 25000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (2.5M) / 100 = 25,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE522F01014",
             "name": "Coal India",
-            "priceBarTicks": 6,
+            "priceBarTicks": 12,
             "volumePerBar": 100000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (10.0M) / 100 = 100,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE423A01024",
             "name": "Adani Enterprises",
-            "priceBarTicks": 8,
+            "priceBarTicks": 32,
             "volumePerBar": 18000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (1.8M) / 100 = 18,000"
+            "notes": "Calibrated | 32 ticks (₹1.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE742F01042",
             "name": "Adani Ports",
-            "priceBarTicks": 7,
+            "priceBarTicks": 14,
             "volumePerBar": 40000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (4.0M) / 100 = 40,000"
+            "notes": "Calibrated | 14 ticks (₹0.70 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE038A01020",
             "name": "Hindalco",
-            "priceBarTicks": 7,
+            "priceBarTicks": 12,
             "volumePerBar": 70000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (7.0M) / 100 = 70,000"
+            "notes": "Calibrated | 12 ticks (₹0.60 range) filters bid-ask noise."
         },
         {
             "key": "NSE_EQ|INE437A01024",
             "name": "Apollo Hospitals",
-            "priceBarTicks": 8,
+            "priceBarTicks": 62,
             "volumePerBar": 10000,
             "exchange": "NSE_EQ",
-            "notes": "10-day avg volume (1.0M) / 100 = 10,000"
+            "notes": "Calibrated | 62 ticks (₹3.10 range) filters bid-ask noise."
         }
     ],
     "directories": {

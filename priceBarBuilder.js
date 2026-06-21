@@ -4,6 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
+// FIX: Helper to dynamically resolve financial tick configurations by instrument class
+function getTickSize(instrumentKey) {
+    if (instrumentKey.includes('MCX_FO')) {
+        // Natural Gas
+        if (instrumentKey.includes('504265') || instrumentKey.includes('487465')) return 0.10;
+        // Base Metals (Zinc, Lead, Copper, Aluminium)
+        if (instrumentKey.includes('552708') || instrumentKey.includes('552711') || instrumentKey.includes('552709') || instrumentKey.includes('552706') || instrumentKey.includes('Bulldex')) return 0.05;
+        // Crude Oil, Silver, Gold
+        return 1.0;
+    }
+    return 0.05; // NSE Equities & Indices Standard
+}
+
 class PriceBarBuilder extends EventEmitter {
     constructor(config) {
         super();
@@ -11,18 +24,15 @@ class PriceBarBuilder extends EventEmitter {
         this.activeBars = new Map();
         this.completedBars = [];
         
-        // Directories
         this.dataDir = config.dataDir || './candles_data/price_bars';
         this.rawDataDir = config.rawDataDir || './raw_ticks_data';
         
-        // Create directories
         [this.dataDir, this.rawDataDir].forEach(dir => {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
         });
         
-        // Statistics
         this.stats = {
             totalTicks: 0,
             totalVolume: 0,
@@ -30,9 +40,8 @@ class PriceBarBuilder extends EventEmitter {
             barsByInstrument: new Map()
         };
         
-        // Initialize bars
         this.initializeBars();
-        this.loadHistoryFromCSV(); // Pre-populate history on startup
+        this.loadHistoryFromCSV(); 
     }
     
     initializeBars() {
@@ -40,9 +49,7 @@ class PriceBarBuilder extends EventEmitter {
             this.activeBars.set(instrument.key, {
                 instrument_key: instrument.key,
                 name: instrument.name,
-                targetTicks: instrument.priceBarTicks || 500,  // Original logic: count price changes
-                
-                // Current bar data
+                targetTicks: instrument.priceBarTicks || 500,  
                 currentTicks: 0,
                 open: null,
                 high: null,
@@ -53,12 +60,10 @@ class PriceBarBuilder extends EventEmitter {
                 lastUpdateTime: null,
                 volume: 0,
                 transactions: 0,
-                
-                // History
                 bars: [],
                 barNumber: 0,
                 lastEmittedProgress: 0,
-                lastSignalBarNumbers: {} // FIX: Track signals per version
+                lastSignalBarNumbers: {} 
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
@@ -80,7 +85,6 @@ class PriceBarBuilder extends EventEmitter {
                     const lines = content.split('\n');
                     if (lines.length < 2) continue;
                     
-                    // Sanitize carriage returns from headers
                     const headers = lines[0].replace(/[\r\n]+/g, '').split(',');
                     const timestampIdx = headers.indexOf('timestamp');
                     const barNumberIdx = headers.indexOf('bar_number');
@@ -123,7 +127,7 @@ class PriceBarBuilder extends EventEmitter {
                         });
                     }
 
-                    // Pre-populate last 500 completed candles for continuous indices
+                    // FIX: Retained dynamic 500-bar depth to avoid startup lags and focus on immediate scalping legs
                     bar.bars = parsedBars.slice(-500);
                     this.stats.barsByInstrument.set(key, parsedBars.length);
                     console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
@@ -152,14 +156,10 @@ class PriceBarBuilder extends EventEmitter {
             receiveTimeMs = Date.now();
         }
        
-        // Use exchange time for candle logic (source of truth)
         const currentTime = exchangeTimeMs || receiveTimeMs;
-       
-        // Store both timestamps for debugging
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
         
-        // Save raw tick
         this.saveRawTick({
            ...tickData, 
            exchange_time_iso: exchangeTimeISO,
@@ -167,14 +167,11 @@ class PriceBarBuilder extends EventEmitter {
            latency_ms: receiveTimeMs - exchangeTimeMs
         });
         
-        // Get bar
         let bar = this.activeBars.get(instrument_key);
         if (!bar) return;
         
-        // Track last price to detect changes (original logic)
         const lastPrice = bar.close;
         
-        // Initialize bar on first tick
         if (bar.open === null) {
             bar.barNumber = this.stats.barsByInstrument.get(instrument_key) + 1;
             bar.open = price;
@@ -188,7 +185,6 @@ class PriceBarBuilder extends EventEmitter {
             console.log(`   Target: ${bar.targetTicks} price changes\n`);
         }
         
-        // Update bar always (for OHLC)
         bar.high = Math.max(bar.high, price);
         bar.low = Math.min(bar.low, price);
         bar.close = price;
@@ -198,14 +194,12 @@ class PriceBarBuilder extends EventEmitter {
         bar.volume += volume;
         bar.transactions++;
         
-        // CRITICAL: Only increment tick count if price changed (original logic)
         if (lastPrice !== null && price !== lastPrice) {
             bar.currentTicks++;
         } else if (lastPrice === null) {
-            bar.currentTicks = 1; // First tick counts
+            bar.currentTicks = 1; 
         }
         
-        // Update global stats
         this.stats.totalTicks++;
         this.stats.totalVolume += volume;
 
@@ -231,10 +225,8 @@ class PriceBarBuilder extends EventEmitter {
             this.emit('live_candle_update', liveCandle);
         }
         
-        // Calculate progress
         const progress = (bar.currentTicks / bar.targetTicks) * 100;
         
-        // Emit progress
         if (Math.floor(progress) % 10 === 0 && progress !== bar.lastEmittedProgress) {
             bar.lastEmittedProgress = progress;
             this.emit('bar_update', {
@@ -250,7 +242,6 @@ class PriceBarBuilder extends EventEmitter {
             });
         }
         
-        // Check if bar should close (based on price changes)
         if (bar.currentTicks >= bar.targetTicks) {
             this.closeBar(instrument_key, bar);
         }
@@ -262,48 +253,34 @@ class PriceBarBuilder extends EventEmitter {
             instrument_key: instrumentKey,
             name: bar.name,
             barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
-            
-            // OHLC
             open: bar.open,
             high: bar.high,
             low: bar.low,
             close: bar.close,
-            
-            // Metrics
             ticks: bar.currentTicks,
             targetTicks: bar.targetTicks,
             volume: bar.volume,
             transactions: bar.transactions,
             avgTradeSize: bar.volume / bar.transactions,
-            
-            // Timing
             startTime: bar.startTimestamp || new Date(bar.startTime).toISOString(),
             endTime: new Date(bar.lastUpdateTime).toISOString(),
             durationMs: bar.lastUpdateTime - bar.startTime,
             durationSeconds: ((bar.lastUpdateTime - bar.startTime) / 1000).toFixed(1),
-            
-            // Price movement
             priceChange: (bar.close - bar.open).toFixed(2),
             priceChangePercent: (((bar.close - bar.open) / bar.open) * 100).toFixed(2),
             priceRange: (bar.high - bar.low).toFixed(2),
             priceRangePercent: (((bar.high - bar.low) / bar.open) * 100).toFixed(2),
-            
             timestamp: bar.lastUpdateTime
         };
         
-        // Store
         bar.bars.push(completedBar);
         this.completedBars.push(completedBar);
         this.stats.totalBars++;
         this.stats.barsByInstrument.set(instrumentKey, (this.stats.barsByInstrument.get(instrumentKey) || 0) + 1);
         
-        // Save to CSV
         this.saveBarToCSV(completedBar);
-        
-        // Emit closed bar event
         this.emit('bar_close', completedBar);
         
-        // Log
         console.log(`\n✅ [PRICE BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
         console.log(`   Ticks: ${bar.currentTicks} / ${bar.targetTicks} (price changes)`);
         console.log(`   OHLC: ${bar.open.toFixed(2)} | ${bar.high.toFixed(2)} | ${bar.low.toFixed(2)} | ${bar.close.toFixed(2)}`);
@@ -322,7 +299,8 @@ class PriceBarBuilder extends EventEmitter {
 
         if (strategyCandles.length >= 32) {
             try {
-                const tickSize = instrumentKey.includes('MCX_FO') ? 0.05 : 0.05;
+                // FIX: Resolve dynamic MCX vs. NSE tick parameters to allow live touches to trigger
+                const tickSize = getTickSize(instrumentKey);
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
                 
                 for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
@@ -337,9 +315,8 @@ class PriceBarBuilder extends EventEmitter {
                                 const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
                                 if (confMatch) confidence = parseInt(confMatch[1]);
                                 
-                                // FIX: Exclude scoping "this.type" and hardcode direct dimensions
                                 const signalEvent = {
-                                    version: versionName, 
+                                    version: versionName,
                                     instrument: instrumentKey,
                                     name: bar.name,
                                     type: latestSignal.type,
@@ -350,7 +327,7 @@ class PriceBarBuilder extends EventEmitter {
                                     reason: latestSignal.reason.replace('Conf:', 'Price, Conf:'),
                                     timestamp: completedBar.timestamp,
                                     barNumber: bar.barNumber,
-                                    bar_type: 'price' // Hardcoded type dimension
+                                    bar_type: 'price' 
                                 };
                                 this.emit('trade_signal', signalEvent);
                             }
@@ -361,7 +338,7 @@ class PriceBarBuilder extends EventEmitter {
                 console.error(`Error processing signals:`, err.message);
             }
         }
-        // Reset bar state completely for the next live candle
+        
         const isExactClose = bar.currentTicks === bar.targetTicks;
         const ohlcReset = isExactClose ? null : bar.close;
         
@@ -369,7 +346,6 @@ class PriceBarBuilder extends EventEmitter {
             instrument_key: bar.instrument_key,
             name: bar.name,
             targetTicks: bar.targetTicks,
-
             currentTicks: 0,
             open: ohlcReset,
             high: ohlcReset,
@@ -381,11 +357,10 @@ class PriceBarBuilder extends EventEmitter {
             lastUpdateTimestamp: null,
             volume: 0,
             transactions: 0,
-
             bars: bar.bars,
             barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
             lastEmittedProgress: 0,
-            lastSignalBarNumbers: bar.lastSignalBarNumbers // FIX: Carry forward plural tracking map
+            lastSignalBarNumbers: bar.lastSignalBarNumbers // Carry forward plural tracking map
         });
     }
     
