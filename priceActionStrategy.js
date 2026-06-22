@@ -1,6 +1,6 @@
 /**
  * Price Action Strategy Versions Module
- * Houses 5 independent versions of the Thomas Wade 2-Legged Pullback strategy.
+ * Houses 10 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy.
  */
 
 const DEFAULT_PARAMS = {
@@ -36,6 +36,7 @@ const DEFAULT_PARAMS = {
     // === Trap Settings ===
     enableTraps: true,                  // Enables Failed Second Entry (Trap) signals
     trapMaxLookback: 3,                 // Maximum bars allowed for the setup to fail and trigger the trap
+    doubleTopBottomToleranceTicks: 4,   // How close (in ticks) a trap must be to a prior swing high/low to count as double top/bottom
     
     // === Confluence Overlays ===
     enableFVGConfluence: true,          // Evaluates Fair Value Gaps for scoring
@@ -54,7 +55,7 @@ const DEFAULT_PARAMS = {
     minBarsBetweenSignals: 3,           // Minimum candles to wait before scanning new setups
 };
 
-// FIX: Central dynamic tick size helper shared by both the backtester and live server
+// Central dynamic tick size helper shared by both the backtester and live server
 function getTickSize(instrumentKey) {
     if (!instrumentKey) return 0.05;
     if (instrumentKey.includes('MCX_FO')) {
@@ -374,18 +375,76 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
     };
 }
 
+// === BROOKS/WADE STRICT LEG EVALUATIONS ===
+
+function evaluateStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
+    const setup = evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize);
+    if (!setup.isH2) return setup;
+
+    const h1TriggerIdx = setup.h1TriggerIdx;
+    const h1SignalIdx = setup.h1SignalIdx;
+
+    let firstLegLow = Infinity;
+    for (let k = swingHighIdx; k <= h1SignalIdx; k++) {
+        if (candles[k].low < firstLegLow) firstLegLow = candles[k].low;
+    }
+
+    let secondLegLow = Infinity;
+    for (let k = h1TriggerIdx; k <= currentIdx; k++) {
+        if (candles[k].low < secondLegLow) secondLegLow = candles[k].low;
+    }
+
+    // Strict count: Leg 2 low must be lower than Leg 1 low
+    if (secondLegLow >= firstLegLow) {
+        setup.isH2 = false;
+    }
+
+    return setup;
+}
+
+function evaluateStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
+    const setup = evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize);
+    if (!setup.isL2) return setup;
+
+    const l1TriggerIdx = setup.l1TriggerIdx;
+    const l1SignalIdx = setup.l1SignalIdx;
+
+    let firstLegHigh = -Infinity;
+    for (let k = swingLowIdx; k <= l1SignalIdx; k++) {
+        if (candles[k].high > firstLegHigh) firstLegHigh = candles[k].high;
+    }
+
+    let secondLegHigh = -Infinity;
+    for (let k = l1TriggerIdx; k <= currentIdx; k++) {
+        if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high;
+    }
+
+    // Strict count: Leg 2 high must be higher than Leg 1 high
+    if (secondLegHigh <= firstLegHigh) {
+        setup.isL2 = false;
+    }
+
+    return setup;
+}
+
 // ============================================================
 // CENTRAL STRATEGY EVALUATION MODULE
 // ============================================================
 
 function twoLeggedPullbackCore(candles, params = {}) {
-    // FIX: Dynamically resolve minimum tick specifications to align strategy inputs with live updates
     const sampleCandle = candles[0];
     const resolvedTickSize = params.tickSize !== undefined 
         ? params.tickSize 
         : getTickSize(sampleCandle?.instrument || sampleCandle?.instrument_key);
 
-    const p = { ...DEFAULT_PARAMS, tickSize: resolvedTickSize, ...params };
+    const p = { 
+        requireStrictSecondLeg: false, 
+        requireDoubleTopBottomTrap: false,
+        ...DEFAULT_PARAMS, 
+        tickSize: resolvedTickSize, 
+        ...params 
+    };
+    
     const signals = [];
     if (candles.length < p.emaPeriod + p.minTrendBars) return signals;
 
@@ -413,7 +472,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
         if (trend.bullish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
             if (swingHighIdx !== null) {
-                const setup = evaluateH2Setup(candles, swingHighIdx, i, p.tickSize);
+                const setup = p.requireStrictSecondLeg 
+                    ? evaluateStrictH2Setup(candles, swingHighIdx, i, p.tickSize)
+                    : evaluateH2Setup(candles, swingHighIdx, i, p.tickSize);
                 if (setup.isH2) {
                     const touchEMA = sBar.low <= ema[i] + (p.emaTouchTicks * p.tickSize) && sBar.high >= ema[i] - (p.emaTouchTicks * p.tickSize);
                     const passesSignalBarCheck = validateSignalBar(sBar, 'BUY', p);
@@ -465,7 +526,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
         if (trend.bearish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
             if (swingLowIdx !== null) {
-                const setup = evaluateL2Setup(candles, swingLowIdx, i, p.tickSize);
+                const setup = p.requireStrictSecondLeg
+                    ? evaluateStrictL2Setup(candles, swingLowIdx, i, p.tickSize)
+                    : evaluateL2Setup(candles, swingLowIdx, i, p.tickSize);
                 if (setup.isL2) {
                     const touchEMA = sBar.low <= ema[i] + (p.emaTouchTicks * p.tickSize) && sBar.high >= ema[i] - (p.emaTouchTicks * p.tickSize);
                     const passesSignalBarCheck = validateSignalBar(sBar, 'SELL', p);
@@ -521,14 +584,24 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingLowIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'low');
                     if (swingLowIdx !== null) {
-                        const setupL2 = evaluateL2Setup(candles, swingLowIdx, L, p.tickSize);
+                        const setupL2 = p.requireStrictSecondLeg
+                            ? evaluateStrictL2Setup(candles, swingLowIdx, L, p.tickSize)
+                            : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize);
                         
                         if (setupL2.isL2) {
                             const triggeredShort = candles[L + 1].low < candles[L].low - (p.tickSize);
                             
                             if (triggeredShort) {
+                                // Double Bottom Check
+                                let isDoubleBottom = true;
+                                if (p.requireDoubleTopBottomTrap) {
+                                    const l2Low = Math.min(candles[L].low, candles[L + 1].low);
+                                    const diff = Math.abs(l2Low - candles[swingLowIdx].low);
+                                    isDoubleBottom = diff <= (p.doubleTopBottomToleranceTicks * p.tickSize);
+                                }
+
                                 const structureHigh = Math.max(candles[L].high, candles[L + 1].high);
-                                if (sBar.high >= structureHigh) {
+                                if (sBar.high >= structureHigh && isDoubleBottom) {
                                     let score = 100;
                                     let passesScore = true;
 
@@ -581,14 +654,24 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingHighIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'high');
                     if (swingHighIdx !== null) {
-                        const setupH2 = evaluateH2Setup(candles, swingHighIdx, L, p.tickSize);
+                        const setupH2 = p.requireStrictSecondLeg
+                            ? evaluateStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
+                            : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize);
                         
                         if (setupH2.isH2) {
                             const triggeredLong = candles[L + 1].high > candles[L].high + (p.tickSize);
                             
                             if (triggeredLong) {
+                                // Double Top Check
+                                let isDoubleTop = true;
+                                if (p.requireDoubleTopBottomTrap) {
+                                    const h2High = Math.max(candles[L].high, candles[L + 1].high);
+                                    const diff = Math.abs(h2High - candles[swingHighIdx].high);
+                                    isDoubleTop = diff <= (p.doubleTopBottomToleranceTicks * p.tickSize);
+                                }
+
                                 const structureLow = Math.min(candles[L].low, candles[L + 1].low);
-                                if (sBar.low <= structureLow) {
+                                if (sBar.low <= structureLow && isDoubleTop) {
                                     let score = 100;
                                     let passesScore = true;
 
@@ -602,7 +685,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                         const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
                                         
                                         let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
-                                        const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
+                                        const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLowIdx + p.minTrendBars, 'low');
                                         if (p.useStructuralTarget && swingLowIdx !== null) {
                                             takeProfit = candles[swingLowIdx].low - (p.triggerOffsetTicks * p.tickSize);
                                         }
@@ -703,6 +786,76 @@ const STRATEGIES = {
             enableLiquiditySweeps: true,
             minConfidenceThreshold: 45,
             useStructuralTarget: true // Calculates TP targets using structural extremes
+        });
+    },
+
+    // ==================== STRICT EDITIONS (CORRECT DEFINITIONS) ====================
+
+    // V6: Double Traps (Strict)
+    "V6: Double Traps (Strict)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    // V7: EMA Pullback (Strict)
+    "V7: EMA Pullback (Strict)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true
+        });
+    },
+    // V8: High Confidence (Strict)
+    "V8: High Confidence (Strict)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    // V9: Aggressive (Strict)
+    "V9: Aggressive (Strict)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableGiantBarFilter: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false,
+            minSignalBarCloseRatio: 0.50,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true
+        });
+    },
+    // V10: Wade Structural (Strict)
+    "V10: Wade Structural (Strict)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: true,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
         });
     }
 };
@@ -942,7 +1095,9 @@ module.exports = {
     DEFAULT_PARAMS, 
     calculateEMA, 
     evaluateH2Setup, 
-    evaluateL2Setup, 
+    evaluateL2Setup,
+    evaluateStrictH2Setup,
+    evaluateStrictL2Setup,
     STRATEGIES,
     twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Fallback
     runPriceActionBacktest 

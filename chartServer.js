@@ -392,11 +392,72 @@ class ChartServer {
 
     saveSignalsToDisk() {
         try {
-            const jsonFile = 'signals_today_' + new Date().toISOString().split('T')[0] + '.json';
+            const localDate = new Date().toLocaleDateString('en-CA');
+            const jsonFile = `signals_today_${localDate}.json`;
             const signalsFile = path.join(this.candlesDataDir, jsonFile);
-            fs.writeFileSync(signalsFile, JSON.stringify(this.tradeSignals, null, 2), 'utf8');
+            
+            // 1. ALWAYS read existing data first
+            let existingSignals = [];
+            if (fs.existsSync(signalsFile)) {
+                try {
+                    const content = fs.readFileSync(signalsFile, 'utf8');
+                    existingSignals = JSON.parse(content);
+                } catch (err) {
+                    console.error('⚠️ Failed to read existing file, creating backup and starting fresh');
+                    const backupName = `signals_today_${localDate}_backup_${Date.now()}.json`;
+                    fs.copyFileSync(signalsFile, path.join(this.candlesDataDir, backupName));
+                    // Continue with empty array
+                }
+            }
+            
+            // 2. Merge, never replace
+            const signalMap = new Map();
+            
+            // Add existing signals first
+            for (const signal of existingSignals) {
+                const key = `${signal.timestamp}_${signal.instrument}_${signal.version}`;
+                signalMap.set(key, signal);
+            }
+            
+            // Add/update with current signals
+            let addedCount = 0;
+            for (const signal of this.tradeSignals) {
+                const key = `${signal.timestamp}_${signal.instrument}_${signal.version}`;
+                if (!signalMap.has(key)) {
+                    signalMap.set(key, signal);
+                    addedCount++;
+                } else {
+                    // Update status if changed
+                    const existing = signalMap.get(key);
+                    if (existing.status !== signal.status) {
+                        signalMap.set(key, { ...existing, ...signal });
+                    }
+                }
+            }
+            
+            const allSignals = Array.from(signalMap.values());
+            
+            // 3. Write with atomic operation
+            const tempFile = `${signalsFile}.tmp`;
+            fs.writeFileSync(tempFile, JSON.stringify(allSignals, null, 2), 'utf8');
+            fs.renameSync(tempFile, signalsFile);
+            
+            console.log(`✅ Signals saved: ${addedCount} new, ${allSignals.length} total`);
+            
         } catch (err) {
-            console.error('❌ Failed to write trade signals to disk:', err.message);
+            console.error('❌ Failed to write signals:', err.message);
+            // Emergency save to a different file
+            try {
+                const emergencyFile = `signals_emergency_${Date.now()}.json`;
+                fs.writeFileSync(
+                    path.join(this.candlesDataDir, emergencyFile),
+                    JSON.stringify(this.tradeSignals, null, 2),
+                    'utf8'
+                );
+                console.log(`🆘 Emergency backup saved to ${emergencyFile}`);
+            } catch (emergencyErr) {
+                console.error('❌ Emergency backup failed:', emergencyErr.message);
+            }
         }
     }
     
