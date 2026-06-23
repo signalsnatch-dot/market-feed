@@ -685,7 +685,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                         const stopLoss = sBar.high + (p.stopOffsetTicks * p.tickSize);
                                         
                                         let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
-                                        const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLowIdx + p.minTrendBars, 'low');
+                                        const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
                                         if (p.useStructuralTarget && swingLowIdx !== null) {
                                             takeProfit = candles[swingLowIdx].low - (p.triggerOffsetTicks * p.tickSize);
                                         }
@@ -737,7 +737,9 @@ const STRATEGIES = {
             enableConfidenceScoring: false,
             enableFVGConfluence: false,
             enableLiquiditySweeps: false,
-            useStructuralTarget: false
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
         });
     },
     // V2: EMA Pullback (from Prompt 2 - Clean standard pullback, traps/confluences disabled)
@@ -748,7 +750,9 @@ const STRATEGIES = {
             enableConfidenceScoring: false,
             enableFVGConfluence: false,
             enableLiquiditySweeps: false,
-            useStructuralTarget: false
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
         });
     },
     // V3: High Confidence (from Prompt 3 - Full traps, scoring, sweeps, and gaps)
@@ -760,7 +764,9 @@ const STRATEGIES = {
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
             minConfidenceThreshold: 45,
-            useStructuralTarget: false
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
         });
     },
     // V4: Aggressive (from Prompt 3 - Relaxed parameters, disabled filters)
@@ -785,7 +791,9 @@ const STRATEGIES = {
             enableFVGConfluence: true,
             enableLiquiditySweeps: true,
             minConfidenceThreshold: 45,
-            useStructuralTarget: true // Calculates TP targets using structural extremes
+            useStructuralTarget: true, // Calculates TP targets using structural extremes
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
         });
     },
 
