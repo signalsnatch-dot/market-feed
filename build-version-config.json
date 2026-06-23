@@ -97,12 +97,12 @@
     {
         "instrument_key": "NSE_EQ|INE090A01021",
         "name": "ICICI Bank",
-        "thresholds": [1500]
+        "thresholds": [5000]
     },
     {
         "instrument_key": "NSE_EQ|INE062A01020",
         "name": "SBI",
-        "thresholds": [3000]
+        "thresholds": [8000]
     },
     {
         "instrument_key": "NSE_EQ|INE467B01029",
@@ -162,7 +162,7 @@
     {
         "instrument_key": "NSE_EQ|INE019A01038",
         "name": "JSW Steel",
-        "thresholds": [500]
+        "thresholds": [2500]
     },
     {
         "instrument_key": "NSE_EQ|INE522F01014",
