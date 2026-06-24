@@ -121,12 +121,23 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (triggered) {
-                        // FIX: Slippage / Gap-fill protection logic to align live executions with your backtest model
+                        // Slippage / Gap-fill protection logic to align live executions with backtest model
                         let fillPrice = pending.entry;
                         if (pending.type === 'BUY_STOP' && bar.open > pending.entry) {
                             fillPrice = bar.open;
                         } else if (pending.type === 'SELL_STOP' && bar.open < pending.entry) {
                             fillPrice = bar.open;
+                        }
+
+                        // FIX: Re-align TP calculation with backtester dynamic slippage adjustment
+                        const risk = Math.abs(fillPrice - pending.sl);
+                        let finalTP;
+                        if (pending.useStructuralTarget && pending.structuralTarget !== null) {
+                            finalTP = pending.structuralTarget;
+                        } else {
+                            finalTP = pending.type === 'BUY_STOP'
+                                ? fillPrice + risk * (pending.rewardRatio || 1.5)
+                                : fillPrice - risk * (pending.rewardRatio || 1.5);
                         }
 
                         const activeTrade = {
@@ -138,7 +149,7 @@ class DualCandleBuilder extends EventEmitter {
                             type: pending.type,
                             entry: fillPrice, // Slippage-aligned execution fill
                             sl: pending.sl,
-                            tp: pending.tp,
+                            tp: finalTP, // Aligned with the backtest's dynamic risk/reward shift
                             direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
                             timestamp: bar.timestamp,
                             status: 'active'
@@ -188,12 +199,18 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (exitPrice !== null) {
+                        // FIX: Compute correct transactional action types for live broker APIs
+                        const exitType = trade.direction === 'long'
+                            ? (exitReason === 'stop_loss' ? 'SELL_STOP' : 'SELL_LIMIT')
+                            : (exitReason === 'stop_loss' ? 'BUY_STOP' : 'BUY_LIMIT');
+
                         const statusUpdate = {
                             version: versionName,
                             instrument: trade.instrument,
                             bar_type: trade.bar_type,
                             barNumber: trade.barNumber,
-                            type: trade.type,
+                            type: trade.type, // Maintain the entry 'type' for chartServer state lookup compatibility [INDEX]
+                            exitType: exitType, // Expose explicit transactional exit actions to the broker engine
                             exitReason: exitReason,
                             exitPrice: exitPrice,
                             timestamp: bar.timestamp,

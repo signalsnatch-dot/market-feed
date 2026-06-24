@@ -568,8 +568,10 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const stopLoss = sBar.low - stopOffset;
                             
                             let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
+                            let structuralTarget = null;
                             if (p.useStructuralTarget && swingHighIdx !== null) {
-                                takeProfit = candles[swingHighIdx].high + triggerOffset;
+                                structuralTarget = candles[swingHighIdx].high + triggerOffset;
+                                takeProfit = structuralTarget;
                             }
 
                             const risk = Math.abs(triggerPrice - stopLoss);
@@ -583,6 +585,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     triggerPrice,
                                     stopLoss,
                                     takeProfit,
+                                    rewardRatio: p.rewardRatio,
+                                    useStructuralTarget: p.useStructuralTarget,
+                                    structuralTarget,
                                     timestamp: sBar.timestamp,
                                     reason: p.enableConfidenceScoring 
                                         ? `H2 Pullback (Conf: ${score}/100)`
@@ -622,8 +627,10 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             const stopLoss = sBar.high + stopOffset;
 
                             let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
+                            let structuralTarget = null;
                             if (p.useStructuralTarget && swingLowIdx !== null) {
-                                takeProfit = candles[swingLowIdx].low - triggerOffset;
+                                structuralTarget = candles[swingLowIdx].low - triggerOffset;
+                                takeProfit = structuralTarget;
                             }
 
                             const risk = Math.abs(triggerPrice - stopLoss);
@@ -637,6 +644,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     triggerPrice,
                                     stopLoss,
                                     takeProfit,
+                                    rewardRatio: p.rewardRatio,
+                                    useStructuralTarget: p.useStructuralTarget,
+                                    structuralTarget,
                                     timestamp: sBar.timestamp,
                                     reason: p.enableConfidenceScoring
                                         ? `L2 Pullback (Conf: ${score}/100)`
@@ -690,9 +700,11 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                         const stopLoss = sBar.low - stopOffset;
                                         
                                         let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
+                                        let structuralTarget = null;
                                         const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
                                         if (p.useStructuralTarget && swingHighIdx !== null) {
-                                            takeProfit = candles[swingHighIdx].high + triggerOffset;
+                                            structuralTarget = candles[swingHighIdx].high + triggerOffset;
+                                            takeProfit = structuralTarget;
                                         }
 
                                         const risk = Math.abs(triggerPrice - stopLoss);
@@ -706,6 +718,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                                 triggerPrice,
                                                 stopLoss,
                                                 takeProfit,
+                                                rewardRatio: p.rewardRatio,
+                                                useStructuralTarget: p.useStructuralTarget,
+                                                structuralTarget,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_BUY (Conf: ${score}/100)`
@@ -760,9 +775,11 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                         const stopLoss = sBar.high + stopOffset;
                                         
                                         let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
+                                        let structuralTarget = null;
                                         const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
                                         if (p.useStructuralTarget && swingLowIdx !== null) {
-                                            takeProfit = candles[swingLowIdx].low - triggerOffset;
+                                            structuralTarget = candles[swingLowIdx].low - triggerOffset;
+                                            takeProfit = structuralTarget;
                                         }
 
                                         const risk = Math.abs(triggerPrice - stopLoss);
@@ -776,6 +793,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                                 triggerPrice,
                                                 stopLoss,
                                                 takeProfit,
+                                                rewardRatio: p.rewardRatio,
+                                                useStructuralTarget: p.useStructuralTarget,
+                                                structuralTarget,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_SELL (Conf: ${score}/100)`
@@ -1195,15 +1215,23 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     const riskAmount = equity * p.maxRiskPerTrade;
                     const quantity = riskAmount / risk;
 
+                    // FIX: Re-align target execution with structural target boundaries
+                    let finalTP;
+                    if (pendingOrder.useStructuralTarget && pendingOrder.structuralTarget !== null) {
+                        finalTP = pendingOrder.structuralTarget;
+                    } else {
+                        finalTP = pendingOrder.type === 'BUY_STOP' 
+                            ? entryPrice + risk * pendingOrder.rewardRatio 
+                            : entryPrice - risk * pendingOrder.rewardRatio;
+                    }
+
                     position = {
                         direction: pendingOrder.type === 'BUY_STOP' ? 'long' : 'short',
                         entry: entryPrice,
                         quantity,
                         entryIndex: i,
                         stopLoss: pendingOrder.stopLoss,
-                        takeProfit: pendingOrder.type === 'BUY_STOP' 
-                            ? entryPrice + risk * p.rewardRatio 
-                            : entryPrice - risk * p.rewardRatio,
+                        takeProfit: finalTP,
                         metadata: pendingOrder.metadata
                     };
 
@@ -1281,6 +1309,9 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     type: signal.type,
                     triggerPrice: signal.triggerPrice,
                     stopLoss: signal.stopLoss,
+                    rewardRatio: signal.rewardRatio !== undefined ? signal.rewardRatio : p.rewardRatio,
+                    useStructuralTarget: signal.useStructuralTarget || false,
+                    structuralTarget: signal.structuralTarget || null,
                     metadata: { setupType: signal.type, signalBarIndex: i }
                 };
             }
