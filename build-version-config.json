@@ -12,12 +12,12 @@
     {
         "instrument_key": "MCX_FO|464150",
         "name": "Silver June Future",
-        "thresholds": [150]
+        "thresholds": [400]
     },
     {
         "instrument_key": "MCX_FO|464151",
         "name": "Silver Mini June Future",
-        "thresholds": [200]
+        "thresholds": [1000]
     },
     {
         "instrument_key": "MCX_FO|477177",
@@ -47,7 +47,7 @@
     {
         "instrument_key": "MCX_FO|466583",
         "name": "Gold June Future",
-        "thresholds": [3]
+        "thresholds": [5]
     },
     {
         "instrument_key": "MCX_FO|510764",
@@ -72,7 +72,7 @@
     {
         "instrument_key": "NSE_FO|62326",
         "name": "Nifty Bank Future",
-        "thresholds": [2600]
+        "thresholds": [5000]
     },
     {
         "instrument_key": "NSE_FO|62327",
@@ -107,7 +107,7 @@
     {
         "instrument_key": "NSE_EQ|INE467B01029",
         "name": "TCS",
-        "thresholds": [600]
+        "thresholds": [4500]
     },
     {
         "instrument_key": "NSE_EQ|INE009A01021",
@@ -127,7 +127,7 @@
     {
         "instrument_key": "NSE_EQ|INE238A01034",
         "name": "Axis Bank",
-        "thresholds": [1200]
+        "thresholds": [3500]
     },
     {
         "instrument_key": "NSE_EQ|INE018A01030",
@@ -137,7 +137,7 @@
     {
         "instrument_key": "NSE_EQ|INE081A01020",
         "name": "Tata Steel",
-        "thresholds": [5000]
+        "thresholds": [8000]
     },
     {
         "instrument_key": "NSE_EQ|INE155A01022",
@@ -147,7 +147,7 @@
     {
         "instrument_key": "NSE_EQ|INE296A01032",
         "name": "Bajaj Finance",
-        "thresholds": [300]
+        "thresholds": [2500]
     },
     {
         "instrument_key": "NSE_EQ|INE237A01028",
@@ -157,7 +157,7 @@
     {
         "instrument_key": "NSE_EQ|INE044A01036",
         "name": "Sun Pharma",
-        "thresholds": [600]
+        "thresholds": [1500]
     },
     {
         "instrument_key": "NSE_EQ|INE019A01038",
@@ -167,17 +167,17 @@
     {
         "instrument_key": "NSE_EQ|INE522F01014",
         "name": "Coal India",
-        "thresholds": [2500]
+        "thresholds": [6000]
     },
     {
         "instrument_key": "NSE_EQ|INE423A01024",
         "name": "Adani Enterprises",
-        "thresholds": [400]
+        "thresholds": [1500]
     },
     {
         "instrument_key": "NSE_EQ|INE742F01042",
         "name": "Adani Ports",
-        "thresholds": [900]
+        "thresholds": [2500]
     },
     {
         "instrument_key": "NSE_EQ|INE038A01020",
@@ -187,6 +187,6 @@
     {
         "instrument_key": "NSE_EQ|INE437A01024",
         "name": "Apollo Hospitals",
-        "thresholds": [120]
+        "thresholds": [800]
     }
 ]

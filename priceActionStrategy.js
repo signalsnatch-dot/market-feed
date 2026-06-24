@@ -1,8 +1,12 @@
 /**
  * Price Action Strategy Versions Module (Dual-Framework Engine)
- * Houses 20 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
+ * Houses 32 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
  * - V1 to V10: Original absolute tick-based logic (preserves baseline results, zero regression).
- * - V11 to V20: New dynamic volatility-adjusted ratio-based logic (loaded from config.json) [10].
+ * - V11 to V20: New dynamic volatility-adjusted ratio-based logic (loaded from config.json).
+ * - V21 to V23: Filtered variations of V3 (Absolute Tick-Based)
+ * - V24 to V26: Filtered variations of V8 (Strict Absolute Tick-Based)
+ * - V27 to V29: Filtered variations of V13 (Calibrated Ratio-Based)
+ * - V30 to V32: Filtered variations of V18 (Strict Calibrated Ratio-Based)
  */
 
 const DEFAULT_PARAMS = {
@@ -560,7 +564,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         
                         if (p.enableConfidenceScoring) {
                             score = calculateConfidenceScore(candles, ema, i, 'BUY', p, avgRange);
-                            passesScore = score >= p.minConfidenceThreshold;
+                            passesScore = typeof p.confidenceFilter === 'function' 
+                                ? p.confidenceFilter(score) 
+                                : (score >= p.minConfidenceThreshold);
                         }
 
                         if (passesScore) {
@@ -588,6 +594,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     rewardRatio: p.rewardRatio,
                                     useStructuralTarget: p.useStructuralTarget,
                                     structuralTarget,
+                                    confidence: p.enableConfidenceScoring ? score : null,
                                     timestamp: sBar.timestamp,
                                     reason: p.enableConfidenceScoring 
                                         ? `H2 Pullback (Conf: ${score}/100)`
@@ -619,7 +626,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                         if (p.enableConfidenceScoring) {
                             score = calculateConfidenceScore(candles, ema, i, 'SELL', p, avgRange);
-                            passesScore = score >= p.minConfidenceThreshold;
+                            passesScore = typeof p.confidenceFilter === 'function' 
+                                ? p.confidenceFilter(score) 
+                                : (score >= p.minConfidenceThreshold);
                         }
 
                         if (passesScore) {
@@ -647,6 +656,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                     rewardRatio: p.rewardRatio,
                                     useStructuralTarget: p.useStructuralTarget,
                                     structuralTarget,
+                                    confidence: p.enableConfidenceScoring ? score : null,
                                     timestamp: sBar.timestamp,
                                     reason: p.enableConfidenceScoring
                                         ? `L2 Pullback (Conf: ${score}/100)`
@@ -692,7 +702,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (p.enableConfidenceScoring) {
                                         score = calculateConfidenceScore(candles, ema, i, 'BUY', p, avgRange);
-                                        passesScore = score >= p.minConfidenceThreshold;
+                                        passesScore = typeof p.confidenceFilter === 'function' 
+                                            ? p.confidenceFilter(score) 
+                                            : (score >= p.minConfidenceThreshold);
                                     }
 
                                     if (passesScore) {
@@ -721,6 +733,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                                 rewardRatio: p.rewardRatio,
                                                 useStructuralTarget: p.useStructuralTarget,
                                                 structuralTarget,
+                                                confidence: p.enableConfidenceScoring ? score : null,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_BUY (Conf: ${score}/100)`
@@ -767,7 +780,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (p.enableConfidenceScoring) {
                                         score = calculateConfidenceScore(candles, ema, i, 'SELL', p, avgRange);
-                                        passesScore = score >= p.minConfidenceThreshold;
+                                        passesScore = typeof p.confidenceFilter === 'function' 
+                                            ? p.confidenceFilter(score) 
+                                            : (score >= p.minConfidenceThreshold);
                                     }
 
                                     if (passesScore) {
@@ -796,6 +811,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                                 rewardRatio: p.rewardRatio,
                                                 useStructuralTarget: p.useStructuralTarget,
                                                 structuralTarget,
+                                                confidence: p.enableConfidenceScoring ? score : null,
                                                 timestamp: sBar.timestamp,
                                                 reason: p.enableConfidenceScoring
                                                     ? `DOUBLE_TRAP_SELL (Conf: ${score}/100)`
@@ -1085,12 +1101,179 @@ const STRATEGIES = {
             requireStrictSecondLeg: true,
             requireDoubleTopBottomTrap: true
         });
+    },
+
+    // ==================== V21-V23: V3 WITH DYNAMIC CONFIDENCE FILTERING ====================
+    "V21: 65-70% confidence of V3": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score >= 65 && score <= 70,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V22: More than 80% confidence of V3": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score > 80,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V23: 65-70% and More than 80% confidence of V3": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+
+    // ==================== V24-V26: V8 WITH DYNAMIC CONFIDENCE FILTERING ====================
+    "V24: 65-70% confidence of V8": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score >= 65 && score <= 70,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V25: More than 80% confidence of V8": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score > 80,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V26: 65-70% and More than 80% confidence of V8": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+
+    // ==================== V27-V29: V13 WITH DYNAMIC CONFIDENCE FILTERING ====================
+    "V27: 65-70% confidence of V13": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score >= 65 && score <= 70,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V28: More than 80% confidence of V13": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score > 80,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V29: 65-70% and More than 80% confidence of V13": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+
+    // ==================== V30-V32: V18 WITH DYNAMIC CONFIDENCE FILTERING ====================
+    "V30: 65-70% confidence of V18": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score >= 65 && score <= 70,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V31: More than 80% confidence of V18": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => score > 80,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V32: 65-70% and More than 80% confidence of V18": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
     }
 };
 
 // Map useRatios flag automatically to parallel editions
 Object.keys(STRATEGIES).forEach(key => {
-    const isCalibrated = key.includes("(Calibrated)") || key.includes("-Calibrated)");
+    const isCalibrated = key.includes("(Calibrated)") || 
+                         key.includes("-Calibrated)") || 
+                         key.includes("of V13") || 
+                         key.includes("of V18");
     const originalFunc = STRATEGIES[key];
     STRATEGIES[key] = (candles, params = {}) => {
         return originalFunc(candles, { useRatios: isCalibrated, ...params });
@@ -1100,6 +1283,10 @@ Object.keys(STRATEGIES).forEach(key => {
 // ============================================================
 // SIMULATED PRICE ACTION BACKTESTER (SAFE PARAMS & STOPS)
 // ============================================================
+
+/**
+ * STREAMING_CHUNK: Running mock portfolio orders, updating MAE/MAFE bounds, and generating JSON results...
+ */
 
 function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, params = {}) {
     const p = { ...DEFAULT_PARAMS, ...params };
@@ -1128,8 +1315,17 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
     for (let i = p.emaPeriod + p.minTrendBars; i < candles.length; i++) {
         const bar = candles[i];
 
-        // 1. Process active trade exits
+        // 1. Process active trade exits and track extremes (MFE/MAE)
         if (position) {
+            // Track Worst Price (MAE) and Best Price (MAFE/MFE) for active long/short trades
+            if (position.direction === 'long') {
+                position.bestPrice = Math.max(position.bestPrice, bar.high);
+                position.worstPrice = Math.min(position.worstPrice, bar.low);
+            } else {
+                position.bestPrice = Math.min(position.bestPrice, bar.low);
+                position.worstPrice = Math.max(position.worstPrice, bar.high);
+            }
+
             let exitPrice = null;
             let exitReason = null;
 
@@ -1174,6 +1370,17 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     consecutiveLosses = 0;
                 }
 
+                // Calculate MAFE & MAE relative percentage distances
+                const initialTpDist = Math.abs(position.takeProfit - position.entry);
+                const mafePercentage = initialTpDist > 0 
+                    ? Math.min(100, Math.max(0, (Math.abs(position.bestPrice - position.entry) / initialTpDist) * 100))
+                    : 0;
+
+                const initialSlDist = Math.abs(position.entry - position.stopLoss);
+                const maePercentage = initialSlDist > 0 
+                    ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100)
+                    : 0;
+
                 trades.push({
                     entryIndex: position.entryIndex,
                     exitIndex: i,
@@ -1185,6 +1392,11 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     pnlAmount,
                     exitReason,
                     direction: position.direction,
+                    confidence: position.confidence,
+                    mafePrice: position.bestPrice,
+                    mafePercentage: parseFloat(mafePercentage.toFixed(2)),
+                    maePrice: position.worstPrice,
+                    maePercentage: parseFloat(maePercentage.toFixed(2)),
                     metadata: position.metadata
                 });
 
@@ -1232,8 +1444,23 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         entryIndex: i,
                         stopLoss: pendingOrder.stopLoss,
                         takeProfit: finalTP,
+                        takeProfit: pendingOrder.type === 'BUY_STOP' 
+                            ? entryPrice + risk * p.rewardRatio 
+                            : entryPrice - risk * p.rewardRatio,
+                        confidence: pendingOrder.confidence,
+                        bestPrice: entryPrice,
+                        worstPrice: entryPrice,
                         metadata: pendingOrder.metadata
                     };
+
+                    // Initial tick assessment on triggering bar
+                    if (position.direction === 'long') {
+                        position.bestPrice = Math.max(position.bestPrice, bar.high);
+                        position.worstPrice = Math.min(position.worstPrice, bar.low);
+                    } else {
+                        position.bestPrice = Math.min(position.bestPrice, bar.low);
+                        position.worstPrice = Math.max(position.worstPrice, bar.high);
+                    }
 
                     let exitPrice = null;
                     let exitReason = null;
@@ -1279,6 +1506,17 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             consecutiveLosses = 0;
                         }
 
+                        // Calculate MAFE & MAE ratios
+                        const initialTpDist = Math.abs(position.takeProfit - position.entry);
+                        const mafePercentage = initialTpDist > 0 
+                            ? Math.min(100, Math.max(0, (Math.abs(position.bestPrice - position.entry) / initialTpDist) * 100))
+                            : 0;
+
+                        const initialSlDist = Math.abs(position.entry - position.stopLoss);
+                        const maePercentage = initialSlDist > 0 
+                            ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100)
+                            : 0;
+
                         trades.push({
                             entryIndex: position.entryIndex,
                             exitIndex: i,
@@ -1290,6 +1528,11 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             pnlAmount,
                             exitReason,
                             direction: position.direction,
+                            confidence: position.confidence,
+                            mafePrice: position.bestPrice,
+                            mafePercentage: parseFloat(mafePercentage.toFixed(2)),
+                            maePrice: position.worstPrice,
+                            maePercentage: parseFloat(maePercentage.toFixed(2)),
                             metadata: position.metadata
                         });
 
@@ -1312,6 +1555,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     rewardRatio: signal.rewardRatio !== undefined ? signal.rewardRatio : p.rewardRatio,
                     useStructuralTarget: signal.useStructuralTarget || false,
                     structuralTarget: signal.structuralTarget || null,
+                    confidence: signal.confidence !== undefined ? signal.confidence : null,
                     metadata: { setupType: signal.type, signalBarIndex: i }
                 };
             }
