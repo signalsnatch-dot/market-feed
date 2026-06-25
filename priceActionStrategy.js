@@ -1,12 +1,14 @@
 /**
  * Price Action Strategy Versions Module (Dual-Framework Engine)
- * Houses 32 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
+ * Houses 43 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
  * - V1 to V10: Original absolute tick-based logic (preserves baseline results, zero regression).
  * - V11 to V20: New dynamic volatility-adjusted ratio-based logic (loaded from config.json).
  * - V21 to V23: Filtered variations of V3 (Absolute Tick-Based)
  * - V24 to V26: Filtered variations of V8 (Strict Absolute Tick-Based)
  * - V27 to V29: Filtered variations of V13 (Calibrated Ratio-Based)
  * - V30 to V32: Filtered variations of V18 (Strict Calibrated Ratio-Based)
+ * - V33 to V42: Structural Calibrated editions incorporating three-dimensional leg completion filters.
+ * - V43: Dynamic Structural variation with confidence metrics.
  */
 
 const DEFAULT_PARAMS = {
@@ -16,11 +18,18 @@ const DEFAULT_PARAMS = {
     minTrendBars: 12,                   // Minimum bars required to establish trend structure
     rewardRatio: 1.5,                   // Target reward-to-risk ratio (Typically 1:1 to 1:1.5)
     
-    // === Fallback Ratio-Based Configurations (V11-V20) ===
+    // === Fallback Ratio-Based Configurations (V11-V32) ===
     emaTouchRatio: 0.20,                // Tolerates EMA test within 20% of average bar range
     triggerOffsetRatio: 0.05,           // Offset order entry by 5% of average bar range beyond signal bar high/low
     stopOffsetRatio: 0.05,              // Stop placed 5% of average bar range beyond opposite extreme
     doubleTopBottomToleranceRatio: 0.25,// Double top/bottom tolerance within 25% of average bar range
+
+    // === Fallback Structural Ratio Configurations (V33-V43) ===
+    emaTouchRatioV2: 0.15,              // Volatility-padded EMA touch threshold
+    triggerOffsetRatioV2: 0.03,         // Volatility-padded stop order triggers
+    stopOffsetRatioV2: 0.30,            // Volatility-padded stops protecting against noise sweeps
+    doubleTopBottomToleranceRatioV2: 0.15, // Padded double top/bottom verification
+    structureOffsetRatio: 0.10,         // Minimum ABR breach buffer to confirm a structural breakout (10% default)
     
     // === Original Tick-Based Configurations (V1-V10) ===
     tickSize: 0.05,                     // Fallback minimum tick size (0.05 paisa/points)
@@ -336,6 +345,62 @@ function isWhipsawing(candles, ema, i, p) {
 }
 
 // ============================================================
+// STRUCTURAL LEG COMPLETION WITH TIME & Acceptance Filters
+// ============================================================
+
+function isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, consecutiveBreachesRef) {
+    const hardBreakoutLevel = prevHigh + (avgRange * structureOffsetRatio);
+    
+    // 1. Distance Rule
+    if (candles[j].high > hardBreakoutLevel) {
+        return true;
+    }
+    
+    // 2. Close Acceptance Rule
+    if (candles[j].close > prevHigh) {
+        return true;
+    }
+    
+    // 3. Time-at-Level Rule (3 consecutive breaches)
+    if (candles[j].high > prevHigh) {
+        consecutiveBreachesRef.count++;
+        if (consecutiveBreachesRef.count >= 3) {
+            return true;
+        }
+    } else {
+        consecutiveBreachesRef.count = 0;
+    }
+    
+    return false;
+}
+
+function isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, consecutiveBreachesRef) {
+    const hardBreakoutLevel = prevLow - (avgRange * structureOffsetRatio);
+    
+    // 1. Distance Rule
+    if (candles[j].low < hardBreakoutLevel) {
+        return true;
+    }
+    
+    // 2. Close Acceptance Rule
+    if (candles[j].close < prevLow) {
+        return true;
+    }
+    
+    // 3. Time-at-Level Rule
+    if (candles[j].low < prevLow) {
+        consecutiveBreachesRef.count++;
+        if (consecutiveBreachesRef.count >= 3) {
+            return true;
+        }
+    } else {
+        consecutiveBreachesRef.count = 0;
+    }
+    
+    return false;
+}
+
+// ============================================================
 // STRUCTURAL PRICE ACTION LEG COUNTING ENGINE
 // ============================================================
 
@@ -475,6 +540,152 @@ function evaluateStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
     return setup;
 }
 
+// === NOISE-CANCELLED STRUCTURAL LEG EVALUATIONS (V33-V43) ===
+
+function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p) {
+    if (swingHighIdx === null || swingHighIdx >= currentIdx - 2) {
+        return { isH2: false };
+    }
+
+    let h1TriggerIdx = -1;
+    let h1SignalIdx = -1;
+    let secondLegStarted = false;
+    let h2TriggerIdx = -1;
+    let h2SignalIdx = -1;
+
+    let h1Breaches = { count: 0 };
+    let h2Breaches = { count: 0 };
+
+    const structureOffsetRatio = p.structureOffsetRatio !== undefined ? p.structureOffsetRatio : 0.10;
+
+    for (let j = swingHighIdx + 1; j <= currentIdx; j++) {
+        const prevHigh = candles[j - 1].high;
+        const prevLow = candles[j - 1].low;
+
+        if (h1TriggerIdx === -1) {
+            if (isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, h1Breaches)) {
+                h1TriggerIdx = j;
+                h1SignalIdx = j - 1;
+            }
+        } else if (!secondLegStarted) {
+            if (candles[j].low < prevLow || candles[j].high < prevHigh) {
+                secondLegStarted = true;
+            }
+        } else if (h2TriggerIdx === -1) {
+            if (isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, h2Breaches)) {
+                h2TriggerIdx = j;
+                h2SignalIdx = j - 1;
+            }
+        }
+    }
+
+    const isValidH2Signal = (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
+
+    return {
+        isH2: isValidH2Signal,
+        h1TriggerIdx,
+        h1SignalIdx,
+        secondLegStarted,
+        swingHighIdx
+    };
+}
+
+function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p) {
+    if (swingLowIdx === null || swingLowIdx >= currentIdx - 2) {
+        return { isL2: false };
+    }
+
+    let l1TriggerIdx = -1;
+    let l1SignalIdx = -1;
+    let secondLegStarted = false;
+    let l2TriggerIdx = -1;
+    let l2SignalIdx = -1;
+
+    let l1Breaches = { count: 0 };
+    let l2Breaches = { count: 0 };
+
+    const structureOffsetRatio = p.structureOffsetRatio !== undefined ? p.structureOffsetRatio : 0.10;
+
+    for (let j = swingLowIdx + 1; j <= currentIdx; j++) {
+        const prevLow = candles[j - 1].low;
+        const prevHigh = candles[j - 1].high;
+
+        if (l1TriggerIdx === -1) {
+            if (isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, l1Breaches)) {
+                l1TriggerIdx = j;
+                l1SignalIdx = j - 1;
+            }
+        } else if (!secondLegStarted) {
+            if (candles[j].high > prevHigh || candles[j].low > prevLow) {
+                secondLegStarted = true;
+            }
+        } else if (l2TriggerIdx === -1) {
+            if (isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, l2Breaches)) {
+                l2TriggerIdx = j;
+                l2SignalIdx = j - 1;
+            }
+        }
+    }
+
+    const isValidL2Signal = (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
+
+    return {
+        isL2: isValidL2Signal,
+        l1TriggerIdx,
+        l1SignalIdx,
+        secondLegStarted,
+        swingLowIdx
+    };
+}
+
+function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p) {
+    const setup = evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p);
+    if (!setup.isH2) return setup;
+
+    const h1TriggerIdx = setup.h1TriggerIdx;
+    const h1SignalIdx = setup.h1SignalIdx;
+
+    let firstLegLow = Infinity;
+    for (let k = swingHighIdx; k <= h1SignalIdx; k++) {
+        if (candles[k].low < firstLegLow) firstLegLow = candles[k].low;
+    }
+
+    let secondLegLow = Infinity;
+    for (let k = h1TriggerIdx; k <= currentIdx; k++) {
+        if (candles[k].low < secondLegLow) secondLegLow = candles[k].low;
+    }
+
+    if (secondLegLow >= firstLegLow) {
+        setup.isH2 = false;
+    }
+
+    return setup;
+}
+
+function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p) {
+    const setup = evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p);
+    if (!setup.isL2) return setup;
+
+    const l1TriggerIdx = setup.l1TriggerIdx;
+    const l1SignalIdx = setup.l1SignalIdx;
+
+    let firstLegHigh = -Infinity;
+    for (let k = swingLowIdx; k <= l1SignalIdx; k++) {
+        if (candles[k].high > firstLegHigh) firstLegHigh = candles[k].high;
+    }
+
+    let secondLegHigh = -Infinity;
+    for (let k = l1TriggerIdx; k <= currentIdx; k++) {
+        if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high;
+    }
+
+    if (secondLegHigh <= firstLegHigh) {
+        setup.isL2 = false;
+    }
+
+    return setup;
+}
+
 // ============================================================
 // CENTRAL STRATEGY EVALUATION MODULE
 // ============================================================
@@ -490,16 +701,69 @@ function twoLeggedPullbackCore(candles, params = {}) {
         ? params.tickSize 
         : (instConfig?.tickSize || getTickSize(instrumentKey));
 
-    // Dynamic Parameter Precedence logic
+    // Decoupled Structural Logic configuration parsing
+    const useStructural = params.useStructuralRules || false;
+    
+    // Dynamic Parameter Precedence logic with complete separation of versions
+    let emaTouchRatioVal;
+    let triggerOffsetRatioVal;
+    let stopOffsetRatioVal;
+    let doubleTopBottomToleranceRatioVal;
+    let structureOffsetRatioVal;
+
+    if (useStructural) {
+        // High probability V33-V43 editions
+        emaTouchRatioVal = instConfig?.emaTouchRatioV2 !== undefined 
+            ? instConfig.emaTouchRatioV2 
+            : (params.emaTouchRatioV2 !== undefined ? params.emaTouchRatioV2 : DEFAULT_PARAMS.emaTouchRatioV2);
+        
+        triggerOffsetRatioVal = instConfig?.triggerOffsetRatioV2 !== undefined 
+            ? instConfig.triggerOffsetRatioV2 
+            : (params.triggerOffsetRatioV2 !== undefined ? params.triggerOffsetRatioV2 : DEFAULT_PARAMS.triggerOffsetRatioV2);
+        
+        stopOffsetRatioVal = instConfig?.stopOffsetRatioV2 !== undefined 
+            ? instConfig.stopOffsetRatioV2 
+            : (params.stopOffsetRatioV2 !== undefined ? params.stopOffsetRatioV2 : DEFAULT_PARAMS.stopOffsetRatioV2);
+        
+        doubleTopBottomToleranceRatioVal = instConfig?.doubleTopBottomToleranceRatioV2 !== undefined 
+            ? instConfig.doubleTopBottomToleranceRatioV2 
+            : (params.doubleTopBottomToleranceRatioV2 !== undefined ? params.doubleTopBottomToleranceRatioV2 : DEFAULT_PARAMS.doubleTopBottomToleranceRatioV2);
+
+        structureOffsetRatioVal = instConfig?.structureOffsetRatio !== undefined 
+            ? instConfig.structureOffsetRatio 
+            : (params.structureOffsetRatio !== undefined ? params.structureOffsetRatio : DEFAULT_PARAMS.structureOffsetRatio);
+    } else {
+        // Standard baseline V11-V32 editions
+        emaTouchRatioVal = instConfig?.emaTouchRatio !== undefined 
+            ? instConfig.emaTouchRatio 
+            : (params.emaTouchRatio !== undefined ? params.emaTouchRatio : DEFAULT_PARAMS.emaTouchRatio);
+        
+        triggerOffsetRatioVal = instConfig?.triggerOffsetRatio !== undefined 
+            ? instConfig.triggerOffsetRatio 
+            : (params.triggerOffsetRatio !== undefined ? params.triggerOffsetRatio : DEFAULT_PARAMS.triggerOffsetRatio);
+        
+        stopOffsetRatioVal = instConfig?.stopOffsetRatio !== undefined 
+            ? instConfig.stopOffsetRatio 
+            : (params.stopOffsetRatio !== undefined ? params.stopOffsetRatio : DEFAULT_PARAMS.stopOffsetRatio);
+        
+        doubleTopBottomToleranceRatioVal = instConfig?.doubleTopBottomToleranceRatio !== undefined 
+            ? instConfig.doubleTopBottomToleranceRatio 
+            : (params.doubleTopBottomToleranceRatio !== undefined ? params.doubleTopBottomToleranceRatio : DEFAULT_PARAMS.doubleTopBottomToleranceRatio);
+
+        structureOffsetRatioVal = DEFAULT_PARAMS.structureOffsetRatio;
+    }
+
     const p = { 
         requireStrictSecondLeg: false, 
         requireDoubleTopBottomTrap: false,
-        useRatios: false, // Default is false (supports V1-V10 original tick-based execution)
+        useRatios: false,
+        useStructuralRules: useStructural,
         ...DEFAULT_PARAMS, 
-        emaTouchRatio: instConfig?.emaTouchRatio !== undefined ? instConfig.emaTouchRatio : DEFAULT_PARAMS.emaTouchRatio,
-        triggerOffsetRatio: instConfig?.triggerOffsetRatio !== undefined ? instConfig.triggerOffsetRatio : DEFAULT_PARAMS.triggerOffsetRatio,
-        stopOffsetRatio: instConfig?.stopOffsetRatio !== undefined ? instConfig.stopOffsetRatio : DEFAULT_PARAMS.stopOffsetRatio,
-        doubleTopBottomToleranceRatio: instConfig?.doubleTopBottomToleranceRatio !== undefined ? instConfig.doubleTopBottomToleranceRatio : DEFAULT_PARAMS.doubleTopBottomToleranceRatio,
+        emaTouchRatio: emaTouchRatioVal,
+        triggerOffsetRatio: triggerOffsetRatioVal,
+        stopOffsetRatio: stopOffsetRatioVal,
+        doubleTopBottomToleranceRatio: doubleTopBottomToleranceRatioVal,
+        structureOffsetRatio: structureOffsetRatioVal,
         tickSize: resolvedTickSize, 
         ...params 
     };
@@ -524,14 +788,14 @@ function twoLeggedPullbackCore(candles, params = {}) {
         let emaTouchDistance, triggerOffset, stopOffset, doubleTopBottomTolerance, triggerBreakDist;
 
         if (p.useRatios) {
-            // Dynamic, volatility-adjusted limits derived from config.json data (V11-V20)
+            // Dynamic, volatility-adjusted limits derived from config.json data
             emaTouchDistance = avgRange > 0 ? avgRange * p.emaTouchRatio : (p.emaTouchTicks * p.tickSize);
             triggerOffset = avgRange > 0 ? avgRange * p.triggerOffsetRatio : (p.triggerOffsetTicks * p.tickSize);
             stopOffset = avgRange > 0 ? avgRange * p.stopOffsetRatio : (p.stopOffsetTicks * p.tickSize);
             doubleTopBottomTolerance = avgRange > 0 ? avgRange * p.doubleTopBottomToleranceRatio : (p.doubleTopBottomToleranceTicks * p.tickSize);
             triggerBreakDist = avgRange > 0 ? avgRange * p.triggerOffsetRatio : p.tickSize;
         } else {
-            // Original absolute tick-based limits (V1-V10)
+            // Original absolute tick-based limits
             emaTouchDistance = p.emaTouchTicks * p.tickSize;
             triggerOffset = p.triggerOffsetTicks * p.tickSize;
             stopOffset = p.stopOffsetTicks * p.tickSize;
@@ -547,13 +811,18 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
         let signalFound = false;
 
-        // 1. STANDARD SECOND ENTRY LONG (H2)
+        // 1. SECOND ENTRY LONG (H2)
         if (trend.bullish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
             if (swingHighIdx !== null) {
-                const setup = p.requireStrictSecondLeg 
-                    ? evaluateStrictH2Setup(candles, swingHighIdx, i, p.tickSize)
-                    : evaluateH2Setup(candles, swingHighIdx, i, p.tickSize);
+                const setup = p.useStructuralRules
+                    ? (p.requireStrictSecondLeg 
+                        ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, i, p.tickSize, avgRange, p)
+                        : evaluateStructuralH2Setup(candles, swingHighIdx, i, p.tickSize, avgRange, p))
+                    : (p.requireStrictSecondLeg 
+                        ? evaluateStrictH2Setup(candles, swingHighIdx, i, p.tickSize)
+                        : evaluateH2Setup(candles, swingHighIdx, i, p.tickSize));
+
                 if (setup.isH2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
                     const passesSignalBarCheck = validateSignalBar(sBar, 'BUY', p);
@@ -609,13 +878,18 @@ function twoLeggedPullbackCore(candles, params = {}) {
             }
         }
 
-        // 2. STANDARD SECOND ENTRY SHORT (L2)
+        // 2. SECOND ENTRY SHORT (L2)
         if (trend.bearish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
             if (swingLowIdx !== null) {
-                const setup = p.requireStrictSecondLeg
-                    ? evaluateStrictL2Setup(candles, swingLowIdx, i, p.tickSize)
-                    : evaluateL2Setup(candles, swingLowIdx, i, p.tickSize);
+                const setup = p.useStructuralRules
+                    ? (p.requireStrictSecondLeg
+                        ? evaluateStructuralStrictL2Setup(candles, swingLowIdx, i, p.tickSize, avgRange, p)
+                        : evaluateStructuralL2Setup(candles, swingLowIdx, i, p.tickSize, avgRange, p))
+                    : (p.requireStrictSecondLeg
+                        ? evaluateStrictL2Setup(candles, swingLowIdx, i, p.tickSize)
+                        : evaluateL2Setup(candles, swingLowIdx, i, p.tickSize));
+
                 if (setup.isL2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
                     const passesSignalBarCheck = validateSignalBar(sBar, 'SELL', p);
@@ -679,9 +953,13 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingLowIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'low');
                     if (swingLowIdx !== null) {
-                        const setupL2 = p.requireStrictSecondLeg
-                            ? evaluateStrictL2Setup(candles, swingLowIdx, L, p.tickSize)
-                            : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize);
+                        const setupL2 = p.useStructuralRules
+                            ? (p.requireStrictSecondLeg
+                                ? evaluateStructuralStrictL2Setup(candles, swingLowIdx, L, p.tickSize, avgRange, p)
+                                : evaluateStructuralL2Setup(candles, swingLowIdx, L, p.tickSize, avgRange, p))
+                            : (p.requireStrictSecondLeg
+                                ? evaluateStrictL2Setup(candles, swingLowIdx, L, p.tickSize)
+                                : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize));
                         
                         if (setupL2.isL2) {
                             const triggeredShort = candles[L + 1].low < candles[L].low - triggerBreakDist;
@@ -757,9 +1035,13 @@ function twoLeggedPullbackCore(candles, params = {}) {
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingHighIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'high');
                     if (swingHighIdx !== null) {
-                        const setupH2 = p.requireStrictSecondLeg
-                            ? evaluateStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
-                            : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize);
+                        const setupH2 = p.useStructuralRules
+                            ? (p.requireStrictSecondLeg
+                                ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p)
+                                : evaluateStructuralH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p))
+                            : (p.requireStrictSecondLeg
+                                ? evaluateStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
+                                : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize));
                         
                         if (setupH2.isH2) {
                             const triggeredLong = candles[L + 1].high > candles[L].high + triggerBreakDist;
@@ -976,7 +1258,7 @@ const STRATEGIES = {
         });
     },
 
-    // ==================== V11-V20: NEW DYNAMIC CALIBRATED RATIO EDITIONS ====================
+    // ==================== V11-V20: CALIBRATED RATIO EDITIONS ====================
 
     "V11: Double Traps (Calibrated)": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
@@ -1265,18 +1547,169 @@ const STRATEGIES = {
             requireStrictSecondLeg: true,
             requireDoubleTopBottomTrap: true
         });
+    },
+
+    // ==================== V33-V42: NEW NOISE-CANCELLED STRUCTURAL CALIBRATED EDITIONS ====================
+    "V33: Double Traps (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V34: EMA Pullback (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V35: High Confidence (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V36: Aggressive (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableGiantBarFilter: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false,
+            minSignalBarCloseRatio: 0.50,
+            useStructuralTarget: false
+        });
+    },
+    "V37: Wade Structural (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: true, 
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
+    },
+    "V38: Double Traps (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V39: EMA Pullback (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true
+        });
+    },
+    "V40: High Confidence (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+    "V41: Aggressive (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableGiantBarFilter: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false,
+            minSignalBarCloseRatio: 0.50,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true
+        });
+    },
+    "V42: Wade Structural (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: true,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true
+        });
+    },
+
+    // ==================== V43: PREMIUM STRUCTURAL FILTER EDITION ====================
+    "V43: 65-70% and More than 80% confidence of V35": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
+            useStructuralTarget: false,
+            enableWhipsawFilter: false,
+            enableBodyToRangeFilter: false
+        });
     }
 };
 
-// Map useRatios flag automatically to parallel editions
+// Map useRatios and useStructuralRules flags automatically to parallel editions
 Object.keys(STRATEGIES).forEach(key => {
     const isCalibrated = key.includes("(Calibrated)") || 
                          key.includes("-Calibrated)") || 
                          key.includes("of V13") || 
-                         key.includes("of V18");
+                         key.includes("of V18") ||
+                         key.includes("Structural-Calibrated") ||
+                         key.includes("of V35");
+
+    const isStructural = key.includes("Structural-Calibrated") ||
+                         key.includes("of V35");
+
     const originalFunc = STRATEGIES[key];
     STRATEGIES[key] = (candles, params = {}) => {
-        return originalFunc(candles, { useRatios: isCalibrated, ...params });
+        return originalFunc(candles, { 
+            useRatios: isCalibrated, 
+            useStructuralRules: isStructural,
+            ...params 
+        });
     };
 });
 
@@ -1444,9 +1877,6 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                         entryIndex: i,
                         stopLoss: pendingOrder.stopLoss,
                         takeProfit: finalTP,
-                        takeProfit: pendingOrder.type === 'BUY_STOP' 
-                            ? entryPrice + risk * p.rewardRatio 
-                            : entryPrice - risk * p.rewardRatio,
                         confidence: pendingOrder.confidence,
                         bestPrice: entryPrice,
                         worstPrice: entryPrice,
@@ -1590,6 +2020,10 @@ module.exports = {
     evaluateL2Setup,
     evaluateStrictH2Setup,
     evaluateStrictL2Setup,
+    evaluateStructuralH2Setup,
+    evaluateStructuralL2Setup,
+    evaluateStructuralStrictH2Setup,
+    evaluateStructuralStrictL2Setup,
     STRATEGIES,
     twoLeggedPullback: STRATEGIES["V1: Double Traps"], // Fallback
     runPriceActionBacktest 

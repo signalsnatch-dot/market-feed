@@ -10,6 +10,11 @@
             "triggerOffsetRatio": 0.05,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.30,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.05,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.12,
             "notes": "Maintained at baseline due to strong comparative win rate of 66.67%."
         },
         {
@@ -22,6 +27,11 @@
             "triggerOffsetRatio": 0.04,
             "stopOffsetRatio": 0.06,
             "doubleTopBottomToleranceRatio": 0.20,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.04,
+            "stopOffsetRatioV2": 0.35,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.15,
             "notes": "Moderately filtered volume threshold to capture crude trend-reversal steps."
         },
         {
@@ -34,6 +44,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.10,
             "notes": "Surgically filtered to suppress massive intraday sweeps on Silver June contracts."
         },
         {
@@ -46,6 +61,11 @@
             "triggerOffsetRatio": 0.03,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Mutes false breakouts on high-frequency retail mini contracts."
         },
         {
@@ -58,6 +78,11 @@
             "triggerOffsetRatio": 0.03,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Scaled to suppress micro June retail whipsaws."
         },
         {
@@ -70,6 +95,11 @@
             "triggerOffsetRatio": 0.04,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.25,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.04,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.12,
             "notes": "Baseline preserved to maintain active pullback setups."
         },
         {
@@ -82,6 +112,11 @@
             "triggerOffsetRatio": 0.05,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.30,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.05,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.15,
             "notes": "Calibrated baseline for commodity swing setups."
         },
         {
@@ -94,6 +129,11 @@
             "triggerOffsetRatio": 0.05,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.30,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.05,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.15,
             "notes": "Mutes false micro-triggers in copper-lead spreads."
         },
         {
@@ -106,6 +146,11 @@
             "triggerOffsetRatio": 0.05,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.30,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.05,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.15,
             "notes": "Maintained baseline profile."
         },
         {
@@ -118,6 +163,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Filters gold contract chop to prevent stop-loss over-exposure."
         },
         {
@@ -130,6 +180,11 @@
             "triggerOffsetRatio": 0.03,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Strictly filters gold mini to eliminate persistent counter-trend losses."
         },
         {
@@ -142,6 +197,11 @@
             "triggerOffsetRatio": 0.03,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Mitigates high-frequency retail tick noise."
         },
         {
@@ -154,6 +214,11 @@
             "triggerOffsetRatio": 0.04,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.25,
+            "emaTouchRatioV2": 0.15,
+            "triggerOffsetRatioV2": 0.04,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.15,
+            "structureOffsetRatio": 0.12,
             "notes": "Calibrated baseline for dynamic structural levels."
         },
         {
@@ -166,6 +231,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.02,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Scaled up to filter out choppy sideways index setups on this date."
         },
         {
@@ -178,6 +248,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.02,
+            "stopOffsetRatioV2": 0.35,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Increased to suppress false double-trap setups on Bank Nifty index swings."
         },
         {
@@ -190,6 +265,11 @@
             "triggerOffsetRatio": 0.03,
             "stopOffsetRatio": 0.03,
             "doubleTopBottomToleranceRatio": 0.18,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.10,
             "notes": "Baseline tracker for financials."
         },
         {
@@ -202,6 +282,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.10,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.02,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Aggressively scaled from 600 to 20,000 to entirely suppress high-frequency losses."
         },
         {
@@ -214,6 +299,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.10,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.02,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Scaled up to 15,000 to bypass persistent non-reversal drawdown blocks on this date."
         },
         {
@@ -226,6 +316,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted back to highly precise 5,000 threshold to capture its +35.00% return run."
         },
         {
@@ -238,6 +333,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted back to 5,000 to preserve its highly consistent positive return profiles."
         },
         {
@@ -250,6 +350,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted to 8,000 to secure its clean 100% win rate and +12.00% return."
         },
         {
@@ -262,6 +367,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Kept close to baseline for tech trends."
         },
         {
@@ -274,6 +384,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted to 1,000 to generate its highly productive +9.50% net return stream."
         },
         {
@@ -286,6 +401,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.10,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Mutes persistent low-ATR choppy traps that caused major failures at threshold 3,000."
         },
         {
@@ -298,6 +418,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted back to highly precise 1,000 threshold to capture Bharti's +19.00% return."
         },
         {
@@ -310,6 +435,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.10,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Scaled up to 15,000 to block persistent whipsaws in Axis Bank structures."
         },
         {
@@ -322,6 +452,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.10,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Slows down L&T's execution to filter minor liquidity pullbacks."
         },
         {
@@ -334,6 +469,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted to 8,000 to secure its high win rate of 71.43%."
         },
         {
@@ -346,6 +486,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Filters out heavy whipsaw periods on Tata Motors."
         },
         {
@@ -358,6 +503,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Reverted to 2,500 to capture clean high-priced pullback signals."
         },
         {
@@ -370,6 +520,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Baseline Kotak parameters retained."
         },
         {
@@ -382,6 +537,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted back to 1,500 to isolate positive reversal patterns."
         },
         {
@@ -394,6 +554,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Baseline steel metrics."
         },
         {
@@ -406,6 +571,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.05,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.11,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted to 6,000 to re-establish the +9.00% return profile."
         },
         {
@@ -418,6 +588,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.35,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Keeps baseline trend boundaries intact."
         },
         {
@@ -430,6 +605,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Standard dynamic breakouts baseline tracker."
         },
         {
@@ -442,6 +622,11 @@
             "triggerOffsetRatio": 0.025,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.15,
+            "emaTouchRatioV2": 0.12,
+            "triggerOffsetRatioV2": 0.03,
+            "stopOffsetRatioV2": 0.30,
+            "doubleTopBottomToleranceRatioV2": 0.12,
+            "structureOffsetRatio": 0.12,
             "notes": "Reverted back to highly precise 1,800 threshold to secure Hindalco's +22.00% return run."
         },
         {
@@ -454,6 +639,11 @@
             "triggerOffsetRatio": 0.02,
             "stopOffsetRatio": 0.04,
             "doubleTopBottomToleranceRatio": 0.12,
+            "emaTouchRatioV2": 0.10,
+            "triggerOffsetRatioV2": 0.02,
+            "stopOffsetRatioV2": 0.25,
+            "doubleTopBottomToleranceRatioV2": 0.10,
+            "structureOffsetRatio": 0.10,
             "notes": "Retained baseline configuration."
         }
     ],

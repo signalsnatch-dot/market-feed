@@ -4,8 +4,8 @@ const path = require('path');
 const RESULTS_DIR = './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
 
-// Matches any V1 to V32 strategy
-const versionRegex = /^V([1-9]|[1-2]\d|3[0-2]):/;
+// Matches any V1 to V43 strategy
+const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
 
 const confidenceVersions = [
     'V3: High Confidence', 
@@ -23,7 +23,8 @@ const confidenceVersions = [
     'V29: 65-70% and More than 80% confidence of V13',
     'V30: 65-70% confidence of V18',
     'V31: More than 80% confidence of V18',
-    'V32: 65-70% and More than 80% confidence of V18'
+    'V32: 65-70% and More than 80% confidence of V18',
+    'V43: 65-70% and More than 80% confidence of V35'
 ];
 
 const INSTRUMENT_NAMES = {
@@ -318,7 +319,7 @@ md += `\n`;
 // ============================================================
 // SECTION 2: DETAILED VERSION PERFORMANCE WITH DAILY BREAKDOWNS
 // ============================================================
-md += `## Section 2: Detailed Performance by Strategy Version (V1 to V32)\n\n`;
+md += `## Section 2: Detailed Performance by Strategy Version (V1 to V43)\n\n`;
 
 uniqueVersions.forEach(v => {
     const vTrades = flatTrades.filter(t => t.strategy === v);
