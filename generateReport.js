@@ -24,6 +24,8 @@ const confidenceVersions = [
     'V30: 65-70% confidence of V18',
     'V31: More than 80% confidence of V18',
     'V32: 65-70% and More than 80% confidence of V18',
+    'V35: High Confidence (Structural-Calibrated)',
+    'V40: High Confidence (Strict Structural-Calibrated)',
     'V43: 65-70% and More than 80% confidence of V35'
 ];
 
@@ -65,16 +67,21 @@ const INSTRUMENT_NAMES = {
     '62327': 'Fin Nifty'
 };
 
+// Strict non-overlapping confidence buckets
 const confidenceBuckets = [
-    '< 45', '45-50', '50-55', '55-60', '60-65', '65-70', 
-    '70-75', '75-80', '80-85', '85-90', '90-95', '95-100'
+    '< 45', '45-49', '50-54', '55-59', '60-64', '65-69', 
+    '70-74', '75-79', '80-84', '85-89', '90-94', '95-100'
 ];
 
+// Refined non-overlapping MAFE buckets extended up to and beyond 200%
 const mafeBuckets = [
-    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', 
-    '81% - 99%', '100% (Hit TP)', '101% - 150%', '151% - 200%', '> 200%'
+    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', '81% - 99%', 
+    '100% (Hit TP)', '101% - 110%', '111% - 120%', '121% - 130%', 
+    '131% - 140%', '141% - 150%', '151% - 160%', '161% - 170%', 
+    '171% - 180%', '181% - 190%', '191% - 200%', '> 200%'
 ];
 
+// Strict non-overlapping MAE buckets
 const maeBuckets = [
     '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', 
     '81% - 100%', '101% - 115%', '116% - 130%', '> 130%'
@@ -105,16 +112,16 @@ function getInstrumentDisplayName(rawInstrument) {
 function getConfidenceBucket(val) {
     if (val === null || val === undefined || isNaN(val)) return null;
     if (val < 45) return '< 45';
-    if (val >= 45 && val < 50) return '45-50';
-    if (val >= 50 && val < 55) return '50-55';
-    if (val >= 55 && val < 60) return '55-60';
-    if (val >= 60 && val < 65) return '60-65';
-    if (val >= 65 && val < 70) return '65-70';
-    if (val >= 70 && val < 75) return '70-75';
-    if (val >= 75 && val < 80) return '75-80';
-    if (val >= 80 && val < 85) return '80-85';
-    if (val >= 85 && val < 90) return '85-90';
-    if (val >= 90 && val < 95) return '90-95';
+    if (val >= 45 && val < 50) return '45-49';
+    if (val >= 50 && val < 55) return '50-54';
+    if (val >= 55 && val < 60) return '55-59';
+    if (val >= 60 && val < 65) return '60-64';
+    if (val >= 65 && val < 70) return '65-69';
+    if (val >= 70 && val < 75) return '70-74';
+    if (val >= 75 && val < 80) return '75-79';
+    if (val >= 80 && val < 85) return '80-84';
+    if (val >= 85 && val < 90) return '85-89';
+    if (val >= 90 && val < 95) return '90-94';
     if (val >= 95 && val <= 100) return '95-100';
     return null;
 }
@@ -127,8 +134,16 @@ function getMafeBucket(val) {
     if (val > 60 && val <= 80) return '61% - 80%';
     if (val > 80 && val < 100) return '81% - 99%';
     if (val >= 100 && val <= 100.01) return '100% (Hit TP)';
-    if (val > 100.01 && val <= 150) return '101% - 150%';
-    if (val > 150 && val <= 200) return '151% - 200%';
+    if (val > 100.01 && val <= 110) return '101% - 110%';
+    if (val > 110 && val <= 120) return '111% - 120%';
+    if (val > 120 && val <= 130) return '121% - 130%';
+    if (val > 130 && val <= 140) return '131% - 140%';
+    if (val > 140 && val <= 150) return '141% - 150%';
+    if (val > 150 && val <= 160) return '151% - 160%';
+    if (val > 160 && val <= 170) return '161% - 170%';
+    if (val > 170 && val <= 180) return '171% - 180%';
+    if (val > 180 && val <= 190) return '181% - 190%';
+    if (val > 190 && val <= 200) return '191% - 200%';
     if (val > 200) return '> 200%';
     return null;
 }
