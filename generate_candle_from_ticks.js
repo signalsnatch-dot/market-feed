@@ -48,7 +48,7 @@ function isValidTick(row) {
 }
 
 /**
- * Read a single CSV file and return an array of valid ticks.
+ * Read a single CSV file, sort chronologically, and calculate volume deltas dynamically.
  */
 function readTicksFromFile(filePath) {
     let content = fs.readFileSync(filePath, 'utf8');
@@ -58,21 +58,58 @@ function readTicksFromFile(filePath) {
     const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) return [];
 
-    const headers = lines[0].split(',');
-    const ticks = [];
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rawTicks = [];
+    
     for (let i = 1; i < lines.length; i++) {
         const row = parseCSVLine(lines[i], headers);
         if (!isValidTick(row)) continue;
-        ticks.push({
+        
+        rawTicks.push({
             instrument_key: row.instrument_key,
             ltp: parseFloat(row.ltp),
-            volume: parseInt(row.last_traded_quantity, 10),
+            last_traded_quantity: parseInt(row.last_traded_quantity, 10),
+            // Parse volume_today if it exists in the headers, default to null
+            volume_today: row.volume_today !== undefined ? parseInt(row.volume_today, 10) : null,
             timestamp: parseInt(row.exchange_timestamp, 10),
             exchange_time_iso: row.exchange_time_iso
         });
     }
-    ticks.sort((a, b) => a.timestamp - b.timestamp);
-    return ticks;
+    
+    // Sort chronologically before computing volume changes
+    rawTicks.sort((a, b) => a.timestamp - b.timestamp);
+    
+    const processedTicks = [];
+    let lastVolToday = null;
+
+    for (const t of rawTicks) {
+        let volume = t.last_traded_quantity; // Default fallback for old files
+
+        if (t.volume_today !== null && !isNaN(t.volume_today) && t.volume_today > 0) {
+            if (lastVolToday !== null) {
+                if (t.volume_today >= lastVolToday) {
+                    volume = t.volume_today - lastVolToday;
+                } else {
+                    // Rollover fallback
+                    volume = t.last_traded_quantity;
+                }
+            } else {
+                // Initialize the baseline on first tick to prevent a massive volume spike
+                volume = t.last_traded_quantity;
+            }
+            lastVolToday = t.volume_today;
+        }
+
+        processedTicks.push({
+            instrument_key: t.instrument_key,
+            ltp: t.ltp,
+            volume: volume,
+            timestamp: t.timestamp,
+            exchange_time_iso: t.exchange_time_iso
+        });
+    }
+
+    return processedTicks;
 }
 
 /**
@@ -470,31 +507,25 @@ function saveSummary(allResults) {
  * Main function.
  */
 async function main() {
-    // Read configuration
     if (!fs.existsSync(CONFIG_FILE)) {
         console.error(`❌ Configuration file not found: ${CONFIG_FILE}`);
         process.exit(1);
     }
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-    if (!Array.isArray(config) || config.length === 0) {
-        console.error('❌ Configuration must be a non-empty array of instrument definitions.');
-        process.exit(1);
-    }
 
-    // Build instrument config map
     const instrumentConfig = new Map();
     for (const item of config) {
-        if (!item.instrument_key || !Array.isArray(item.thresholds)) {
-            console.warn(`⚠️ Skipping invalid config entry: missing instrument_key or thresholds array`);
+        if (!item.instrument_key || (!item.thresholds && !item.static_thresholds)) {
+            console.warn(`⚠️ Skipping invalid config entry: missing key or thresholds.`);
             continue;
         }
         instrumentConfig.set(item.instrument_key, {
             name: item.name || item.instrument_key,
-            thresholds: item.thresholds
+            thresholds: item.thresholds,
+            static_thresholds: item.static_thresholds || []
         });
     }
 
-    // Get all CSV files in INPUT_DIR
     const files = fs.readdirSync(INPUT_DIR).filter(f => f.toLowerCase().endsWith('.csv'));
     if (files.length === 0) {
         console.log(`❌ No CSV files found in ${INPUT_DIR}`);
@@ -505,7 +536,7 @@ async function main() {
     console.log('📋 Using configuration from', CONFIG_FILE);
     console.log(`📊 Candle mode: ${CANDLE_MODE}`);
 
-    const allResults = new Map(); // sourceFile -> Map(instrument -> Map(mode -> Map(threshold -> candles)))
+    const allResults = new Map();
 
     for (const file of files) {
         const filePath = path.join(INPUT_DIR, file);
@@ -517,19 +548,58 @@ async function main() {
         }
 
         const instrument = ticks[0].instrument_key;
-        console.log(`   Instrument: ${instrument} (${ticks.length} ticks)`);
-
         const configEntry = instrumentConfig.get(instrument);
         if (!configEntry) {
             console.log(`   ⚠️ No thresholds defined for ${instrument} in config. Skipping.`);
             continue;
         }
 
-        const fileResults = new Map(); // instrument -> Map(mode -> Map(threshold -> candles))
+        // Format chronological date of tick file for threshold map lookups
+        let dateKey = null;
+        if (ticks.length > 0) {
+            let ts = ticks[0].timestamp;
+            if (ts < 10000000000) ts *= 1000; // Convert seconds to ms
+            const d = new Date(ts);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = String(d.getFullYear()).slice(-2);
+            dateKey = `${day}/${month}/${year}`;
+        }
+
+        console.log(`   Instrument: ${instrument} | Session Date: ${dateKey || 'Unknown'} (${ticks.length} ticks)`);
+
+        let thresholdsToProcess = [];
+
+        // 1. Process Date-Mapped dynamic thresholds
+        if (configEntry.thresholds && typeof configEntry.thresholds === 'object' && !Array.isArray(configEntry.thresholds)) {
+            if (dateKey && configEntry.thresholds[dateKey] !== undefined) {
+                const dynamicThreshold = configEntry.thresholds[dateKey];
+                thresholdsToProcess.push(dynamicThreshold);
+                console.log(`   -> Found dynamic 10-day rolling threshold for ${dateKey}: ${dynamicThreshold}`);
+            }
+        } else if (Array.isArray(configEntry.thresholds)) {
+            thresholdsToProcess = [...configEntry.thresholds];
+        }
+
+        // 2. Process Static / Fallback thresholds to verify alternative builds
+        if (Array.isArray(configEntry.static_thresholds)) {
+            for (const val of configEntry.static_thresholds) {
+                if (!thresholdsToProcess.includes(val)) {
+                    thresholdsToProcess.push(val);
+                }
+            }
+        }
+
+        if (thresholdsToProcess.length === 0) {
+            console.warn(`   ⚠️ No thresholds to process for this file.`);
+            continue;
+        }
+
+        const fileResults = new Map();
         const instrumentModes = new Map();
         const modeThresholds = new Map();
 
-        for (const threshold of configEntry.thresholds) {
+        for (const threshold of thresholdsToProcess) {
             console.log(`      Threshold ${threshold.toLocaleString()} (mode: ${CANDLE_MODE})...`);
             const candles = generateVolumeCandles(ticks, threshold, instrument, configEntry.name, CANDLE_MODE);
             if (candles.length === 0) {

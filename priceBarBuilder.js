@@ -4,28 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-// FIX: Helper to dynamically resolve financial tick configurations by instrument class
-function getTickSize(instrumentKey) {
-    if (instrumentKey.includes('MCX_FO')) {
-        // Natural Gas
-        if (instrumentKey.includes('504265') || instrumentKey.includes('487465')) return 0.10;
-        // Base Metals (Zinc, Lead, Copper, Aluminium)
-        if (instrumentKey.includes('552708') || instrumentKey.includes('552711') || instrumentKey.includes('552709') || instrumentKey.includes('552706') || instrumentKey.includes('Bulldex')) return 0.05;
-        // Crude Oil, Silver, Gold
-        return 1.0;
-    }
-    return 0.05; // NSE Equities & Indices Standard
-}
-
 class PriceBarBuilder extends EventEmitter {
     constructor(config) {
         super();
         this.instrumentConfigs = config.instruments;
         this.activeBars = new Map();
         this.completedBars = [];
+        this.lastExchangeVolumeToday = new Map();
+        this.tickSizeMap = new Map();
         
-        this.dataDir = config.dataDir || './candles_data/price_bars';
-        this.rawDataDir = config.rawDataDir || './raw_ticks_data';
+        this.dataDir = config.directories?.candlesDataDir || './candles_data/price_bars';
+        this.rawDataDir = config.directories?.rawDataDir || './raw_ticks_data';
         
         [this.dataDir, this.rawDataDir].forEach(dir => {
             if (!fs.existsSync(dir)) {
@@ -42,6 +31,7 @@ class PriceBarBuilder extends EventEmitter {
         
         this.initializeBars();
         this.loadHistoryFromCSV(); 
+        this.loadActiveState();
     }
     
     initializeBars() {
@@ -67,10 +57,10 @@ class PriceBarBuilder extends EventEmitter {
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
+            this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
             
             console.log(`📊 [PRICE BAR] ${instrument.name}:`);
             console.log(`   Target: ${instrument.priceBarTicks || 500} price changes per bar`);
-            console.log(`   Logic: Each price change = 1 tick\n`);
         }
     }
 
@@ -86,7 +76,6 @@ class PriceBarBuilder extends EventEmitter {
                     if (lines.length < 2) continue;
                     
                     const headers = lines[0].replace(/[\r\n]+/g, '').split(',');
-                    const timestampIdx = headers.indexOf('timestamp');
                     const barNumberIdx = headers.indexOf('bar_number');
                     const openIdx = headers.indexOf('open');
                     const highIdx = headers.indexOf('high');
@@ -99,6 +88,7 @@ class PriceBarBuilder extends EventEmitter {
                     const startTimeIdx = headers.indexOf('start_time');
                     const endTimeIdx = headers.indexOf('end_time');
                     const durationIdx = headers.indexOf('duration_seconds');
+                    const timestampIdx = headers.indexOf('timestamp');
 
                     const parsedBars = [];
                     for (let i = 1; i < lines.length; i++) {
@@ -127,7 +117,6 @@ class PriceBarBuilder extends EventEmitter {
                         });
                     }
 
-                    // FIX: Retained dynamic 500-bar depth to avoid startup lags and focus on immediate scalping legs
                     bar.bars = parsedBars.slice(-500);
                     this.stats.barsByInstrument.set(key, parsedBars.length);
                     console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
@@ -138,13 +127,78 @@ class PriceBarBuilder extends EventEmitter {
         }
     }
     
+    saveActiveState() {
+        const stateFile = path.join(this.dataDir, 'active_price_bars_state.json');
+        try {
+            const state = {
+                date: new Date().toISOString().split('T')[0],
+                activeBars: Array.from(this.activeBars.entries()).map(([key, value]) => {
+                    const { bars, ...activeState } = value;
+                    return [key, activeState];
+                }),
+                lastExchangeVolumeToday: Array.from(this.lastExchangeVolumeToday.entries())
+            };
+            fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
+        } catch (err) {
+            console.error(`❌ [PRICE BAR] State save failed:`, err.message);
+        }
+    }
+
+    loadActiveState() {
+        const stateFile = path.join(this.dataDir, 'active_price_bars_state.json');
+        if (fs.existsSync(stateFile)) {
+            try {
+                const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+                const today = new Date().toISOString().split('T')[0];
+                
+                if (state.date === today) {
+                    if (Array.isArray(state.activeBars)) {
+                        state.activeBars.forEach(([key, activeState]) => {
+                            const existingBar = this.activeBars.get(key);
+                            if (existingBar) {
+                                Object.assign(existingBar, activeState);
+                            }
+                        });
+                    }
+                    if (Array.isArray(state.lastExchangeVolumeToday)) {
+                        this.lastExchangeVolumeToday = new Map(state.lastExchangeVolumeToday);
+                    }
+                    console.log(`✅ [PRICE BAR] Restored active candle progress and cumulative baselines.`);
+                } else {
+                    fs.unlinkSync(stateFile);
+                }
+            } catch (err) {
+                console.error(`❌ [PRICE BAR] State recovery failed:`, err.message);
+            }
+        }
+    }
+
     processTick(tickData) {
-        const { instrument_key, ltp, last_traded_quantity, exchange_timestamp, timestamp } = tickData;
+        const { instrument_key, ltp, last_traded_quantity, volume_today, exchange_timestamp, timestamp } = tickData;
         
         if (!ltp) return;
         
         const price = parseFloat(ltp);
-        const volume = parseInt(last_traded_quantity) || 0;
+        
+        let tickVolume = 0;
+        const currentVolToday = parseInt(volume_today, 10);
+
+        if (!isNaN(currentVolToday) && currentVolToday > 0) {
+            const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
+            
+            if (prevVolToday !== undefined && prevVolToday !== null) {
+                if (currentVolToday >= prevVolToday) {
+                    tickVolume = currentVolToday - prevVolToday;
+                } else {
+                    tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                }
+            } else {
+                tickVolume = parseInt(last_traded_quantity, 10) || 0;
+            }
+            this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
+        } else {
+            tickVolume = parseInt(last_traded_quantity, 10) || 0;
+        }
 
         let exchangeTimeMs = Number(exchange_timestamp);
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
@@ -191,7 +245,7 @@ class PriceBarBuilder extends EventEmitter {
         bar.lastUpdateTime = currentTime;
         bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
 
-        bar.volume += volume;
+        bar.volume += tickVolume;
         bar.transactions++;
         
         if (lastPrice !== null && price !== lastPrice) {
@@ -201,7 +255,7 @@ class PriceBarBuilder extends EventEmitter {
         }
         
         this.stats.totalTicks++;
-        this.stats.totalVolume += volume;
+        this.stats.totalVolume += tickVolume;
 
         if (bar.open !== null && this.emit) {
             const liveCandle = {
@@ -279,15 +333,13 @@ class PriceBarBuilder extends EventEmitter {
         this.stats.barsByInstrument.set(instrumentKey, (this.stats.barsByInstrument.get(instrumentKey) || 0) + 1);
         
         this.saveBarToCSV(completedBar);
+        this.saveActiveState();
         this.emit('bar_close', completedBar);
         
         console.log(`\n✅ [PRICE BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
         console.log(`   Ticks: ${bar.currentTicks} / ${bar.targetTicks} (price changes)`);
         console.log(`   OHLC: ${bar.open.toFixed(2)} | ${bar.high.toFixed(2)} | ${bar.low.toFixed(2)} | ${bar.close.toFixed(2)}`);
-        console.log(`   Change: ${completedBar.priceChange} (${completedBar.priceChangePercent}%)`);
-        console.log(`   Volume: ${bar.volume.toLocaleString()} units`);
-        console.log(`   Duration: ${completedBar.durationSeconds}s\n`);
-
+        
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
             high: b.high,
@@ -299,8 +351,7 @@ class PriceBarBuilder extends EventEmitter {
 
         if (strategyCandles.length >= 32) {
             try {
-                // FIX: Resolve dynamic MCX vs. NSE tick parameters to allow live touches to trigger
-                const tickSize = getTickSize(instrumentKey);
+                const tickSize = this.tickSizeMap.get(instrumentKey) || 0.05;
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
                 
                 for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
@@ -360,7 +411,7 @@ class PriceBarBuilder extends EventEmitter {
             bars: bar.bars,
             barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
             lastEmittedProgress: 0,
-            lastSignalBarNumbers: bar.lastSignalBarNumbers // Carry forward plural tracking map
+            lastSignalBarNumbers: bar.lastSignalBarNumbers
         });
     }
     
@@ -369,11 +420,13 @@ class PriceBarBuilder extends EventEmitter {
         const safeKey = tickData.instrument_key.replace(/[^a-zA-Z0-9]/g, '_');
         const filename = path.join(this.rawDataDir, `${safeKey}_raw_ticks_${today}.csv`);
         
+        // Added 'volume_today' to track accurate real-time volume in raw tick traces
         const headers = [
            'receive_timestamp', 'receive_time_iso',
            'exchange_timestamp', 'exchange_time_iso',
            'latency_ms',
-           'instrument_key', 'ltp', 'last_traded_quantity'
+           'instrument_key', 'ltp', 'last_traded_quantity',
+           'volume_today'
         ];
         const fileExists = fs.existsSync(filename);
         const writeStream = fs.createWriteStream(filename, { flags: 'a' });
@@ -390,7 +443,8 @@ class PriceBarBuilder extends EventEmitter {
             tickData.latency_ms || 0,
             tickData.instrument_key,
             tickData.ltp,
-            tickData.last_traded_quantity || 0
+            tickData.last_traded_quantity || 0,
+            tickData.volume_today || 0 // Log cumulative volume today (vtt)
         ].join(',');
         
         writeStream.write(row + '\n');

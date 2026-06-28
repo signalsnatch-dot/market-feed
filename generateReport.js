@@ -50,6 +50,7 @@ const INSTRUMENT_NAMES = {
     'INE467B01029': 'TCS',
     'INE062A01020': 'SBI',
     'INE742F01042': 'Adani Ports',
+    'INE237A01036': 'Kotak Bank',
     '552706': 'Aluminium (MCX)',
     '552709': 'Lead (MCX)',
     '552708': 'Copper (MCX)',
@@ -58,7 +59,8 @@ const INSTRUMENT_NAMES = {
     '477177': 'Silver Micro (MCX)',
     '464151': 'Silver Mini (MCX)',
     '510464': 'Gold Petal (MCX)',
-    '504265': 'Natural Gas (MCX)',
+    '538685': 'Natural Gas (MCX)',
+    '520702': 'Crude Oil (MCX)',
     '510764': 'Gold Mini (MCX)',
     '466583': 'Gold (MCX)',
     '62326': 'Bank Nifty',
@@ -533,6 +535,30 @@ uniqueInstruments.forEach(inst => {
             const vThTrades = thTrades.filter(t => t.strategy === v);
             const vThm = computeMetrics(vThTrades.map(t => t.trade));
             md += `| **${v}** | ${vThm.totalTrades} | ${vThm.winRate.toFixed(2)}% | ${vThm.totalReturn >= 0 ? '+' : ''}${vThm.totalReturn.toFixed(2)}% | ${vThm.avgReturn >= 0 ? '+' : ''}${vThm.avgReturn.toFixed(3)}% | ${vThm.avgMafe.toFixed(1)}% | ${vThm.avgMae.toFixed(1)}% |\n`;
+        });
+        md += `\n`;
+
+        // --- NEW GRANULAR NESTED BREAKDOWN: Instrument -> Threshold -> Date -> All Strategy Versions ---
+        md += `##### **Daily Strategy Version Performance Breakdown under Threshold ${thresh}**\n\n`;
+        thDates.forEach(d => {
+            const dtTrades = thTrades.filter(t => t.date === d);
+            
+            md += `###### **Date: ${d}**\n`;
+            md += `| Strategy Version | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`;
+            md += `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
+
+            const dtVersions = [...new Set(dtTrades.map(t => t.strategy))].sort((a,b) => {
+                const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
+                const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
+                return numA - numB;
+            });
+
+            dtVersions.forEach(v => {
+                const vDtTrades = dtTrades.filter(t => t.strategy === v);
+                const vDtm = computeMetrics(vDtTrades.map(t => t.trade));
+                md += `| **${v}** | ${vDtm.totalTrades} | ${vDtm.winRate.toFixed(2)}% | ${vDtm.totalReturn >= 0 ? '+' : ''}${vDtm.totalReturn.toFixed(2)}% | ${vDtm.avgReturn >= 0 ? '+' : ''}${vDtm.avgReturn.toFixed(3)}% | ${vDtm.avgMafe.toFixed(1)}% | ${vDtm.avgMae.toFixed(1)}% |\n`;
+            });
+            md += `\n`;
         });
         md += `\n`;
     });

@@ -2,11 +2,11 @@ const fs = require('fs');
 const path = require('path');
 
 // --- User Configurations ---
-const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-06-25.json'; 
+const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-06-26.json'; 
 const OUTPUT_DIR = './live-performance-report';
 
-const startTime = '13:00'; // Session Start (HH:MM in 24h IST format)
-const endTime = null;   // Session End (HH:MM in 24h IST format). Set to null to use current time.
+const startTime = '09:00'; // Session Start (HH:MM in 24h IST format)
+const endTime = '23:55';   // Session End (HH:MM in 24h IST format). Set to null to use current time.
 
 // Matches any V1 to V43 strategy
 const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
@@ -54,6 +54,7 @@ const INSTRUMENT_NAMES = {
     'INE467B01029': 'TCS',
     'INE062A01020': 'SBI',
     'INE742F01042': 'Adani Ports',
+    'INE237A01036': 'Kotak Bank',
     '552706': 'Aluminium (MCX)',
     '552709': 'Lead (MCX)',
     '552708': 'Copper (MCX)',
@@ -62,7 +63,8 @@ const INSTRUMENT_NAMES = {
     '477177': 'Silver Micro (MCX)',
     '464151': 'Silver Mini (MCX)',
     '510464': 'Gold Petal (MCX)',
-    '504265': 'Natural Gas (MCX)',
+    '538685': 'Natural Gas (MCX)',
+    '520702': 'Crude Oil (MCX)',
     '510764': 'Gold Mini (MCX)',
     '466583': 'Gold (MCX)',
     '62326': 'Bank Nifty',

@@ -4,25 +4,17 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-// FIX: Helper to dynamically resolve financial tick configurations by instrument class
-function getTickSize(instrumentKey) {
-    if (instrumentKey.includes('MCX_FO')) {
-        if (instrumentKey.includes('504265') || instrumentKey.includes('487465')) return 0.10;
-        if (instrumentKey.includes('552708') || instrumentKey.includes('552711') || instrumentKey.includes('552709') || instrumentKey.includes('552706') || instrumentKey.includes('Bulldex')) return 0.05;
-        return 1.0;
-    }
-    return 0.05; 
-}
-
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {
         super();
         this.instrumentConfigs = config.instruments;
         this.activeBars = new Map();
         this.completedBars = [];
+        this.lastExchangeVolumeToday = new Map();
+        this.tickSizeMap = new Map();
         
-        this.dataDir = config.dataDir || './candles_data/volume_bars';
-        this.rawDataDir = config.rawDataDir || './raw_ticks_data';
+        this.dataDir = config.directories?.candlesDataDir || './candles_data/volume_bars';
+        this.rawDataDir = config.directories?.rawDataDir || './raw_ticks_data';
         
         [this.dataDir, this.rawDataDir].forEach(dir => {
             if (!fs.existsSync(dir)) {
@@ -39,6 +31,7 @@ class VolumeBarBuilder extends EventEmitter {
         
         this.initializeBars();
         this.loadHistoryFromCSV();
+        this.loadActiveState();
     }
     
     initializeBars() {
@@ -64,10 +57,10 @@ class VolumeBarBuilder extends EventEmitter {
             });
             
             this.stats.barsByInstrument.set(instrument.key, 0);
+            this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
             
             console.log(`📊 [VOLUME BAR] ${instrument.name}:`);
             console.log(`   Target: ${instrument.volumePerBar.toLocaleString()} units per bar`);
-            console.log(`   Logic: Continuous volume candle building spread algorithm enabled.\n`);
         }
     }
 
@@ -83,7 +76,6 @@ class VolumeBarBuilder extends EventEmitter {
                     if (lines.length < 2) continue;
                     
                     const headers = lines[0].replace(/[\r\n]+/g, '').split(',');
-                    const timestampIdx = headers.indexOf('timestamp');
                     const barNumberIdx = headers.indexOf('bar_number');
                     const openIdx = headers.indexOf('open');
                     const highIdx = headers.indexOf('high');
@@ -95,6 +87,7 @@ class VolumeBarBuilder extends EventEmitter {
                     const startTimeIdx = headers.indexOf('start_time');
                     const endTimeIdx = headers.indexOf('end_time');
                     const durationIdx = headers.indexOf('duration_seconds');
+                    const timestampIdx = headers.indexOf('timestamp');
 
                     const parsedBars = [];
                     for (let i = 1; i < lines.length; i++) {
@@ -123,7 +116,6 @@ class VolumeBarBuilder extends EventEmitter {
                         });
                     }
 
-                    // FIX: Retained dynamic 500-bar depth to avoid startup lags and focus on immediate scalping legs
                     bar.bars = parsedBars.slice(-500);
                     this.stats.barsByInstrument.set(key, parsedBars.length);
                     console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
@@ -134,13 +126,80 @@ class VolumeBarBuilder extends EventEmitter {
         }
     }
     
+    saveActiveState() {
+        const stateFile = path.join(this.dataDir, 'active_volume_bars_state.json');
+        try {
+            const state = {
+                date: new Date().toISOString().split('T')[0],
+                activeBars: Array.from(this.activeBars.entries()).map(([key, value]) => {
+                    const { bars, ...activeState } = value;
+                    return [key, activeState];
+                }),
+                lastExchangeVolumeToday: Array.from(this.lastExchangeVolumeToday.entries())
+            };
+            fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
+        } catch (err) {
+            console.error(`❌ [VOLUME BAR] State save failed:`, err.message);
+        }
+    }
+
+    loadActiveState() {
+        const stateFile = path.join(this.dataDir, 'active_volume_bars_state.json');
+        if (fs.existsSync(stateFile)) {
+            try {
+                const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+                const today = new Date().toISOString().split('T')[0];
+                
+                if (state.date === today) {
+                    if (Array.isArray(state.activeBars)) {
+                        state.activeBars.forEach(([key, activeState]) => {
+                            const existingBar = this.activeBars.get(key);
+                            if (existingBar) {
+                                Object.assign(existingBar, activeState);
+                            }
+                        });
+                    }
+                    if (Array.isArray(state.lastExchangeVolumeToday)) {
+                        this.lastExchangeVolumeToday = new Map(state.lastExchangeVolumeToday);
+                    }
+                    console.log(`✅ [VOLUME BAR] Restored active candle progress and cumulative baselines.`);
+                } else {
+                    fs.unlinkSync(stateFile);
+                }
+            } catch (err) {
+                console.error(`❌ [VOLUME BAR] State recovery failed:`, err.message);
+            }
+        }
+    }
+
     processTick(tickData) {
-        const { instrument_key, ltp, last_traded_quantity, exchange_timestamp, timestamp } = tickData;
+        const { instrument_key, ltp, last_traded_quantity, volume_today, exchange_timestamp, timestamp } = tickData;
         
         if (!ltp) return;
         
         const price = parseFloat(ltp);
-        const volume = parseInt(last_traded_quantity) || 0;
+        
+        let tickVolume = 0;
+        const currentVolToday = parseInt(volume_today, 10);
+
+        if (!isNaN(currentVolToday) && currentVolToday > 0) {
+            const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
+            
+            if (prevVolToday !== undefined && prevVolToday !== null) {
+                if (currentVolToday >= prevVolToday) {
+                    tickVolume = currentVolToday - prevVolToday;
+                } else {
+                    tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                }
+            } else {
+                tickVolume = parseInt(last_traded_quantity, 10) || 0;
+            }
+            this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
+        } else {
+            tickVolume = parseInt(last_traded_quantity, 10) || 0;
+        }
+
+        if (tickVolume <= 0) return;
 
         let exchangeTimeMs = Number(exchange_timestamp);
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
@@ -160,9 +219,8 @@ class VolumeBarBuilder extends EventEmitter {
         if (!bar) return;
         
         this.stats.totalTicks++;
-        this.stats.totalVolume += volume;
+        this.stats.totalVolume += tickVolume;
 
-        let tickVolume = volume;
         let isFirstTransaction = bar.transactions === 0 || bar.open === null;
 
         while (tickVolume > 0) {
@@ -296,7 +354,7 @@ class VolumeBarBuilder extends EventEmitter {
             priceChangePercent: (((bar.close - bar.open) / bar.open) * 100).toFixed(2),
             priceRange: (bar.high - bar.low).toFixed(2),
             priceRangePercent: (((bar.high - bar.low) / bar.open) * 100).toFixed(2),
-            volumeEfficiency: bar.currentVolume / bar.target_volume,
+            volumeEfficiency: bar.currentVolume / bar.targetVolume,
             timestamp: bar.lastUpdateTime
         };
         
@@ -306,18 +364,13 @@ class VolumeBarBuilder extends EventEmitter {
         this.stats.barsByInstrument.set(instrumentKey, (this.stats.barsByInstrument.get(instrumentKey) || 0) + 1);
         
         this.saveBarToCSV(completedBar);
+        this.saveActiveState();
         this.emit('bar_close', completedBar);
         
         console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
         console.log(`   Volume: ${bar.currentVolume.toLocaleString()} / ${bar.targetVolume.toLocaleString()} units`);
-        console.log(`   Transactions: ${bar.transactions} | Price changes: ${bar.priceChanges}`);
         console.log(`   OHLC: ${bar.open.toFixed(2)} | ${bar.high.toFixed(2)} | ${bar.low.toFixed(2)} | ${bar.close.toFixed(2)}`);
-        console.log(`   Change: ${completedBar.priceChange} (${completedBar.priceChangePercent}%)`);
-        console.log(`   Duration: ${completedBar.durationSeconds}s`);
-        console.log(`   Avg trade size: ${Math.round(bar.currentVolume / bar.transactions).toLocaleString()} units\n`);
         
-        // --- RUN SIGNAL STRATEGY NOW ON THE COMPLETED BARS ---
-        // --- RUN SIGNAL STRATEGY NOW ON THE COMPLETED BARS ---
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
             high: b.high,
@@ -329,8 +382,7 @@ class VolumeBarBuilder extends EventEmitter {
 
         if (strategyCandles.length >= 32) {
             try {
-                // FIX: Resolve dynamic MCX vs. NSE tick parameters to allow live touches to trigger
-                const tickSize = getTickSize(instrumentKey);
+                const tickSize = this.tickSizeMap.get(instrumentKey) || 0.05;
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
                 
                 for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
@@ -388,7 +440,7 @@ class VolumeBarBuilder extends EventEmitter {
             bars: bar.bars,
             barNumber: nextBarNumber,
             lastEmittedProgress: 0,
-            lastSignalBarNumbers: bar.lastSignalBarNumbers // Carry forward plural tracking map
+            lastSignalBarNumbers: bar.lastSignalBarNumbers
         });
     }
     

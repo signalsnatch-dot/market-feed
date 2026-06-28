@@ -31,7 +31,7 @@ const feed = new UpstoxMarketFeed({
     authCode: process.env.UPSTOX_AUTH_CODE,
     instruments: config.instruments.map(i => i.key),
     dataDir: './market_data',
-    mode: 'ltpc',
+    mode: 'full',
     debug: false
 });
 
@@ -96,12 +96,26 @@ setInterval(() => {
 // Start the feed
 feed.start().catch(console.error);
 
-// Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('\n🛑 Shutting down...');
-    const finalReport = candleBuilder.saveComparisonReport();
-    console.log('Final report saved:', finalReport);
+    console.log('\n🛑 Graceful shutdown initiated. Saving live tracking states...');
+    
+    try {
+        const finalReport = candleBuilder.saveComparisonReport();
+        console.log('Final comparison report saved successfully.');
+    } catch (err) {
+        console.error('Failed to save comparison report:', err.message);
+    }
+    
+    // Save state layers dynamically to prevent restart gaps
+    if (candleBuilder.priceBarBuilder && typeof candleBuilder.priceBarBuilder.saveActiveState === 'function') {
+        candleBuilder.priceBarBuilder.saveActiveState();
+    }
+    if (candleBuilder.volumeBarBuilder && typeof candleBuilder.volumeBarBuilder.saveActiveState === 'function') {
+        candleBuilder.volumeBarBuilder.saveActiveState();
+    }
+    
     feed.stop();
+    console.log('Feeder connections disconnected cleanly. Exiting.');
     process.exit(0);
 });
 
