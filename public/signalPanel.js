@@ -1,10 +1,15 @@
+
 // public/signalPanel.js
 class LiveTradeTracker {
     constructor(chartServer) {
         this.chartServer = chartServer;
         this.allSignals = [];          
-        this.currentVersion = "V1: Double Traps"; 
         this.activeTrades = new Map(); 
+
+        this.filterVersion = "V1: Double Traps";
+        this.filterInstrument = "ALL";
+        this.filterBarType = "ALL";
+        this.filterThreshold = "ALL";
         
         this.initializeUI();
     }
@@ -19,31 +24,72 @@ class LiveTradeTracker {
             container.style.boxSizing = 'border-box';
             
             container.innerHTML = `
-                <!-- Select Dropdown Menu (Populated dynamically on handshake) -->
-                <div id="strategy-selector-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; align-items: center; justify-content: space-between;">
-                    <span style="font-size: 11px; font-weight: bold; color: #b2b5be;">ACTIVE STRATEGY:</span>
-                    <select id="strategy-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; font-weight: bold;">
-                        <!-- Options generated dynamically on websocket handshake -->
-                    </select>
+                <!-- Advanced Multi-Filter controls -->
+                <div class="filter-controls-container" style="padding: 10px; background: #1e222d; border-bottom: 1px solid #2a2e39; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 10px; font-weight: bold; color: #b2b5be;">VERSION:</span>
+                        <select id="filter-version-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; width: 170px;"></select>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 10px; font-weight: bold; color: #b2b5be;">ASSET:</span>
+                        <select id="filter-instrument-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; width: 170px;"></select>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 10px; font-weight: bold; color: #b2b5be;">BAR TYPE:</span>
+                        <select id="filter-bartype-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; width: 170px;">
+                            <option value="ALL">All Bar Types</option>
+                            <option value="volume">Volume Bars</option>
+                            <option value="price">Price Bars</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 10px; font-weight: bold; color: #b2b5be;">THRESHOLD:</span>
+                        <select id="filter-threshold-select" style="background: #2a2e39; border: 1px solid #4a4e5a; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer; width: 170px;">
+                            <option value="ALL">All Thresholds</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Cumulative Metrics Widget -->
+                <div id="stats-widget-container" style="padding: 10px; background: #141722; border-bottom: 2px solid #2a2e39; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; box-sizing: border-box;">
+                    <div style="border-right: 1px solid #2a2e39; padding-right: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Total Trades</div>
+                        <div id="metric-total-trades" style="font-size: 14px; font-weight: bold; color: #fff;">0</div>
+                    </div>
+                    <div style="padding-left: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Win Rate</div>
+                        <div id="metric-win-rate" style="font-size: 14px; font-weight: bold; color: #26a69a;">0.00%</div>
+                    </div>
+                    <div style="border-right: 1px solid #2a2e39; padding-right: 4px; border-top: 1px solid #2a2e39; padding-top: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Cum. Return</div>
+                        <div id="metric-cum-return" style="font-size: 14px; font-weight: bold; color: #26a69a;">+0.00%</div>
+                    </div>
+                    <div style="padding-left: 4px; border-top: 1px solid #2a2e39; padding-top: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Avg. Return</div>
+                        <div id="metric-avg-return" style="font-size: 14px; font-weight: bold; color: #26a69a;">+0.00%</div>
+                    </div>
+                    <div style="border-right: 1px solid #2a2e39; padding-right: 4px; border-top: 1px solid #2a2e39; padding-top: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Avg MAFE</div>
+                        <div id="metric-avg-mafe" style="font-size: 14px; font-weight: bold; color: #00bcd4;">0.00%</div>
+                    </div>
+                    <div style="padding-left: 4px; border-top: 1px solid #2a2e39; padding-top: 4px;">
+                        <div style="font-size: 9px; color: #787b86; text-transform: uppercase;">Avg MAE</div>
+                        <div id="metric-avg-mae" style="font-size: 14px; font-weight: bold; color: #ef5350;">0.00%</div>
+                    </div>
                 </div>
                 
-                <div id="volume-signals-section" style="height: 70%; display: flex; flex-direction: column; border-bottom: 2px solid #2a2e39; box-sizing: border-box; overflow: hidden;">
-                    <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
-                        <span>📊 VOLUME BARS (70%)</span>
-                        <span id="volume-signals-count" style="color: #787b86;">0</span>
+                <!-- Live Trades Feed -->
+                <div id="filtered-signals-section" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+                    <div style="padding: 6px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #00bcd4; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
+                        <span>📡 STREAM FEED</span>
+                        <span id="filtered-signals-count" style="color: #787b86;">0</span>
                     </div>
-                    <div id="volume-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
-                </div>
-                <div id="price-signals-section" style="height: 30%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
-                    <div style="padding: 8px 12px; background: #2a2e39; font-size: 11px; font-weight: bold; color: #26a69a; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e222d;">
-                        <span>💰 PRICE BARS (30%)</span>
-                        <span id="price-signals-count" style="color: #787b86;">0</span>
-                    </div>
-                    <div id="price-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
+                    <div id="filtered-signals-list" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
                 </div>
             `;
         }
         this.injectCSS();
+        this.setupEventHandlers();
     }
 
     injectCSS() {
@@ -108,76 +154,214 @@ class LiveTradeTracker {
         document.head.appendChild(style);
     }
 
+    setupEventHandlers() {
+        document.getElementById('filter-version-select')?.addEventListener('change', (e) => {
+            this.filterVersion = e.target.value;
+            this.renderFilteredSignals();
+        });
+        document.getElementById('filter-instrument-select')?.addEventListener('change', (e) => {
+            this.filterInstrument = e.target.value;
+            this.updateThresholdOptions();
+            this.renderFilteredSignals();
+        });
+        document.getElementById('filter-bartype-select')?.addEventListener('change', (e) => {
+            this.filterBarType = e.target.value;
+            this.updateThresholdOptions();
+            this.renderFilteredSignals();
+        });
+        document.getElementById('filter-threshold-select')?.addEventListener('change', (e) => {
+            this.filterThreshold = e.target.value;
+            this.renderFilteredSignals();
+        });
+    }
+
     setupStrategyVersions(versions) {
         if (!Array.isArray(versions) || versions.length === 0) return;
-        
-        const select = document.getElementById('strategy-version-select');
+        const select = document.getElementById('filter-version-select');
         if (select) {
-            const prevValue = this.currentVersion;
             select.innerHTML = ''; 
-            
             versions.forEach(v => {
                 const opt = document.createElement('option');
                 opt.value = v;
                 opt.textContent = v;
                 select.appendChild(opt);
             });
-            
-            if (versions.includes(prevValue)) {
-                this.currentVersion = prevValue;
-            } else {
-                this.currentVersion = versions[0];
-            }
-            select.value = this.currentVersion;
-            
-            select.onchange = (e) => {
-                this.currentVersion = e.target.value;
-                this.renderFilteredSignals();
-            };
-
-            this.renderFilteredSignals();
+            this.filterVersion = versions[0];
+            select.value = this.filterVersion;
         }
     }
 
     renderSignals(signals) {
         this.allSignals = signals;
+        this.updateFilterDropdowns();
         this.renderFilteredSignals();
+    }
+
+    updateFilterDropdowns() {
+        // Instrument Select
+        const instSelect = document.getElementById('filter-instrument-select');
+        if (instSelect) {
+            const uniqueInstruments = ["ALL", ...new Set(this.allSignals.map(s => s.instrument))].sort();
+            const prevValue = instSelect.value;
+            instSelect.innerHTML = '';
+            uniqueInstruments.forEach(inst => {
+                const opt = document.createElement('option');
+                opt.value = inst;
+                opt.textContent = inst === "ALL" ? "All Instruments" : inst.split('|')[1] || inst;
+                instSelect.appendChild(opt);
+            });
+            if (uniqueInstruments.includes(prevValue)) {
+                instSelect.value = prevValue;
+                this.filterInstrument = prevValue;
+            } else {
+                this.filterInstrument = "ALL";
+            }
+        }
+        this.updateThresholdOptions();
+    }
+
+    updateThresholdOptions() {
+        const thresholdSelect = document.getElementById('filter-threshold-select');
+        if (!thresholdSelect) return;
+
+        let filteredSignals = this.allSignals;
+        if (this.filterInstrument !== 'ALL') {
+            filteredSignals = filteredSignals.filter(s => s.instrument === this.filterInstrument);
+        }
+        if (this.filterBarType !== 'ALL') {
+            filteredSignals = filteredSignals.filter(s => s.bar_type === this.filterBarType);
+        }
+
+        const uniqueThresholds = ["ALL", ...new Set(filteredSignals.map(s => s.threshold).filter(t => t !== undefined))].sort((a, b) => a - b);
+        
+        const prevValue = thresholdSelect.value;
+        thresholdSelect.innerHTML = '';
+        uniqueThresholds.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t === "ALL" ? "All Thresholds" : t;
+            thresholdSelect.appendChild(opt);
+        });
+
+        if (uniqueThresholds.includes(prevValue)) {
+            thresholdSelect.value = prevValue;
+            this.filterThreshold = prevValue;
+        } else {
+            this.filterThreshold = "ALL";
+            thresholdSelect.value = "ALL";
+        }
     }
 
     renderFilteredSignals() {
         this.activeTrades.clear();
+        const listContainer = document.getElementById('filtered-signals-list');
+        if (!listContainer) return;
+        listContainer.innerHTML = '';
 
-        const volList = document.getElementById('volume-signals-list');
-        const priceList = document.getElementById('price-signals-list');
-        if (volList) volList.innerHTML = '';
-        if (priceList) priceList.innerHTML = '';
-
-        // FIX: Implement a version fallback (sig.version || "V1: Double Traps") to ensure legacy price-based trades are displayed correctly
         const filtered = this.allSignals.filter(sig => {
-            const sigVersion = sig.version || "V1: Double Traps";
-            return sigVersion === this.currentVersion;
+            const matchesVersion = (sig.version || "V1: Double Traps") === this.filterVersion;
+            const matchesInstrument = this.filterInstrument === 'ALL' || sig.instrument === this.filterInstrument;
+            const matchesBarType = this.filterBarType === 'ALL' || sig.bar_type === this.filterBarType;
+            const matchesThreshold = this.filterThreshold === 'ALL' || String(sig.threshold) === String(this.filterThreshold);
+            return matchesVersion && matchesInstrument && matchesBarType && matchesThreshold;
         });
 
         const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
-        
         sorted.forEach(sig => {
-            this.addCardToDOM(sig, 'append');
+            this.addCardToDOM(sig, listContainer);
             if (sig.status === 'active') {
-                const sigVersion = sig.version || "V1: Double Traps";
-                const key = `${sig.instrument}_${sig.bar_type}_${sigVersion}`;
+                const key = `${sig.instrument}_${sig.bar_type}_${sig.threshold}_${sig.version || "V1: Double Traps"}`;
                 this.activeTrades.set(key, sig);
             }
         });
 
-        this.updateCounts();
+        const countEl = document.getElementById('filtered-signals-count');
+        if (countEl) countEl.textContent = sorted.length;
+
+        this.calculateAndDisplayMetrics(filtered);
+    }
+
+    calculateAndDisplayMetrics(signals) {
+        const completed = signals.filter(s => s.status === 'completed');
+        const total = completed.length;
+
+        const tradesEl = document.getElementById('metric-total-trades');
+        const wrEl = document.getElementById('metric-win-rate');
+        const crEl = document.getElementById('metric-cum-return');
+        const arEl = document.getElementById('metric-avg-return');
+        const mafeEl = document.getElementById('metric-avg-mafe');
+        const maeEl = document.getElementById('metric-avg-mae');
+
+        if (total === 0) {
+            tradesEl.textContent = '0';
+            wrEl.textContent = '0.00%';
+            wrEl.style.color = '#787b86';
+            crEl.textContent = '0.00%';
+            crEl.style.color = '#fff';
+            arEl.textContent = '0.00%';
+            arEl.style.color = '#fff';
+            mafeEl.textContent = '0.00%';
+            maeEl.textContent = '0.00%';
+            return;
+        }
+
+        let wins = 0;
+        let cumulativeReturn = 0;
+        let mafeSum = 0;
+        let maeSum = 0;
+        let validMafeCount = 0;
+        let validMaeCount = 0;
+
+        completed.forEach(s => {
+            const isBuy = s.type.toUpperCase().includes('BUY');
+            const entry = s.entry;
+            const exit = s.exitPrice || (s.exitReason === 'take_profit' ? s.tp : s.sl);
+
+            let tradeReturn = 0;
+            if (isBuy) {
+                tradeReturn = ((exit - entry) / entry) * 100;
+            } else {
+                tradeReturn = ((entry - exit) / entry) * 100;
+            }
+
+            cumulativeReturn += tradeReturn;
+            if (s.exitReason === 'take_profit') wins++;
+
+            if (s.mafePercentage !== undefined && s.mafePercentage !== null) {
+                mafeSum += parseFloat(s.mafePercentage);
+                validMafeCount++;
+            }
+            if (s.maePercentage !== undefined && s.maePercentage !== null) {
+                maeSum += parseFloat(s.maePercentage);
+                validMaeCount++;
+            }
+        });
+
+        const wr = (wins / total) * 100;
+        const avgReturn = cumulativeReturn / total;
+        const avgMafe = validMafeCount > 0 ? (mafeSum / validMafeCount) : 0;
+        const avgMae = validMaeCount > 0 ? (maeSum / validMaeCount) : 0;
+
+        tradesEl.textContent = total;
+        wrEl.textContent = `${wr.toFixed(2)}%`;
+        wrEl.style.color = wr >= 50 ? '#26a69a' : '#ef5350';
+
+        crEl.textContent = `${cumulativeReturn >= 0 ? '+' : ''}${cumulativeReturn.toFixed(2)}%`;
+        crEl.style.color = cumulativeReturn >= 0 ? '#26a69a' : '#ef5350';
+
+        arEl.textContent = `${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%`;
+        arEl.style.color = avgReturn >= 0 ? '#26a69a' : '#ef5350';
+
+        mafeEl.textContent = `${avgMafe.toFixed(2)}%`;
+        maeEl.textContent = `${avgMae.toFixed(2)}%`;
     }
 
     handleIncomingSignal(sig) {
         const sigVersion = sig.version || "V1: Double Traps";
-        
         const exists = this.allSignals.some(s => 
             s.instrument === sig.instrument &&
             s.bar_type === sig.bar_type &&
+            s.threshold === sig.threshold &&
             s.barNumber === sig.barNumber &&
             s.type === sig.type &&
             (s.version || "V1: Double Traps") === sigVersion
@@ -185,19 +369,16 @@ class LiveTradeTracker {
         if (exists) return;
 
         this.allSignals.push(sig);
-        
-        if (sigVersion === this.currentVersion) {
-            this.addCardToDOM(sig, 'prepend');
-            this.updateCounts();
-        }
+        this.updateFilterDropdowns();
+        this.renderFilteredSignals();
     }
 
     handleStatusUpdate(update) {
         const updateVersion = update.version || "V1: Double Traps";
-
         const match = this.allSignals.find(s => 
             s.instrument === update.instrument &&
             s.bar_type === update.bar_type &&
+            s.threshold === update.threshold &&
             s.barNumber === update.barNumber &&
             s.type === update.type &&
             (s.version || "V1: Double Traps") === updateVersion
@@ -209,20 +390,19 @@ class LiveTradeTracker {
                 match.exitReason = update.exitReason;
                 match.exitPrice = update.exitPrice;
             }
-
-            const key = `${match.instrument}_${match.bar_type}_${updateVersion}`;
+            
+            const key = `${match.instrument}_${match.bar_type}_${match.threshold}_${updateVersion}`;
             if (update.status === 'active') {
                 this.activeTrades.set(key, match);
             } else {
                 this.activeTrades.delete(key);
             }
-
             this.renderFilteredSignals();
         }
     }
 
-    handleTickPriceUpdate(instrument, barType, currentPrice) {
-        const key = `${instrument}_${barType}_${this.currentVersion}`;
+    handleTickPriceUpdate(instrument, barType, threshold, currentPrice) {
+        const key = `${instrument}_${barType}_${threshold}_${this.filterVersion}`;
         const active = this.activeTrades.get(key);
         if (!active) return;
 
@@ -243,7 +423,7 @@ class LiveTradeTracker {
         }
 
         const sigVersion = active.version || "V1: Double Traps";
-        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const cardId = `sig-${active.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${active.bar_type}-${active.threshold}-${active.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const pnlTextEl = document.getElementById(`${cardId}-live-pnl`);
         if (pnlTextEl) {
             const color = pnlAmount >= 0 ? '#26a69a' : '#ef5350';
@@ -253,17 +433,10 @@ class LiveTradeTracker {
         }
     }
 
-    addCardToDOM(sig, position = 'prepend') {
-        const listId = sig.bar_type === 'volume' ? 'volume-signals-list' : 'price-signals-list';
-        const container = document.getElementById(listId);
-        if (!container) return;
-
+    addCardToDOM(sig, container) {
         const sigVersion = sig.version || "V1: Double Traps";
-        const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const cardId = `sig-${sig.instrument.replace(/[^a-zA-Z0-9]/g, '_')}-${sig.bar_type}-${sig.threshold}-${sig.barNumber}-${sigVersion.replace(/[^a-zA-Z0-9]/g, '_')}`;
         
-        const oldCard = document.getElementById(cardId);
-        if (oldCard) oldCard.remove();
-
         const card = document.createElement('div');
         card.id = cardId;
 
@@ -347,7 +520,10 @@ class LiveTradeTracker {
                     <span style="font-size: 9px; color: #787b86;">#${sig.barNumber}</span>
                 </div>
             </div>
-            <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: #fff;">${sig.name || sig.instrument.split('|')[1]}</div>
+            <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: #fff;">
+                ${sig.name || sig.instrument.split('|')[1]} 
+                <span style="font-size:10px; color:#787b86; font-weight:normal;">(T: ${sig.threshold})</span>
+            </div>
             
             <div class="metric-row">
                 <div>Entry: <span class="metric-val">${sig.entry.toFixed(2)}</span></div>
@@ -362,22 +538,6 @@ class LiveTradeTracker {
             </div>
         `;
 
-        if (position === 'append') {
-            container.appendChild(card);
-        } else {
-            container.insertBefore(card, container.firstChild);
-        }
-    }
-
-    updateCounts() {
-        const volCount = document.getElementById('volume-signals-count');
-        const priceCount = document.getElementById('price-signals-count');
-        
-        if (volCount) {
-            volCount.textContent = this.allSignals.filter(s => s.bar_type === 'volume' && (s.version || "V1: Double Traps") === this.currentVersion).length;
-        }
-        if (priceCount) {
-            priceCount.textContent = this.allSignals.filter(s => s.bar_type === 'price' && (s.version || "V1: Double Traps") === this.currentVersion).length;
-        }
+        container.appendChild(card);
     }
 }

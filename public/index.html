@@ -237,9 +237,15 @@
     
     <div class="instrument-selector" id="instrumentSelector"></div>
     
-    <div class="candle-type-selector">
+    <div class="candle-type-selector" style="display: flex; align-items: center; gap: 15px; background: #2a2e39; padding: 12px 20px; border-bottom: 1px solid #2f3c5c;">
         <button class="type-btn active" data-type="volume">📊 Volume Bars</button>
         <button class="type-btn" data-type="price">💰 Price Bars</button>
+        
+        <div class="threshold-selector-wrapper" style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+            <span style="font-size: 12px; color: #787b86; font-weight: bold;">BAR THRESHOLD:</span>
+            <select id="threshold-selector" style="background: #363c4b; border: 1px solid #4a4e5a; color: #d1d4dc; padding: 5px 12px; border-radius: 20px; font-size: 12px; outline: none; cursor: pointer;"></select>
+        </div>
+        
         <button id="reset-zoom-btn" style="margin-left: auto; background: #363c4b; border: none; color: #d1d4dc; padding: 6px 16px; border-radius: 20px; cursor: pointer;">🔍 Reset Zoom</button>
     </div>
     <div class="drawing-tools" id="drawingTools">

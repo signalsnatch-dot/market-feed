@@ -4,8 +4,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-
-// Import the strategy directly for historical lookup
 const { STRATEGIES } = require('./priceActionStrategy');
 
 class ChartServer {
@@ -14,22 +12,17 @@ class ChartServer {
         this.candlesDataDir = path.resolve(candlesDataDir);
         this.allowedOrigins = options.allowedOrigins || ['http://localhost:3000', 'http://localhost:3001'];
         this.requireAuth = options.requireAuth || false;
-        this.validTokens = options.validTokens || new Set(); // For auth if enabled
+        this.validTokens = options.validTokens || new Set();
         
-        // Validate candlesDataDir path to prevent directory traversal
         this.validateDataDirectory();
         
         this.app = express();
         this.server = http.createServer(this.app);
         
-        // Configure Socket.IO with strict CORS
         this.io = socketIo(this.server, {
             cors: {
                 origin: (origin, callback) => {
-                    // Allow requests with no origin (like mobile apps or curl)
                     if (!origin) return callback(null, true);
-                    
-                    // Check if origin is allowed
                     if (this.allowedOrigins.includes(origin)) {
                         callback(null, true);
                     } else {
@@ -47,47 +40,37 @@ class ChartServer {
         
         this.recentCandles = { price_bars: [], volume_bars: [] };
         this.tradeSignals = [];
-        this.maxRecentCandlesPerInstrument = 1200; // Increased to support 1200 candles on chart
+        this.maxRecentCandlesPerInstrument = 1200; 
         
         this.setupRoutes();
         this.setupSocketEvents();
-        this.loadSavedSignals(); // Load saved trade signals on startup
+        this.loadSavedSignals();
         this.loadHistoricalCandles();
-        
-        // NEW: Generate signals from historical loaded bars to populate chart instantly on launch
         this.generateHistoricalSignals(); 
     }
     
     validateDataDirectory() {
-        // Resolve and validate the data directory path
         const resolvedPath = path.resolve(this.candlesDataDir);
         const parentDir = path.resolve('.');
         
-        // Ensure the directory is within the project root (prevent directory traversal)
         if (!resolvedPath.startsWith(parentDir)) {
             throw new Error("Security violation: candlesDataDir resolves outside project root");
         }
         
-        // Check if directory exists, create if not
         if (!fs.existsSync(resolvedPath)) {
             fs.mkdirSync(resolvedPath, { recursive: true });
-            console.log(`Created data directory: ${resolvedPath}`);
         }
         
-        // Verify we can write to the directory
         try {
             fs.accessSync(resolvedPath, fs.constants.W_OK);
         } catch (err) {
-            console.error(`Cannot write to data directory: ${resolvedPath}`);
             throw new Error(`Data directory not writable: ${resolvedPath}`);
         }
         
-        console.log(`✅ Data directory validated: ${resolvedPath}`);
         this.candlesDataDir = resolvedPath;
     }
     
     validateFilePath(filepath, type) {
-        // Ensure the filepath is within the allowed subdirectories
         const resolvedPath = path.resolve(filepath);
         const allowedDirs = [
             path.join(this.candlesDataDir, 'volume_bars'),
@@ -100,101 +83,73 @@ class ChartServer {
         );
         
         if (!isAllowed) {
-            throw new Error(`Security violation: Attempted access to unauthorized path: ${filepath}`);
+            throw new Error(`Security violation: Unauthorized path: ${filepath}`);
         }
         
         return resolvedPath;
     }
     
+    extractInstrumentKeyAndThreshold(filename) {
+        const match = filename.match(/^(MCX_FO|NSE_FO|NSE_EQ)_([^_]+)_(\d+)_(volume|price)_bars\.csv$/);
+        if (match) {
+            return {
+                instrumentKey: `${match[1]}|${match[2]}`,
+                threshold: parseInt(match[3], 10),
+                type: match[4]
+            };
+        }
+        const legacyMatch = filename.match(/^(MCX_FO|NSE_FO|NSE_EQ)_([^_]+)/);
+        if (legacyMatch) {
+            return {
+                instrumentKey: `${legacyMatch[1]}|${legacyMatch[2]}`,
+                threshold: null,
+                type: filename.includes('volume') ? 'volume' : 'price'
+            };
+        }
+        return {
+            instrumentKey: filename.replace('_volume_bars.csv', '').replace('_price_bars.csv', ''),
+            threshold: null,
+            type: filename.includes('volume') ? 'volume' : 'price'
+        };
+    }
+    
     setupRoutes() {
-        // Serve static files
         this.app.use(express.static(path.join(__dirname, 'public')));
-        
-        // Serve node_modules for local library access (optional)
         const nodeModulesPath = path.join(__dirname, 'node_modules');
         if (fs.existsSync(nodeModulesPath)) {
             this.app.use('/node_modules', express.static(nodeModulesPath));
         }
         
-        // API endpoint to get recent candles
         this.app.get('/api/recent/:type', (req, res) => {
             const type = req.params.type;
-            
             if (type === 'price' || type === 'volume') {
                 const storeKey = `${type}_bars`;
-                const candles = this.recentCandles[storeKey];
-                
-                // Group candles by instrument to make sure we return full requested history up to 1200 for all
-                const candlesByInstrument = {};
-                for (const c of candles) {
-                    const key = c.instrument || c.instrument_key;
-                    if (!candlesByInstrument[key]) {
-                        candlesByInstrument[key] = [];
-                    }
-                    candlesByInstrument[key].push(c);
-                }
-                
-                const responseCandles = [];
-                for (const key of Object.keys(candlesByInstrument)) {
-                    responseCandles.push(...candlesByInstrument[key].slice(-this.maxRecentCandlesPerInstrument));
-                }
-                
-                // Sort chronologically before returning
-                responseCandles.sort((a, b) => a.timestamp - b.timestamp);
-                res.json(responseCandles);
+                res.json(this.recentCandles[storeKey]);
             } else {
-                res.status(400).json({ error: 'Invalid type. Use "price" or "volume"' });
+                res.status(400).json({ error: 'Invalid type' });
             }
         });
         
-        // API endpoint to get instruments list
         this.app.get('/api/instruments', (req, res) => {
-            const instruments = this.getInstrumentsFromFiles();
-            res.json(instruments);
+            res.json(this.getInstrumentsFromFiles());
         });
 
         this.app.get('/api/strategies', (req, res) => {
             res.json(Object.keys(STRATEGIES));
         });
         
-        // API endpoint for historical candles
-        this.app.get('/api/historical/:instrument/:type', (req, res) => {
-            const { instrument, type } = req.params;
-            const limit = parseInt(req.query.limit) || this.maxRecentCandlesPerInstrument;
-            
-            if (type !== 'price' && type !== 'volume') {
-                return res.status(400).json({ error: 'Invalid type' });
-            }
-            
-            const candles = this.recentCandles[`${type}_bars`].filter(
-                c => (c.instrument === instrument || c.instrument_key === instrument)
-            );
-            res.json(candles.slice(-limit));
-        });
-
-        // API endpoint to retrieve saved trade signals
         this.app.get('/api/signals', (req, res) => {
             res.json(this.tradeSignals);
         });
         
-        // Health check
         this.app.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: Date.now() });
-        });
-        
-        // 404 handler for undefined routes (MUST be last)
-        this.app.use((req, res) => {
-            res.status(404).json({ error: `Cannot ${req.method} ${req.url}` });
         });
     }
         
     setupSocketEvents() {
-        // Authentication middleware for socket connections
         this.io.use((socket, next) => {
-            if (!this.requireAuth) {
-                return next();
-            }
-            
+            if (!this.requireAuth) return next();
             const token = socket.handshake.auth.token || socket.handshake.headers.authorization;
             if (token && this.validTokens.has(token)) {
                 next();
@@ -204,126 +159,110 @@ class ChartServer {
         });
         
         this.io.on('connection', (socket) => {
-            console.log(`Client connected: ${socket.id} from ${socket.handshake.address}`);
+            console.log(`Client connected: ${socket.id}`);
             
-            // Emit historical parameters, signals, and strategy lists on handshake
             socket.emit('historical_candles', {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
                 trade_signals: this.tradeSignals,
-                strategies: Object.keys(STRATEGIES) // FIX: Served dynamically from backend
+                strategies: Object.keys(STRATEGIES)
             });
             
             socket.on('subscribe', (data) => {
-                const { instrument, type } = data;
-                // Validate instrument format
-                if (!instrument || !type || (type !== 'volume' && type !== 'price')) {
+                const { instrument, type, threshold } = data;
+                if (!instrument || !type || (type !== 'volume' && type !== 'price') || !threshold) {
                     socket.emit('error', { message: 'Invalid subscription' });
                     return;
                 }
-                socket.join(`${instrument}_${type}`);
-                console.log(`Client ${socket.id} subscribed to ${instrument} ${type}`);
+                socket.join(`${instrument}_${type}_${threshold}`);
+                console.log(`Client subscribed to ${instrument} ${type} (Threshold: ${threshold})`);
             });
             
             socket.on('unsubscribe', (data) => {
-                const { instrument, type } = data;
-                socket.leave(`${instrument}_${type}`);
-            });
-            
-            socket.on('disconnect', () => {
-                console.log(`Client disconnected: ${socket.id}`);
+                const { instrument, type, threshold } = data;
+                if (instrument && type && threshold) {
+                    socket.leave(`${instrument}_${type}_${threshold}`);
+                }
             });
         });
     }
     
     loadHistoricalCandles() {
-        console.log('📂 Loading historical candles...');
-        
+        console.log('📂 Loading historical parallel threshold candles...');
         this.recentCandles = { price_bars: [], volume_bars: [] };
         
-        // Load volume bars with path validation
         const volumeDir = path.join(this.candlesDataDir, 'volume_bars');
         if (fs.existsSync(volumeDir)) {
             const files = fs.readdirSync(volumeDir);
-            
             files.forEach(file => {
                 if (file.endsWith('_volume_bars.csv')) {
                     const filepath = path.join(volumeDir, file);
                     try {
                         this.validateFilePath(filepath, 'volume_bars');
-                        const instrumentKey = this.extractInstrumentKey(file);
-                        const candles = this.parseVolumeBarCSV(filepath, instrumentKey);
-                        // Limit to maximum configured depth per instrument to avoid memory exhaustion
+                        const info = this.extractInstrumentKeyAndThreshold(file);
+                        const candles = this.parseVolumeBarCSV(filepath, info.instrumentKey);
+                        candles.forEach(c => c.threshold = info.threshold || c.targetVolume);
                         const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
                         this.recentCandles.volume_bars.push(...limitedCandles);
                     } catch (err) {
-                        console.error(`Security error loading ${file}:`, err.message);
+                        console.error(`Error loading ${file}:`, err.message);
                     }
                 }
             });
         }
         
-        // Load price bars with path validation
         const priceDir = path.join(this.candlesDataDir, 'price_bars');
         if (fs.existsSync(priceDir)) {
             const files = fs.readdirSync(priceDir);
-            
             files.forEach(file => {
                 if (file.endsWith('_price_bars.csv')) {
                     const filepath = path.join(priceDir, file);
                     try {
                         this.validateFilePath(filepath, 'price_bars');
-                        const instrumentKey = this.extractInstrumentKey(file);
-                        const candles = this.parsePriceBarCSV(filepath, instrumentKey);
-                        // Limit to maximum configured depth per instrument
+                        const info = this.extractInstrumentKeyAndThreshold(file);
+                        const candles = this.parsePriceBarCSV(filepath, info.instrumentKey);
+                        candles.forEach(c => c.threshold = info.threshold || c.targetTicks);
                         const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
                         this.recentCandles.price_bars.push(...limitedCandles);
                     } catch (err) {
-                        console.error(`Security error loading ${file}:`, err.message);
+                        console.error(`Error loading ${file}:`, err.message);
                     }
                 }
             });
         }
         
-        // Sort
         this.recentCandles.volume_bars.sort((a, b) => a.timestamp - b.timestamp);
         this.recentCandles.price_bars.sort((a, b) => a.timestamp - b.timestamp);
-        
-        console.log(`✅ Loaded ${this.recentCandles.volume_bars.length} volume bars`);
-        console.log(`✅ Loaded ${this.recentCandles.price_bars.length} price bars`);
     }
 
-    /**
-     * NEW: Scan loaded historical candles on startup to identify and register previous signals.
-     * This populates client charts with trade indicators immediately on startup.
-     */
     generateHistoricalSignals() {
-        console.log('⚡ Generating trade signals on historical candles across all versions...');
-        
+        console.log('⚡ Generating signals on history...');
         const seenSignals = new Set();
         this.tradeSignals.forEach(sig => {
-            const key = `${sig.instrument}_${sig.bar_type}_${sig.barNumber}_${sig.type}_${sig.version}`;
+            const key = `${sig.instrument}_${sig.bar_type}_${sig.threshold}_${sig.barNumber}_${sig.type}_${sig.version}`;
             seenSignals.add(key);
         });
 
         const processStrategyOnHistory = (candles, barType) => {
             const grouped = {};
             candles.forEach(c => {
-                const key = c.instrument || c.instrument_key;
+                const inst = c.instrument || c.instrument_key;
+                const thresh = c.threshold || (barType === 'volume' ? c.targetVolume : c.targetTicks);
+                const key = `${inst}_${thresh}`;
                 if (!grouped[key]) grouped[key] = [];
                 grouped[key].push(c);
             });
 
-            for (const [instKey, list] of Object.entries(grouped)) {
+            for (const [groupKey, list] of Object.entries(grouped)) {
                 if (list.length < 32) continue;
+                const [instKey, threshStr] = groupKey.split('_');
+                const threshold = parseInt(threshStr, 10);
+                
                 try {
                     const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
-                    
-                    // Generate historical elements for all configured strategies
                     for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
                         const signals = strategyFn(list, { tickSize });
-                        
                         signals.forEach(sig => {
                             const candle = list[sig.index];
                             if (!candle) return;
@@ -345,11 +284,12 @@ class ChartServer {
                                 timestamp: candle.timestamp,
                                 barNumber: candle.barNumber,
                                 bar_type: barType,
+                                threshold: threshold,
                                 status: 'cancelled', 
                                 overlapping: false
                             };
 
-                            const uniqueKey = `${instKey}_${barType}_${candle.barNumber}_${sig.type}_${versionName}`;
+                            const uniqueKey = `${instKey}_${barType}_${threshold}_${candle.barNumber}_${sig.type}_${versionName}`;
                             if (!seenSignals.has(uniqueKey)) {
                                 seenSignals.add(uniqueKey);
                                 this.tradeSignals.push(signalEvent);
@@ -357,22 +297,19 @@ class ChartServer {
                         });
                     }
                 } catch (err) {
-                    console.error(`Error processing historical signals for ${instKey}:`, err.message);
+                    console.error(`Error processing history signals:`, err.message);
                 }
             }
         };
 
         processStrategyOnHistory(this.recentCandles.volume_bars, 'volume');
         processStrategyOnHistory(this.recentCandles.price_bars, 'price');
-
         this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
 
-        if (this.tradeSignals.length > 800) {
-            this.tradeSignals = this.tradeSignals.slice(-800);
+        if (this.tradeSignals.length > 2000) {
+            this.tradeSignals = this.tradeSignals.slice(-2000);
         }
-
         this.saveSignalsToDisk();
-        console.log(`✅ Calculated ${this.tradeSignals.length} historical trade signals across all versions`);
     }
 
     loadSavedSignals() {
@@ -382,9 +319,7 @@ class ChartServer {
             try {
                 const fileData = fs.readFileSync(signalsFile, 'utf8');
                 this.tradeSignals = JSON.parse(fileData);
-                console.log(`✅ Loaded ${this.tradeSignals.length} persisted trade signals from disk`);
             } catch (err) {
-                console.warn('⚠️ No signal file found or file corrupted, starting fresh.', err.message);
                 this.tradeSignals = [];
             }
         }
@@ -396,82 +331,42 @@ class ChartServer {
             const jsonFile = `signals_today_${localDate}.json`;
             const signalsFile = path.join(this.candlesDataDir, jsonFile);
             
-            // 1. ALWAYS read existing data first
             let existingSignals = [];
             if (fs.existsSync(signalsFile)) {
                 try {
                     const content = fs.readFileSync(signalsFile, 'utf8');
                     existingSignals = JSON.parse(content);
-                } catch (err) {
-                    console.error('⚠️ Failed to read existing file, creating backup and starting fresh');
-                    const backupName = `signals_today_${localDate}_backup_${Date.now()}.json`;
-                    fs.copyFileSync(signalsFile, path.join(this.candlesDataDir, backupName));
-                    // Continue with empty array
-                }
+                } catch (err) {}
             }
             
-            // 2. Merge, never replace
             const signalMap = new Map();
-            
-            // Add existing signals first
             for (const signal of existingSignals) {
-                const key = `${signal.timestamp}_${signal.instrument}_${signal.version}`;
+                const key = `${signal.timestamp}_${signal.instrument}_${signal.threshold}_${signal.version}`;
                 signalMap.set(key, signal);
             }
             
-            // Add/update with current signals
-            let addedCount = 0;
             for (const signal of this.tradeSignals) {
-                const key = `${signal.timestamp}_${signal.instrument}_${signal.version}`;
-                if (!signalMap.has(key)) {
-                    signalMap.set(key, signal);
-                    addedCount++;
-                } else {
-                    // Update status if changed
-                    const existing = signalMap.get(key);
-                    if (existing.status !== signal.status) {
-                        signalMap.set(key, { ...existing, ...signal });
-                    }
-                }
+                const key = `${signal.timestamp}_${signal.instrument}_${signal.threshold}_${signal.version}`;
+                signalMap.set(key, signal);
             }
             
             const allSignals = Array.from(signalMap.values());
-            
-            // 3. Write with atomic operation
             const tempFile = `${signalsFile}.tmp`;
             fs.writeFileSync(tempFile, JSON.stringify(allSignals, null, 2), 'utf8');
             fs.renameSync(tempFile, signalsFile);
-            
-            console.log(`✅ Signals saved: ${addedCount} new, ${allSignals.length} total`);
-            
         } catch (err) {
-            console.error('❌ Failed to write signals:', err.message);
-            // Emergency save to a different file
-            try {
-                const emergencyFile = `signals_emergency_${Date.now()}.json`;
-                fs.writeFileSync(
-                    path.join(this.candlesDataDir, emergencyFile),
-                    JSON.stringify(this.tradeSignals, null, 2),
-                    'utf8'
-                );
-                console.log(`🆘 Emergency backup saved to ${emergencyFile}`);
-            } catch (emergencyErr) {
-                console.error('❌ Emergency backup failed:', emergencyErr.message);
-            }
+            console.error('❌ Save signals failed:', err.message);
         }
     }
     
     parseVolumeBarCSV(filepath, instrumentKey) {
         const candles = [];
-        
         try {
             const content = fs.readFileSync(filepath, 'utf8');
             const lines = content.split('\n');
-            
             if (lines.length < 2) return candles;
             
             const headers = lines[0].trim().split(',');
-            
             const timestampIdx = headers.indexOf('timestamp');
             const barNumberIdx = headers.indexOf('bar_number');
             const openIdx = headers.indexOf('open');
@@ -481,10 +376,8 @@ class ChartServer {
             const volumeIdx = headers.indexOf('volume');
             const transactionsIdx = headers.indexOf('transactions');
             const priceChangesIdx = headers.indexOf('price_changes');
-            const changePercentIdx = headers.indexOf('price_change_percent');
             const startTimeIdx = headers.indexOf('start_time');
             const endTimeIdx = headers.indexOf('end_time');
-            const durationIdx = headers.indexOf('duration_seconds');
             
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
@@ -494,60 +387,37 @@ class ChartServer {
                 if (values.length < 10) continue;
                 
                 let timestamp = parseInt(values[timestampIdx]);
-                if (isNaN(timestamp)) {
-                    const endTimeStr = values[endTimeIdx];
-                    if (endTimeStr) {
-                        timestamp = new Date(endTimeStr).getTime();
-                    }
-                }
-                
                 const istTimestamp = this.convertToIST(timestamp);
-                
-                const open = parseFloat(values[openIdx]);
-                const high = parseFloat(values[highIdx]);
-                const low = parseFloat(values[lowIdx]);
-                const close = parseFloat(values[closeIdx]);
-                
-                if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) continue;
                 
                 candles.push({
                     timestamp: istTimestamp,
-                    original_timestamp: timestamp,
                     instrument: instrumentKey,
                     instrument_key: instrumentKey,
                     type: 'volume',
                     barNumber: parseInt(values[barNumberIdx]) || i,
-                    open: open,
-                    high: high,
-                    low: low,
-                    close: close,
+                    open: parseFloat(values[openIdx]),
+                    high: parseFloat(values[highIdx]),
+                    low: parseFloat(values[lowIdx]),
+                    close: parseFloat(values[closeIdx]),
                     volume: parseFloat(values[volumeIdx]) || 0,
                     transactions: parseInt(values[transactionsIdx]) || 0,
                     priceChanges: parseInt(values[priceChangesIdx]) || 0,
-                    priceChangePercent: parseFloat(values[changePercentIdx]) || 0,
                     startTime: values[startTimeIdx] || '',
-                    endTime: values[endTimeIdx] || '',
-                    durationSeconds: parseFloat(values[durationIdx]) || 0
+                    endTime: values[endTimeIdx] || ''
                 });
             }
-        } catch (error) {
-            console.error(`Error parsing ${filepath}:`, error.message);
-        }
-        
+        } catch (error) {}
         return candles;
     }
     
     parsePriceBarCSV(filepath, instrumentKey) {
         const candles = [];
-        
         try {
             const content = fs.readFileSync(filepath, 'utf8');
             const lines = content.split('\n');
-            
             if (lines.length < 2) return candles;
             
             const headers = lines[0].trim().split(',');
-            
             const timestampIdx = headers.indexOf('timestamp');
             const barNumberIdx = headers.indexOf('bar_number');
             const openIdx = headers.indexOf('open');
@@ -555,12 +425,9 @@ class ChartServer {
             const lowIdx = headers.indexOf('low');
             const closeIdx = headers.indexOf('close');
             const ticksIdx = headers.indexOf('ticks');
-            const targetTicksIdx = headers.indexOf('target_ticks');
             const volumeIdx = headers.indexOf('volume');
-            const changePercentIdx = headers.indexOf('price_change_percent');
             const startTimeIdx = headers.indexOf('start_time');
             const endTimeIdx = headers.indexOf('end_time');
-            const durationIdx = headers.indexOf('duration_seconds');
             
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
@@ -570,46 +437,25 @@ class ChartServer {
                 if (values.length < 8) continue;
                 
                 let timestamp = parseInt(values[timestampIdx]);
-                if (isNaN(timestamp)) {
-                    const endTimeStr = values[endTimeIdx];
-                    if (endTimeStr) {
-                        timestamp = new Date(endTimeStr).getTime();
-                    }
-                }
-                
                 const istTimestamp = this.convertToIST(timestamp);
-                
-                const open = parseFloat(values[openIdx]);
-                const high = parseFloat(values[highIdx]);
-                const low = parseFloat(values[lowIdx]);
-                const close = parseFloat(values[closeIdx]);
-                
-                if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) continue;
                 
                 candles.push({
                     timestamp: istTimestamp,
-                    original_timestamp: timestamp,
                     instrument: instrumentKey,
                     instrument_key: instrumentKey,
                     type: 'price',
                     barNumber: parseInt(values[barNumberIdx]) || i,
-                    open: open,
-                    high: high,
-                    low: low,
-                    close: close,
+                    open: parseFloat(values[openIdx]),
+                    high: parseFloat(values[highIdx]),
+                    low: parseFloat(values[lowIdx]),
+                    close: parseFloat(values[closeIdx]),
                     ticks: parseInt(values[ticksIdx]) || 0,
-                    targetTicks: parseInt(values[targetTicksIdx]) || 0,
                     volume: parseFloat(values[volumeIdx]) || 0,
-                    priceChangePercent: parseFloat(values[changePercentIdx]) || 0,
                     startTime: values[startTimeIdx] || '',
-                    endTime: values[endTimeIdx] || '',
-                    durationSeconds: parseFloat(values[durationIdx]) || 0
+                    endTime: values[endTimeIdx] || ''
                 });
             }
-        } catch (error) {
-            console.error(`Error parsing ${filepath}:`, error.message);
-        }
-        
+        } catch (error) {}
         return candles;
     }
     
@@ -626,67 +472,65 @@ class ChartServer {
         const result = [];
         let inQuotes = false;
         let current = '';
-        
         for (let i = 0; i < line.length; i++) {
             const char = line[i];
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
+            if (char === '"') inQuotes = !inQuotes;
+            else if (char === ',' && !inQuotes) {
                 result.push(current);
                 current = '';
-            } else {
-                current += char;
-            }
+            } else current += char;
         }
         result.push(current);
-        
         return result;
-    }
-    
-    extractInstrumentKey(filename) {
-        const match = filename.match(/^(MCX_FO|NSE_FO|NSE_EQ)_([^_]+)/);
-        if (match) {
-            return `${match[1]}|${match[2]}`;
-        }
-        return filename.replace('_volume_bars.csv', '').replace('_price_bars.csv', '');
     }
     
     getInstrumentName(key) {
         const names = {
-            'MCX_FO|504265': 'Natural Gas Future',
+            'MCX_FO|538685': 'Natural Gas Future',
             'NSE_FO|62329': 'Nifty 50 Future',
-            'NSE_FO|62326': 'Nifty Bank Future',
-            'MCX_FO|487465': 'Natural Gas Future',
-            'NSE_FO|45450': 'Nifty 50 Future',
-            'NSE_FO|66688': 'Nifty Bank Future'
+            'NSE_FO|62326': 'Nifty Bank Future'
         };
         return names[key] || key.split('|')[1];
     }
     
     getInstrumentsFromFiles() {
-        const instruments = [];
-        const seen = new Set();
-        
+        const instrumentsMap = new Map();
         [...this.recentCandles.volume_bars, ...this.recentCandles.price_bars].forEach(candle => {
             const key = candle.instrument || candle.instrument_key;
-            if (key && !seen.has(key)) {
-                seen.add(key);
-                instruments.push({
+            if (!key) return;
+            
+            if (!instrumentsMap.has(key)) {
+                instrumentsMap.set(key, {
                     key: key,
                     name: this.getInstrumentName(key),
                     exchange: key.split('|')[0],
-                    symbol: key.split('|')[1]
+                    symbol: key.split('|')[1],
+                    volumeThresholds: new Set(),
+                    priceThresholds: new Set()
                 });
+            }
+            
+            const inst = instrumentsMap.get(key);
+            if (candle.type === 'volume' && candle.threshold) {
+                inst.volumeThresholds.add(candle.threshold);
+            } else if (candle.type === 'price' && candle.threshold) {
+                inst.priceThresholds.add(candle.threshold);
             }
         });
         
-        return instruments;
+        return Array.from(instrumentsMap.values()).map(inst => ({
+            ...inst,
+            volumeThresholds: Array.from(inst.volumeThresholds).sort((a,b) => a-b),
+            priceThresholds: Array.from(inst.priceThresholds).sort((a,b) => a-b)
+        }));
     }
     
     broadcastCandle(instrumentKey, candle, type) {
+        const threshold = type === 'volume' ? candle.targetVolume : candle.targetTicks;
         const candleData = {
             ...candle,
             type: type,
+            threshold: threshold,
             instrument: instrumentKey,
             instrument_key: instrumentKey,
             broadcast_time: Date.now()
@@ -695,47 +539,44 @@ class ChartServer {
         const storeKey = `${type}_bars`;
         this.recentCandles[storeKey].push(candleData);
         
-        // Group by instrument to slice each instrument dataset up to 1200 candles safely
-        const candlesByInstrument = {};
+        const candlesByGroup = {};
         for (const c of this.recentCandles[storeKey]) {
-            const key = c.instrument || c.instrument_key;
-            if (!candlesByInstrument[key]) {
-                candlesByInstrument[key] = [];
-            }
-            candlesByInstrument[key].push(c);
+            const key = `${c.instrument || c.instrument_key}_${c.threshold}`;
+            if (!candlesByGroup[key]) candlesByGroup[key] = [];
+            candlesByGroup[key].push(c);
         }
         
-        // Re-flatten limited bars
         const updatedCandles = [];
-        for (const key of Object.keys(candlesByInstrument)) {
-            updatedCandles.push(...candlesByInstrument[key].slice(-this.maxRecentCandlesPerInstrument));
+        for (const key of Object.keys(candlesByGroup)) {
+            updatedCandles.push(...candlesByGroup[key].slice(-this.maxRecentCandlesPerInstrument));
         }
         
-        // Sort chronologically
         this.recentCandles[storeKey] = updatedCandles.sort((a, b) => a.timestamp - b.timestamp);
         
-        this.io.to(`${instrumentKey}_${type}`).emit(`${instrumentKey}_${type}_candle`, candleData);
+        this.io.to(`${instrumentKey}_${type}_${threshold}`).emit(`${instrumentKey}_${type}_${threshold}_candle`, candleData);
         this.io.emit('candle_update', candleData);
     }
     
     broadcastLiveCandle(instrumentKey, liveCandle, type) {
+        const threshold = type === 'volume' ? liveCandle.targetVolume : liveCandle.targetTicks;
         const candleData = {
             ...liveCandle,
             instrument: instrumentKey,
             instrument_key: instrumentKey,
             type: type,
+            threshold: threshold,
             broadcast_time: Date.now()
         };
         
-        this.io.to(`${instrumentKey}_${type}`).emit(`${instrumentKey}_${type}_live_candle`, candleData);
+        this.io.to(`${instrumentKey}_${type}_${threshold}`).emit(`${instrumentKey}_${type}_${threshold}_live_candle`, candleData);
         this.io.emit('live_candle_update', candleData);
     }
 
     broadcastTradeSignal(signalData) {
-        // FIX: Prevent duplicate cache entries by validating key parameters + strategy version
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
             sig.bar_type === signalData.bar_type &&
+            sig.threshold === signalData.threshold &&
             sig.barNumber === signalData.barNumber &&
             sig.type === signalData.type &&
             sig.version === signalData.version
@@ -746,20 +587,20 @@ class ChartServer {
         signalData.status = signalData.status || 'pending';
         this.tradeSignals.push(signalData);
         
-        if (this.tradeSignals.length > 800) {
+        if (this.tradeSignals.length > 2000) {
             this.tradeSignals.shift();
         }
         
         this.saveSignalsToDisk();
         this.io.emit('trade_signal', signalData);
-        console.log(`🚀 Broadcasted: ${signalData.version} | ${signalData.instrument} | Bar #${signalData.barNumber}`);
+        console.log(`🚀 Broadcasted: ${signalData.version} | ${signalData.instrument} | Thresh: ${signalData.threshold} | Bar #${signalData.barNumber}`);
     }
 
     broadcastTradeStatusUpdate(updateData) {
-        // FIX: Update status mapping specifically matched to active strategy version
         const matchIndex = this.tradeSignals.findIndex(sig => 
             sig.instrument === updateData.instrument &&
             sig.bar_type === updateData.bar_type &&
+            sig.threshold === updateData.threshold &&
             sig.barNumber === updateData.barNumber &&
             sig.type === updateData.type &&
             sig.version === updateData.version
@@ -767,13 +608,10 @@ class ChartServer {
 
         if (matchIndex !== -1) {
             this.tradeSignals[matchIndex].status = updateData.status;
-            
             if (updateData.exitReason) {
                 this.tradeSignals[matchIndex].exitReason = updateData.exitReason;
                 this.tradeSignals[matchIndex].exitPrice = updateData.exitPrice;
             }
-
-            console.log(`ℹ️ Transition: ${updateData.version} | ${updateData.instrument} Bar #${updateData.barNumber} -> ${updateData.status}`);
             
             this.saveSignalsToDisk();
             this.io.emit('trade_status_update', this.tradeSignals[matchIndex]);
@@ -782,11 +620,7 @@ class ChartServer {
     
     start() {
         this.server.listen(this.port, () => {
-            console.log(`📊 Secure chart server running on port ${this.port}`);
-            console.log(`   CORS allowed origins: ${this.allowedOrigins.join(', ')}`);
-            console.log(`   Data directory: ${this.candlesDataDir}`);
-            console.log(`   Volume bars loaded: ${this.recentCandles.volume_bars.length}`);
-            console.log(`   Price bars loaded: ${this.recentCandles.price_bars.length}`);
+            console.log(`📊 Chart server on port ${this.port}`);
         });
     }
 }

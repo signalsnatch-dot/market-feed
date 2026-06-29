@@ -1,3 +1,4 @@
+
 // candleBuilder.js
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
@@ -8,8 +9,8 @@ class DualCandleBuilder extends EventEmitter {
     constructor(config) {
         super();
         
-        this.pendingOrders = new Map(); // key: `${instrument}_${bar_type}_${version}` -> pending order
-        this.activeTrades = new Map();  // key: `${instrument}_${bar_type}_${version}` -> active trade
+        this.pendingOrders = new Map(); // key: `${instrument}_${bar_type}_${threshold}_${version}`
+        this.activeTrades = new Map();  // key: `${instrument}_${bar_type}_${threshold}_${version}`
         
         this.priceBuilder = new PriceBarBuilder({
             instruments: config.instruments,
@@ -81,7 +82,8 @@ class DualCandleBuilder extends EventEmitter {
     }
 
     processIncomingSignal(signal, barType) {
-        const key = `${signal.instrument}_${barType}_${signal.version}`;
+        const threshold = signal.threshold;
+        const key = `${signal.instrument}_${barType}_${threshold}_${signal.version}`;
         const hasActive = this.activeTrades.has(key);
         const hasPending = this.pendingOrders.has(key);
 
@@ -106,8 +108,10 @@ class DualCandleBuilder extends EventEmitter {
 
     setupStateTracking() {
         this.on('bar_close', (bar) => {
+            const threshold = bar.targetVolume || bar.targetTicks;
+            
             for (const versionName of Object.keys(STRATEGIES)) {
-                const key = `${bar.instrument}_${bar.type}_${versionName}`;
+                const key = `${bar.instrument}_${bar.type}_${threshold}_${versionName}`;
 
                 // 1. Evaluate Pending Activation
                 if (this.pendingOrders.has(key)) {
@@ -121,7 +125,6 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (triggered) {
-                        // Slippage / Gap-fill protection logic to align live executions with backtest model
                         let fillPrice = pending.entry;
                         if (pending.type === 'BUY_STOP' && bar.open > pending.entry) {
                             fillPrice = bar.open;
@@ -129,7 +132,6 @@ class DualCandleBuilder extends EventEmitter {
                             fillPrice = bar.open;
                         }
 
-                        // FIX: Re-align TP calculation with backtester dynamic slippage adjustment
                         const risk = Math.abs(fillPrice - pending.sl);
                         let finalTP;
                         if (pending.useStructuralTarget && pending.structuralTarget !== null) {
@@ -145,11 +147,12 @@ class DualCandleBuilder extends EventEmitter {
                             instrument: pending.instrument,
                             name: pending.name,
                             bar_type: pending.bar_type,
+                            threshold: threshold,
                             barNumber: pending.barNumber,
                             type: pending.type,
-                            entry: fillPrice, // Slippage-aligned execution fill
+                            entry: fillPrice, 
                             sl: pending.sl,
-                            tp: finalTP, // Aligned with the backtest's dynamic risk/reward shift
+                            tp: finalTP, 
                             direction: pending.type === 'BUY_STOP' ? 'long' : 'short',
                             timestamp: bar.timestamp,
                             status: 'active'
@@ -199,7 +202,6 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (exitPrice !== null) {
-                        // FIX: Compute correct transactional action types for live broker APIs
                         const exitType = trade.direction === 'long'
                             ? (exitReason === 'stop_loss' ? 'SELL_STOP' : 'SELL_LIMIT')
                             : (exitReason === 'stop_loss' ? 'BUY_STOP' : 'BUY_LIMIT');
@@ -208,9 +210,10 @@ class DualCandleBuilder extends EventEmitter {
                             version: versionName,
                             instrument: trade.instrument,
                             bar_type: trade.bar_type,
+                            threshold: threshold,
                             barNumber: trade.barNumber,
-                            type: trade.type, // Maintain the entry 'type' for chartServer state lookup compatibility [INDEX]
-                            exitType: exitType, // Expose explicit transactional exit actions to the broker engine
+                            type: trade.type, 
+                            exitType: exitType, 
                             exitReason: exitReason,
                             exitPrice: exitPrice,
                             timestamp: bar.timestamp,
@@ -230,6 +233,7 @@ class DualCandleBuilder extends EventEmitter {
                             version: versionName,
                             instrument: pending.instrument,
                             bar_type: pending.bar_type,
+                            threshold: threshold,
                             barNumber: pending.barNumber,
                             type: pending.type,
                             status: 'cancelled',

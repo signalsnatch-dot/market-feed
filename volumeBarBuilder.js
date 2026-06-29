@@ -39,6 +39,7 @@ class VolumeBarBuilder extends EventEmitter {
         this.completedBars = [];
         this.lastExchangeVolumeToday = new Map();
         this.tickSizeMap = new Map();
+        this.instrumentTargetsMap = new Map();
         
         this.dataDir = config.directories?.candlesDataDir || './candles_data/volume_bars';
         this.rawDataDir = config.directories?.rawDataDir || './raw_ticks_data';
@@ -63,38 +64,45 @@ class VolumeBarBuilder extends EventEmitter {
     
     initializeBars() {
         for (const instrument of this.instrumentConfigs) {
-            this.activeBars.set(instrument.key, {
-                instrument_key: instrument.key,
-                name: instrument.name,
-                targetVolume: instrument.volumePerBar,  
-                currentVolume: 0,
-                open: null,
-                high: null,
-                low: null,
-                close: null,
-                startTime: null,
-                startTimestamp: null,
-                lastUpdateTime: null,
-                transactions: 0,
-                priceChanges: 0,  
-                bars: [],
-                barNumber: 0,
-                lastEmittedProgress: 0,
-                lastSignalBarNumbers: {} 
-            });
-            
-            this.stats.barsByInstrument.set(instrument.key, 0);
+            const targets = Array.isArray(instrument.volumePerBar) 
+                ? instrument.volumePerBar 
+                : [instrument.volumePerBar];
+                
+            this.instrumentTargetsMap.set(instrument.key, targets);
             this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
-            
-            console.log(`📊 [VOLUME BAR] ${instrument.name}:`);
-            console.log(`   Target: ${instrument.volumePerBar.toLocaleString()} lots/shares per bar`);
+
+            for (const targetVol of targets) {
+                const mapKey = `${instrument.key}_${targetVol}`;
+                this.activeBars.set(mapKey, {
+                    instrument_key: instrument.key,
+                    name: instrument.name,
+                    targetVolume: targetVol,  
+                    currentVolume: 0,
+                    open: null,
+                    high: null,
+                    low: null,
+                    close: null,
+                    startTime: null,
+                    startTimestamp: null,
+                    lastUpdateTime: null,
+                    transactions: 0,
+                    priceChanges: 0,  
+                    bars: [],
+                    barNumber: 0,
+                    lastEmittedProgress: 0,
+                    lastSignalBarNumbers: {} 
+                });
+                
+                this.stats.barsByInstrument.set(mapKey, 0);
+            }
+            console.log(`📊 [VOLUME BAR] ${instrument.name}: Parallel tracking initialized for thresholds [${targets.join(', ')}]`);
         }
     }
 
     loadHistoryFromCSV() {
         console.log('📂 Pre-populating volume bar histories from CSV files...');
-        for (const [key, bar] of this.activeBars.entries()) {
-            const safeKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+        for (const [mapKey, bar] of this.activeBars.entries()) {
+            const safeKey = mapKey.replace(/[^a-zA-Z0-9]/g, '_');
             const filepath = path.join(this.dataDir, `${safeKey}_volume_bars.csv`);
             if (fs.existsSync(filepath)) {
                 try {
@@ -125,7 +133,7 @@ class VolumeBarBuilder extends EventEmitter {
 
                         parsedBars.push({
                             type: 'volume_bar',
-                            instrument_key: key,
+                            instrument_key: bar.instrument_key,
                             name: bar.name,
                             barNumber: parseInt(values[barNumberIdx]) || i,
                             open: parseFloat(values[openIdx]),
@@ -144,8 +152,8 @@ class VolumeBarBuilder extends EventEmitter {
                     }
 
                     bar.bars = parsedBars.slice(-500);
-                    this.stats.barsByInstrument.set(key, parsedBars.length);
-                    console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
+                    this.stats.barsByInstrument.set(mapKey, parsedBars.length);
+                    console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name} (Threshold: ${bar.targetVolume})`);
                 } catch (err) {
                     console.error(`Failed to load history for ${bar.name}:`, err.message);
                 }
@@ -182,13 +190,8 @@ class VolumeBarBuilder extends EventEmitter {
                         state.activeBars.forEach(([key, activeState]) => {
                             const existingBar = this.activeBars.get(key);
                             if (existingBar) {
-                                // 1. Save the freshly loaded config-derived targetVolume
                                 const freshTargetVolume = existingBar.targetVolume;
-                                
-                                // 2. Restore the active progress parameters
                                 Object.assign(existingBar, activeState);
-                                
-                                // 3. Force re-align to the updated configuration threshold
                                 existingBar.targetVolume = freshTargetVolume;
                             }
                         });
@@ -208,9 +211,7 @@ class VolumeBarBuilder extends EventEmitter {
 
     processTick(tickData) {
         const { instrument_key, ltp, last_traded_quantity, volume_today, exchange_timestamp, timestamp } = tickData;
-        
         if (!ltp) return;
-        
         const price = parseFloat(ltp);
         
         let tickVolume = 0;
@@ -219,12 +220,11 @@ class VolumeBarBuilder extends EventEmitter {
 
         if (!isNaN(currentVolToday) && currentVolToday > 0) {
             const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
-            
             if (prevVolToday !== undefined && prevVolToday !== null) {
                 if (currentVolToday >= prevVolToday) {
-                    tickVolume = currentVolToday - prevVolToday; // Delta of volume_today is already in lots
+                    tickVolume = currentVolToday - prevVolToday;
                 } else {
-                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier; // Convert fallback LTQ units to lots
+                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
                 }
             } else {
                 tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
@@ -240,7 +240,6 @@ class VolumeBarBuilder extends EventEmitter {
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
             exchangeTimeMs = Date.now();
         }
-        
         let receiveTimeMs = parseInt(timestamp, 10);
         if (isNaN(receiveTimeMs) || receiveTimeMs <= 0) {
             receiveTimeMs = Date.now();
@@ -250,128 +249,130 @@ class VolumeBarBuilder extends EventEmitter {
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
         
-        let bar = this.activeBars.get(instrument_key);
-        if (!bar) return;
-        
         this.stats.totalTicks++;
         this.stats.totalVolume += tickVolume;
 
-        let isFirstTransaction = bar.transactions === 0 || bar.open === null;
+        const targets = this.instrumentTargetsMap.get(instrument_key) || [];
 
-        while (tickVolume > 0) {
-            if (isFirstTransaction || bar.open === null) {
-                bar.barNumber = this.stats.barsByInstrument.get(instrument_key) + 1;
-                bar.open = price;
-                bar.high = price;
-                bar.low = price;
-                bar.close = price;
-                bar.startTime = currentTime;
-                bar.startTimestamp = exchangeTimeISO || receiveTimeISO;
-                bar.transactions = 0;
-                bar.priceChanges = 0;
-                isFirstTransaction = false;
+        for (const targetVol of targets) {
+            let currentTickVolume = tickVolume; 
+            const mapKey = `${instrument_key}_${targetVol}`;
+            let bar = this.activeBars.get(mapKey);
+            if (!bar) continue;
 
-                console.log(`\n🕯️ [VOLUME BAR] New continuous bar #${bar.barNumber} for ${bar.name}`);
-                console.log(`   Starting price: ${price}`);
-                console.log(`   Start time (exchange): ${bar.startTimestamp}`);
-                console.log(`   Target volume: ${bar.targetVolume.toLocaleString()} lots/shares\n`);
-            }
+            let isFirstTransaction = bar.transactions === 0 || bar.open === null;
 
-            const needed = bar.targetVolume - bar.currentVolume;
-            let volumeToAdd = 0;
-            let exceededThreshold = false;
-            let remainingVolume = 0;
+            while (currentTickVolume > 0) {
+                if (isFirstTransaction || bar.open === null) {
+                    bar.barNumber = this.stats.barsByInstrument.get(mapKey) + 1;
+                    bar.open = price;
+                    bar.high = price;
+                    bar.low = price;
+                    bar.close = price;
+                    bar.startTime = currentTime;
+                    bar.startTimestamp = exchangeTimeISO || receiveTimeISO;
+                    bar.transactions = 0;
+                    bar.priceChanges = 0;
+                    isFirstTransaction = false;
 
-            if (tickVolume <= needed) {
-                volumeToAdd = tickVolume;
-                tickVolume = 0;
-            } else {
-                volumeToAdd = needed;
-                remainingVolume = tickVolume - needed;
-                tickVolume = 0;
-                exceededThreshold = true;
-            }
-
-            if (bar.transactions > 0 && bar.open !== null) {
-                if (price !== bar.close) {
-                    bar.priceChanges++;
+                    console.log(`\n🕯️ [VOLUME BAR] New bar #${bar.barNumber} for ${bar.name} (Threshold: ${targetVol})`);
                 }
-                bar.high = Math.max(bar.high, price);
-                bar.low = Math.min(bar.low, price);
-                bar.close = price;
-            }
 
-            bar.currentVolume += volumeToAdd;
-            bar.lastUpdateTime = currentTime;
-            bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
-            bar.transactions++;
+                const needed = bar.targetVolume - bar.currentVolume;
+                let volumeToAdd = 0;
+                let exceededThreshold = false;
+                let remainingVolume = 0;
 
-            if (bar.currentVolume >= bar.targetVolume) {
-                const prevClose = bar.close;
-                this.closeBar(instrument_key, bar, exceededThreshold ? prevClose : null);
+                if (currentTickVolume <= needed) {
+                    volumeToAdd = currentTickVolume;
+                    currentTickVolume = 0;
+                } else {
+                    volumeToAdd = needed;
+                    remainingVolume = currentTickVolume - needed;
+                    currentTickVolume = 0;
+                    exceededThreshold = true;
+                }
 
-                bar = this.activeBars.get(instrument_key);
+                if (bar.transactions > 0 && bar.open !== null) {
+                    if (price !== bar.close) {
+                        bar.priceChanges++;
+                    }
+                    bar.high = Math.max(bar.high, price);
+                    bar.low = Math.min(bar.low, price);
+                    bar.close = price;
+                }
 
-                if (exceededThreshold) {
-                    tickVolume = remainingVolume;
-                    isFirstTransaction = true;
+                bar.currentVolume += volumeToAdd;
+                bar.lastUpdateTime = currentTime;
+                bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
+                bar.transactions++;
+
+                if (bar.currentVolume >= bar.targetVolume) {
+                    const prevClose = bar.close;
+                    this.closeBar(mapKey, bar, exceededThreshold ? prevClose : null);
+
+                    bar = this.activeBars.get(mapKey);
+
+                    if (exceededThreshold) {
+                        currentTickVolume = remainingVolume;
+                        isFirstTransaction = true;
+                    } else {
+                        break;
+                    }
                 } else {
                     break;
                 }
-            } else {
-                break;
-            }
-        }
-
-        let finalActiveBar = this.activeBars.get(instrument_key);
-        if (finalActiveBar && finalActiveBar.open !== null) {
-            if (this.emit) {
-                const liveCandle = {
-                    instrument: instrument_key,
-                    type: 'volume',
-                    is_live: true,
-                    barNumber: finalActiveBar.barNumber,
-                    open: finalActiveBar.open,
-                    high: finalActiveBar.high,
-                    low: finalActiveBar.low,
-                    close: finalActiveBar.close,
-                    volume: finalActiveBar.currentVolume,
-                    targetVolume: finalActiveBar.targetVolume,
-                    transactions: finalActiveBar.transactions,
-                    priceChanges: finalActiveBar.priceChanges,
-                    startTime: finalActiveBar.startTimestamp,
-                    timestamp: currentTime,
-                    progress: (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100
-                };
-                
-                this.emit('live_candle_update', liveCandle);
             }
 
-            const progress = (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100;
-            if (Math.floor(progress) % 10 === 0 && progress !== finalActiveBar.lastEmittedProgress) {
-                finalActiveBar.lastEmittedProgress = progress;
-                this.emit('bar_update', {
-                    type: 'volume_bar',
-                    instrument_key: finalActiveBar.instrument_key,
-                    name: finalActiveBar.name,
-                    barNumber: finalActiveBar.barNumber,
-                    progress: progress.toFixed(1),
-                    currentVolume: finalActiveBar.currentVolume.toLocaleString(),
-                    targetVolume: finalActiveBar.targetVolume.toLocaleString(),
-                    transactions: finalActiveBar.transactions,
-                    priceChanges: finalActiveBar.priceChanges,
-                    currentPrice: price
-                });
+            let finalActiveBar = this.activeBars.get(mapKey);
+            if (finalActiveBar && finalActiveBar.open !== null) {
+                if (this.emit) {
+                    const liveCandle = {
+                        instrument: instrument_key,
+                        type: 'volume',
+                        is_live: true,
+                        barNumber: finalActiveBar.barNumber,
+                        open: finalActiveBar.open,
+                        high: finalActiveBar.high,
+                        low: finalActiveBar.low,
+                        close: finalActiveBar.close,
+                        volume: finalActiveBar.currentVolume,
+                        targetVolume: finalActiveBar.targetVolume,
+                        transactions: finalActiveBar.transactions,
+                        priceChanges: finalActiveBar.priceChanges,
+                        startTime: finalActiveBar.startTimestamp,
+                        timestamp: currentTime,
+                        progress: (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100
+                    };
+                    this.emit('live_candle_update', liveCandle);
+                }
+
+                const progress = (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100;
+                if (Math.floor(progress) % 10 === 0 && progress !== finalActiveBar.lastEmittedProgress) {
+                    finalActiveBar.lastEmittedProgress = progress;
+                    this.emit('bar_update', {
+                        type: 'volume_bar',
+                        instrument_key: finalActiveBar.instrument_key,
+                        name: finalActiveBar.name,
+                        barNumber: finalActiveBar.barNumber,
+                        progress: progress.toFixed(1),
+                        currentVolume: finalActiveBar.currentVolume.toLocaleString(),
+                        targetVolume: finalActiveBar.targetVolume.toLocaleString(),
+                        transactions: finalActiveBar.transactions,
+                        priceChanges: finalActiveBar.priceChanges,
+                        currentPrice: price
+                    });
+                }
             }
         }
     }
     
-    closeBar(instrumentKey, bar, nextOhlc = null) {
+    closeBar(mapKey, bar, nextOhlc = null) {
         const completedBar = {
             type: 'volume_bar',
-            instrument_key: instrumentKey,
+            instrument_key: bar.instrument_key,
             name: bar.name,
-            barNumber: this.stats.barsByInstrument.get(instrumentKey) + 1,
+            barNumber: this.stats.barsByInstrument.get(mapKey) + 1,
             open: bar.open,
             high: bar.high,
             low: bar.low,
@@ -382,7 +383,7 @@ class VolumeBarBuilder extends EventEmitter {
             priceChanges: bar.priceChanges,
             avgTradeSize: bar.currentVolume / bar.transactions,
             startTime: bar.startTimestamp || new Date(bar.startTime).toISOString(),
-            endTime: bar.lastUpdateTimestamp || new Date(bar.lastUpdateTimestamp).toISOString(),
+            endTime: bar.lastUpdateTimestamp || new Date(bar.lastUpdateTime).toISOString(),
             durationMs: bar.lastUpdateTime - bar.startTime,
             durationSeconds: ((bar.lastUpdateTime - bar.startTime) / 1000).toFixed(1),
             priceChange: (bar.close - bar.open).toFixed(2),
@@ -396,15 +397,13 @@ class VolumeBarBuilder extends EventEmitter {
         bar.bars.push(completedBar);
         this.completedBars.push(completedBar);
         this.stats.totalBars++;
-        this.stats.barsByInstrument.set(instrumentKey, (this.stats.barsByInstrument.get(instrumentKey) || 0) + 1);
+        this.stats.barsByInstrument.set(mapKey, (this.stats.barsByInstrument.get(mapKey) || 0) + 1);
         
         this.saveBarToCSV(completedBar);
         this.saveActiveState();
         this.emit('bar_close', completedBar);
         
-        console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
-        console.log(`   Volume: ${bar.currentVolume.toLocaleString()} / ${bar.targetVolume.toLocaleString()} lots/shares`);
-        console.log(`   OHLC: ${bar.open.toFixed(2)} | ${bar.high.toFixed(2)} | ${bar.low.toFixed(2)} | ${bar.close.toFixed(2)}`);
+        console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber} (Threshold: ${bar.targetVolume})`);
         
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
@@ -417,7 +416,7 @@ class VolumeBarBuilder extends EventEmitter {
 
         if (strategyCandles.length >= 32) {
             try {
-                const tickSize = this.tickSizeMap.get(instrumentKey) || 0.05;
+                const tickSize = this.tickSizeMap.get(bar.instrument_key) || 0.05;
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
                 
                 for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
@@ -434,7 +433,7 @@ class VolumeBarBuilder extends EventEmitter {
                                 
                                 const signalEvent = {
                                     version: versionName, 
-                                    instrument: instrumentKey,
+                                    instrument: bar.instrument_key,
                                     name: bar.name,
                                     type: latestSignal.type,
                                     entry: latestSignal.triggerPrice,
@@ -444,7 +443,8 @@ class VolumeBarBuilder extends EventEmitter {
                                     reason: latestSignal.reason.replace('Conf:', 'Volume, Conf:'),
                                     timestamp: completedBar.timestamp,
                                     barNumber: bar.barNumber,
-                                    bar_type: 'volume'
+                                    bar_type: 'volume',
+                                    threshold: bar.targetVolume
                                 };
                                 this.emit('trade_signal', signalEvent);
                             }
@@ -456,8 +456,8 @@ class VolumeBarBuilder extends EventEmitter {
             }
         }
         
-        const nextBarNumber = this.stats.barsByInstrument.get(instrumentKey) + 1;
-        this.activeBars.set(instrumentKey, {
+        const nextBarNumber = this.stats.barsByInstrument.get(mapKey) + 1;
+        this.activeBars.set(mapKey, {
             instrument_key: bar.instrument_key,
             name: bar.name,
             targetVolume: bar.targetVolume,
@@ -480,7 +480,7 @@ class VolumeBarBuilder extends EventEmitter {
     }
     
     saveBarToCSV(bar) {
-        const safeKey = bar.instrument_key.replace(/[^a-zA-Z0-9]/g, '_');
+        const safeKey = `${bar.instrument_key}_${bar.targetVolume}`.replace(/[^a-zA-Z0-9]/g, '_');
         const filename = path.join(this.dataDir, `${safeKey}_volume_bars.csv`);
         
         const headers = [
@@ -513,16 +513,16 @@ class VolumeBarBuilder extends EventEmitter {
     }
     
     getProgress(instrumentKey) {
-        const bar = this.activeBars.get(instrumentKey);
-        if (!bar || bar.open === null) return null;
+        const matched = Array.from(this.activeBars.values()).find(b => b.instrument_key === instrumentKey);
+        if (!matched || matched.open === null) return null;
         
         return {
-            currentVolume: bar.currentVolume,
-            targetVolume: bar.targetVolume,
-            progress: ((bar.currentVolume / bar.targetVolume) * 100).toFixed(1) + '%',
-            currentPrice: bar.close,
-            transactions: bar.transactions,
-            priceChanges: bar.priceChanges
+            currentVolume: matched.currentVolume,
+            targetVolume: matched.targetVolume,
+            progress: ((matched.currentVolume / matched.targetVolume) * 100).toFixed(1) + '%',
+            currentPrice: matched.close,
+            transactions: matched.transactions,
+            priceChanges: matched.priceChanges
         };
     }
     
