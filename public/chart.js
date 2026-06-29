@@ -15,7 +15,7 @@ class MarketChart {
         this.initialDataLoaded = false;
         this.lastSubscription = null;
         
-        // FIX: Shared translation map to resolve time duplication crashes
+        // Shared translation map to resolve time duplication crashes
         this.timeMap = new Map();
         
         this.indicators = new ChartIndicators(this);
@@ -26,6 +26,12 @@ class MarketChart {
         this.init();
     }
 
+    // Standardizes all incoming keys to prevent underscore vs. pipe duplication
+    normalizeKey(key) {
+        if (!key) return '';
+        return key.replace(/_/g, '|');
+    }
+
     async init() {
         await this.loadHistoricalData();
         this.setupWebSocket();
@@ -34,9 +40,10 @@ class MarketChart {
     }
 
     setActiveInstrument(key) {
+        const normalizedKey = this.normalizeKey(key);
         const buttons = document.querySelectorAll('.instrument-btn');
         buttons.forEach(btn => {
-            if (btn.dataset.key === key) {
+            if (this.normalizeKey(btn.dataset.key) === normalizedKey) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
@@ -45,9 +52,10 @@ class MarketChart {
     }
     
     switchInstrument(key) {
-        console.log(`Switching to instrument: ${key}`);
-        this.currentInstrument = key;
-        this.setActiveInstrument(key);
+        const normalizedKey = this.normalizeKey(key);
+        console.log(`Switching to instrument: ${normalizedKey}`);
+        this.currentInstrument = normalizedKey;
+        this.setActiveInstrument(normalizedKey);
         this.initialDataLoaded = false;
         this.timeMap.clear(); // Flush key mappings on instrument swaps
         this.loadCandlesForCurrentInstrument();
@@ -78,7 +86,10 @@ class MarketChart {
         const cacheKey = `${this.currentType}_candles`;
         if (this[cacheKey]) {
             this.candles = this[cacheKey]
-                .filter(c => (c.instrument === this.currentInstrument || c.instrument_key === this.currentInstrument))
+                .filter(c => {
+                    const instKey = c.instrument || c.instrument_key;
+                    return this.currentInstrument === (instKey ? instKey.replace(/_/g, '|') : null);
+                })
                 .map(c => this.convertToChartCandle(c))
                 .filter(c => null !== c);
             this.candles.sort((a,b) => a.time - b.time);
@@ -107,7 +118,7 @@ class MarketChart {
             bottomValue = parseFloat(candleData.volume) || 0;
         }
 
-        // FIX: Construct a synthetic strictly increasing time to prevent duplicate epoch crashes
+        // Construct a synthetic strictly increasing time to prevent duplicate epoch crashes
         const syntheticTime = 1600000000 + (barNum * 60);
 
         // Store the real timestamp translation inside our map
@@ -118,7 +129,9 @@ class MarketChart {
             }
             const d = new Date(realTime);
             const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            this.instruments.set(`${this.currentInstrument}_${candleData.barNumber}`, timeStr);
+            
+            const normalizedKey = this.normalizeKey(this.currentInstrument);
+            this.instruments.set(`${normalizedKey}_${candleData.barNumber}`, timeStr);
             this.timeMap.set(syntheticTime, timeStr);
         }
         
@@ -139,11 +152,31 @@ class MarketChart {
     
     async loadHistoricalData() {
         try {
+            // 1. Fetch current active instruments directly from config.json via API
+            const instRes = await fetch('/api/instruments');
+            if (instRes.ok) {
+                const activeInstruments = await instRes.json();
+                activeInstruments.forEach(inst => {
+                    const normalizedKey = this.normalizeKey(inst.key);
+                    this.instruments.set(normalizedKey, {
+                        key: normalizedKey,
+                        name: inst.name,
+                        exchange: inst.exchange || normalizedKey.split('|')[0]
+                    });
+                });
+            }
+
+            // 2. Fetch volume candles
             const volumeRes = await fetch('/api/recent/volume?limit=500');
             if (volumeRes.ok) {
-                this.volume_candles = await volumeRes.json();
+                const recentVolume = await volumeRes.json();
+                this.volume_candles = recentVolume.map(c => {
+                    const normKey = this.normalizeKey(c.instrument || c.instrument_key);
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
+                
                 this.volume_candles.forEach(candle => {
-                    const instKey = candle.instrument || candle.instrument_key;
+                    const instKey = candle.instrument;
                     if (instKey && !this.instruments.has(instKey)) {
                         this.instruments.set(instKey, {
                             key: instKey,
@@ -154,11 +187,17 @@ class MarketChart {
                 });
             }
             
+            // 3. Fetch price candles
             const priceRes = await fetch('/api/recent/price?limit=500');
             if (priceRes.ok) {
-                this.price_candles = await priceRes.json();
+                const recentPrice = await priceRes.json();
+                this.price_candles = recentPrice.map(c => {
+                    const normKey = this.normalizeKey(c.instrument || c.instrument_key);
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
+
                 this.price_candles.forEach(candle => {
-                    const instKey = candle.instrument || candle.instrument_key;
+                    const instKey = candle.instrument;
                     if (instKey && !this.instruments.has(instKey)) {
                         this.instruments.set(instKey, {
                             key: instKey,
@@ -171,9 +210,9 @@ class MarketChart {
             
             this.renderInstrumentSelector();
             
-            const firstInstrument = this.instruments.values().next().value;
-            if (firstInstrument) {
-                this.currentInstrument = firstInstrument.key;
+            // Use active instruments to set current selection
+            if (this.currentInstrument === null && this.instruments.size > 0) {
+                this.currentInstrument = this.instruments.keys().next().value;
                 this.setActiveInstrument(this.currentInstrument);
                 this.loadCandlesForCurrentInstrument();
                 this.updateBottomChartLabel();
@@ -184,12 +223,14 @@ class MarketChart {
     }
     
     getInstrumentName(key) {
+        const normalizedKey = this.normalizeKey(key);
         const names = {
-            'MCX_FO|504265': 'Natural Gas Future',
+            'MCX_FO|538685': 'Natural Gas Future',
+            'MCX_FO|520702': 'Crude Oil Future',
             'NSE_FO|62329': 'Nifty 50 Future',
             'NSE_FO|62326': 'Nifty Bank Future'
         };
-        return names[key] || key.split('|')[1];
+        return names[normalizedKey] || normalizedKey.split('|')[1];
     }
     
     renderInstrumentSelector() {
@@ -201,6 +242,7 @@ class MarketChart {
         }
         let html = '';
         for (const [key, inst] of this.instruments) {
+            // Standardize output name display
             html += `<button class="instrument-btn" data-key="${key}">${inst.name || key.split('|')[1]}</button>`;
         }
         container.innerHTML = html;
@@ -223,16 +265,16 @@ class MarketChart {
         
         this.socket.on('historical_candles', (data) => {
             if (data.volume_bars) {
-                this.volume_candles = data.volume_bars.map(c => ({
-                    ...c,
-                    instrument: c.instrument || c.instrument_key
-                }));
+                this.volume_candles = data.volume_bars.map(c => {
+                    const normKey = this.normalizeKey(c.instrument || c.instrument_key);
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
             }
             if (data.price_bars) {
-                this.price_candles = data.price_bars.map(c => ({
-                    ...c,
-                    instrument: c.instrument || c.instrument_key
-                }));
+                this.price_candles = data.price_bars.map(c => {
+                    const normKey = this.normalizeKey(c.instrument || c.instrument_key);
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
 
@@ -240,41 +282,60 @@ class MarketChart {
                 this.tracker.setupStrategyVersions(data.strategies);
             }
 
+            // Normalizes historical trade logs on WebSocket handshake
             if (data.trade_signals) {
-                this.tracker.renderSignals(data.trade_signals);
+                const normalizedSignals = data.trade_signals.map(sig => ({
+                    ...sig,
+                    instrument: this.normalizeKey(sig.instrument)
+                }));
+                this.tracker.renderSignals(normalizedSignals);
             }
         });
         
         this.socket.on('live_candle_update', (liveCandle) => {
-            const normalizedCandle = {
-                ...liveCandle,
-                instrument: liveCandle.instrument || liveCandle.instrument_key
-            };
-            const candleInst = normalizedCandle.instrument;
-            if (candleInst === this.currentInstrument && liveCandle.type === this.currentType) {
+            const normalizedKey = this.normalizeKey(liveCandle.instrument || liveCandle.instrument_key);
+            const currentKey = this.normalizeKey(this.currentInstrument);
+            
+            if (normalizedKey === currentKey && liveCandle.type === this.currentType) {
+                const normalizedCandle = {
+                    ...liveCandle,
+                    instrument: normalizedKey,
+                    instrument_key: normalizedKey
+                };
                 this.updateLiveCandle(normalizedCandle);
                 this.updateProgressBar(normalizedCandle);
             }
         });
         
         this.socket.on('candle_update', (candle) => {
-            const normalizedCandle = {
-                ...candle,
-                instrument: candle.instrument || candle.instrument_key
-            };
-            const candleInst = normalizedCandle.instrument;
-            if (candleInst === this.currentInstrument && candle.type === this.currentType && !candle.is_live) {
+            const normalizedKey = this.normalizeKey(candle.instrument || candle.instrument_key);
+            const currentKey = this.normalizeKey(this.currentInstrument);
+            
+            if (normalizedKey === currentKey && candle.type === this.currentType && !candle.is_live) {
+                const normalizedCandle = {
+                    ...candle,
+                    instrument: normalizedKey,
+                    instrument_key: normalizedKey
+                };
                 const newCandle = this.convertToChartCandle(normalizedCandle);
                 if (newCandle) this.addCompletedCandle(newCandle);
             }
         });
 
         this.socket.on('trade_signal', (signal) => {
-            this.tracker.handleIncomingSignal(signal);
+            const normalizedSignal = {
+                ...signal,
+                instrument: this.normalizeKey(signal.instrument)
+            };
+            this.tracker.handleIncomingSignal(normalizedSignal);
         });
 
         this.socket.on('trade_status_update', (update) => {
-            this.tracker.handleStatusUpdate(update);
+            const normalizedUpdate = {
+                ...update,
+                instrument: this.normalizeKey(update.instrument)
+            };
+            this.tracker.handleStatusUpdate(normalizedUpdate);
         });
         
         this.socket.on('disconnect', () => {
@@ -298,7 +359,6 @@ class MarketChart {
             timeScale: {
                 timeVisible: true,
                 secondsVisible: true,
-                // FIX: Translates synthetic time codes back to real-world timestamps inside x-axis formatter
                 tickMarkFormatter: (time) => {
                     if (this.timeMap && this.timeMap.has(time)) {
                         return this.timeMap.get(time);
@@ -344,7 +404,6 @@ class MarketChart {
         this.addBottomPaneLabel();
         this.addSmaToggleButtons();   
         
-        // FIX: Retain SMA Toggle buttons but dynamically remove SMA9, SMA21, EMA20 text legends
         if (this.indicators.sma9Series) this.indicators.sma9Series.applyOptions({ title: '' });
         if (this.indicators.sma21Series) this.indicators.sma21Series.applyOptions({ title: '' });
         if (this.indicators.ema20Series) this.indicators.ema20Series.applyOptions({ title: '' });
@@ -471,7 +530,6 @@ class MarketChart {
 
         if (!this.isInitialized) return;
 
-        // FIX: Strict chronological time guard to prevent out-of-order crashes
         const lastIdx = this.candles.length - 1;
         if (lastIdx >= 0) {
             const lastCandle = this.candles[lastIdx];
@@ -483,7 +541,6 @@ class MarketChart {
                     this.candles.shift();
                 }
             } else {
-                // Ignore descending time indices to prevent chart breaks
                 return;
             }
         } else {
@@ -548,7 +605,6 @@ class MarketChart {
         } else {
             const last = this.candles[this.candles.length - 1];
             if (last && candle.time <= last.time) {
-                // FIX: Ensure ascending chronology to prevent Lightweight-Charts crash exceptions
                 candle.time = last.time + 1;
             }
             this.candles.push(candle);
@@ -603,8 +659,6 @@ class MarketChart {
         });
     }
 
-    // FIX: Progress Bar container created as a structural sibling directly after the chart container, 
-    // completely preventing it from overlapping the time x-axis labels.
     updateProgressBar(candle) {
         const chartContainer = document.getElementById('main-chart');
         if (!chartContainer) return;
