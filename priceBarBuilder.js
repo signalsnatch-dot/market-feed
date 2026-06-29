@@ -156,7 +156,14 @@ class PriceBarBuilder extends EventEmitter {
                         state.activeBars.forEach(([key, activeState]) => {
                             const existingBar = this.activeBars.get(key);
                             if (existingBar) {
+                                // 1. Save the freshly loaded config-derived targetTicks
+                                const freshTargetTicks = existingBar.targetTicks;
+                                
+                                // 2. Restore the active progress parameters
                                 Object.assign(existingBar, activeState);
+                                
+                                // 3. Force re-align to the updated configuration threshold
+                                existingBar.targetTicks = freshTargetTicks;
                             }
                         });
                     }
