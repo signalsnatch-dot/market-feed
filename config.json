@@ -22,7 +22,7 @@
             "key": "MCX_FO|520702",
             "name": "Crude Oil June Future",
             "priceBarTicks": 10,
-            "volumePerBar": 2000,
+            "volumePerBar": 50,
             "tickSize": 1,
             "exchange": "MCX_FO",
             "emaTouchRatio": 0.2,
@@ -34,7 +34,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.15,
-            "notes": "Optimized to 2,000 based on June 18 volume profile."
+            "notes": "Optimized to 50 based on maximum win rate (100.00%) and consistent average return profile (+1.500%)."
         },
         {
             "key": "MCX_FO|464150",
@@ -166,7 +166,7 @@
             "key": "MCX_FO|466583",
             "name": "Gold June Future",
             "priceBarTicks": 40,
-            "volumePerBar": 5461,
+            "volumePerBar": 15,
             "tickSize": 1,
             "exchange": "MCX_FO",
             "emaTouchRatio": 0.12,
@@ -178,7 +178,7 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Lowered to 25 to lift June 18-23 candle counts into target parameters."
+            "notes": "Optimized to 15 based on the highest win rate (100.00% Cumulative Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "MCX_FO|510764",
@@ -220,7 +220,7 @@
             "key": "NSE_FO|62329",
             "name": "Nifty 50 Future",
             "priceBarTicks": 80,
-            "volumePerBar": 41505,
+            "volumePerBar": 2800,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
             "emaTouchRatio": 0.1,
@@ -232,13 +232,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Calibrated to 22,000 to maintain exceptional stability between 89 and 126 candles."
+            "notes": "Updated to 2,800 based on optimal win rate (92.86% Cumulative Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_FO|62326",
             "name": "Nifty Bank Future",
             "priceBarTicks": 150,
-            "volumePerBar": 7943,
+            "volumePerBar": 2800,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
             "emaTouchRatio": 0.12,
@@ -250,7 +250,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Calibrated to 11,000 to hold consistent targets near 95-106 candles."
+            "notes": "Updated to 2,800 based on optimal win rate (92.86% Cumulative Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_FO|62327",
@@ -274,7 +274,7 @@
             "key": "NSE_FO|62328",
             "name": "Midcap Nifty Future",
             "priceBarTicks": 50,
-            "volumePerBar": 4685,
+            "volumePerBar": 200,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
             "emaTouchRatio": 0.1,
@@ -286,13 +286,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Set to 22,000 to keep the most active sessions near 120 candles."
+            "notes": "Set to 200 to maximize potential win rate and system consistency."
         },
         {
             "key": "NSE_EQ|INE002A01018",
             "name": "Reliance",
             "priceBarTicks": 29,
-            "volumePerBar": 15160,
+            "volumePerBar": 2100,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -304,13 +304,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Optimized to 13,000 to align daily prints between 80 and 130."
+            "notes": "Updated to 2,100 based on top performance metrics (72.36% Cumulative Win Rate, +101.35% Cumulative Return, and several versions with 100.00% Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE040A01034",
             "name": "HDFC Bank",
             "priceBarTicks": 16,
-            "volumePerBar": 34649,
+            "volumePerBar": 19500,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -322,13 +322,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Increased to 30,000 to flatten out a high daily volume rise."
+            "notes": "Updated to 19500 to yield exceptional performance (95.88% Cumulative Win Rate, +132.78% Cumulative Total Return, and multiple versions with 100.00% Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE090A01021",
             "name": "ICICI Bank",
             "priceBarTicks": 12,
-            "volumePerBar": 12845,
+            "volumePerBar": 11500,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -340,13 +340,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Shifted to 13,000 to anchor peak sessions close to 130-150."
+            "notes": "Updated to 11,500 based on solid win rates (73.58% Cumulative Win Rate and versions V15/V20 achieving +1.531% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE062A01020",
             "name": "SBI",
             "priceBarTicks": 12,
-            "volumePerBar": 10592,
+            "volumePerBar": 1250,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -358,13 +358,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Adjusted to 12,000 to steady extreme volume on June 25."
+            "notes": "Updated to 1,250 based on exceptional risk parameters (96.00% Cumulative Win Rate and versions showing +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE467B01029",
             "name": "TCS",
             "priceBarTicks": 38,
-            "volumePerBar": 4887,
+            "volumePerBar": 7000,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.12,
@@ -376,13 +376,13 @@
             "stopOffsetRatioV2": 0.25,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Adjusted to 7,500 to yield very consistent counts (77 to 121)."
+            "notes": "Updated to 7,000 based on top performance metrics (55.91% Cumulative Win Rate, +41.25% Cumulative Total Return, and multiple versions with 100.00% Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE009A01021",
             "name": "Infosys",
-            "priceBarTicks": 15,
-            "volumePerBar": 15254,
+            "priceBarTicks": 0.05,
+            "volumePerBar": 3600,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -394,13 +394,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Optimized to 15,000 to reduce daily counts from ~1,500 down to the target 70–131 range."
+            "notes": "Updated to 3,600 based on optimal win rate (67.35% Cumulative Win Rate and version V37 achieving +1.602% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE154A01025",
             "name": "ITC",
             "priceBarTicks": 12,
-            "volumePerBar": 10827,
+            "volumePerBar": 1800,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -412,13 +412,13 @@
             "stopOffsetRatioV2": 0.25,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Lowered to 4,000 to extract balanced patterns from low aggregate volume."
+            "notes": "Updated to 1,800 based on solid win rates (66.67% Cumulative Win Rate and versions V4/V12/V13/V14/V27/V29/V34/V35/V36/V41/V43 achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE397D01024",
             "name": "Bharti Airtel",
             "priceBarTicks": 14,
-            "volumePerBar": 7144,
+            "volumePerBar": 3300,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -430,13 +430,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Set to 8,500 to compress daily candle prints near 81–107."
+            "notes": "Updated to 3,300 based on optimal win rate (74.07% Cumulative Win Rate and versions achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE238A01034",
             "name": "Axis Bank",
             "priceBarTicks": 12,
-            "volumePerBar": 6359,
+            "volumePerBar": 480,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -448,13 +448,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Updated to 7,500 to yield balanced daily candle ranges."
+            "notes": "Updated to 480 based on top performance metrics (68.07% Cumulative Win Rate, +119.19% Cumulative Return, and versions V12/V16/V17/V18/V19/V27/V29 achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE018A01030",
             "name": "L&T",
             "priceBarTicks": 35,
-            "volumePerBar": 2173,
+            "volumePerBar": 5600,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -466,13 +466,13 @@
             "stopOffsetRatioV2": 0.25,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Calibrated to 3,000 to keep high volume days around 130-145."
+            "notes": "Updated to 5,600 based on top performance metrics (71.43% Cumulative Win Rate, +43.54% Cumulative Return, and versions achieving up to +1.535% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE081A01020",
             "name": "Tata Steel",
             "priceBarTicks": 12,
-            "volumePerBar": 29945,
+            "volumePerBar": 1800,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.12,
@@ -484,13 +484,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Increased to 25,000 to compress high aggregate volume peaks."
+            "notes": "Updated to 1,800 based on consistent performance parameters (50.00% Cumulative Win Rate, +25.22% Cumulative Total Return, and multiple versions achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE155A01022",
             "name": "Tata Motors",
             "priceBarTicks": 12,
-            "volumePerBar": 17159,
+            "volumePerBar": 2800,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -502,13 +502,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Calibrated to 13,000 to align daily prints close to 97-156."
+            "notes": "Updated to 2,800 based on optimal win rate (92.86% Cumulative Win Rate and versions achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE296A01032",
             "name": "Bajaj Finance",
             "priceBarTicks": 71,
-            "volumePerBar": 9399,
+            "volumePerBar": 2100,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.12,
@@ -520,13 +520,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Updated to 11,000 to keep daily outputs consistently near 90–137."
+            "notes": "Updated to 2,100 based on top performance metrics (72.36% Cumulative Win Rate, +101.35% Cumulative Return, and several versions with 100.00% Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE237A01036",
             "name": "Kotak Bank",
             "priceBarTicks": 18,
-            "volumePerBar": 900,
+            "volumePerBar": 45,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -538,13 +538,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Retained baseline configuration (no log coverage)."
+            "notes": "Updated to 45 based on consistent win rates (65.91% Cumulative Win Rate and versions V1/V2/V3/V4/V6/V8/V12/V14/V15/V34/V36/V37 achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE044A01036",
             "name": "Sun Pharma",
             "priceBarTicks": 15,
-            "volumePerBar": 1838,
+            "volumePerBar": 1250,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -556,13 +556,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Shifted to 2,500 to capture clean pattern counts."
+            "notes": "Updated to 1,250 based on exceptional risk parameters (96.00% Cumulative Win Rate and versions showing +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE019A01038",
             "name": "JSW Steel",
             "priceBarTicks": 12,
-            "volumePerBar": 1355,
+            "volumePerBar": 1100,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -574,13 +574,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Adjusted to 2,200 to keep high volume days around 100-180."
+            "notes": "Updated to 1,100 based on top performance metrics (95.00% Cumulative Win Rate, +54.52% Cumulative Return, and multiple versions with 100.00% Win Rate and +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE522F01014",
             "name": "Coal India",
             "priceBarTicks": 12,
-            "volumePerBar": 6629,
+            "volumePerBar": 840,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.11,
@@ -592,13 +592,13 @@
             "stopOffsetRatioV2": 0.25,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Optimized to 5,500 to yield very consistent results."
+            "notes": "Updated to 840 based on top performance metrics (74.81% Cumulative Win Rate, +118.87% Cumulative Return, and versions V20/V42 achieving up to +1.905% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE423A01024",
             "name": "Adani Enterprises",
             "priceBarTicks": 32,
-            "volumePerBar": 1958,
+            "volumePerBar": 420,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -610,13 +610,13 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Adjusted to 4,000 to keep daily prints steadily between 75 and 128."
+            "notes": "Updated to 420 based on optimal win rate (81.63% Cumulative Win Rate and versions achieving +1.575% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE742F01042",
             "name": "Adani Ports",
             "priceBarTicks": 14,
-            "volumePerBar": 2351,
+            "volumePerBar": 3220,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.12,
@@ -628,13 +628,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Calibrated to 3,000 to balance peak volume sessions."
+            "notes": "Updated to 3,220 based on optimal win rate (85.00% Cumulative Win Rate and versions achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE038A01020",
             "name": "Hindalco",
             "priceBarTicks": 12,
-            "volumePerBar": 8074,
+            "volumePerBar": 4410,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.15,
@@ -646,13 +646,13 @@
             "stopOffsetRatioV2": 0.3,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "Optimized to 6,000 to manage a sharp volume expansion."
+            "notes": "Updated to 4,410 based on optimal win rate (79.79% Cumulative Win Rate and versions achieving +1.500% Average Return per Trade)."
         },
         {
             "key": "NSE_EQ|INE437A01024",
             "name": "Apollo Hospitals",
             "priceBarTicks": 62,
-            "volumePerBar": 296,
+            "volumePerBar": 162,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
             "emaTouchRatio": 0.1,
@@ -664,11 +664,11 @@
             "stopOffsetRatioV2": 0.25,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "Calibrated to 600 to pull lower volume days into targets."
+            "notes": "Updated to 162 based on optimal win rate (84.21% Cumulative Win Rate and versions achieving +1.555% Average Return per Trade)."
         }
     ],
     "directories": {
         "rawDataDir": "./raw_ticks_data",
-        "candlesDataDir": "./candles_data"
+        "candlesDir": "./candles_data"
     }
 }
