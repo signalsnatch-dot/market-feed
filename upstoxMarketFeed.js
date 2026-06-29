@@ -406,12 +406,12 @@ class UpstoxMarketFeed {
         
         const modeMap = {
             'ltpc': 'ltpc',
-            'full': 'full_d5',
+            'full': 'full',
             'full_d30': 'full_d30',
             'option_greeks': 'option_greeks'
         };
         
-        const requestMode = modeMap[this.mode] || 'full_d5';
+        const requestMode = modeMap[this.mode] || 'full';
         
         const subscribeMsg = {
             guid: crypto.randomBytes(8).toString('hex'),
