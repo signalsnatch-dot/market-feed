@@ -4,9 +4,9 @@ const path = require('path');
 const axios = require('axios');
 require('dotenv').config();
 
-const CONFIG_FILE = './config.json'; // The first configuration file for live trading
+const CONFIG_FILE = './config.json';
 
-// MCX lot size multiplier map
+// MCX lot size multiplier map (retained as metadata/utilities)
 const MCX_LOT_MULTIPLIER_MAP = {
     '538685': 1250, // Natural Gas
     '520702': 100,  // Crude Oil
@@ -26,19 +26,14 @@ const MCX_LOT_MULTIPLIER_MAP = {
 // Segment-aware feed divisor
 function getDivisor(instrumentKey) {
     if (!instrumentKey) return 100;
-    
-    // NSE Equities require a 1000 divisor to scale down 10x and match the real-time tick feed
     if (instrumentKey.includes('NSE_EQ')) {
         return 1000;
     }
-    
-    // Index futures and commodities are processed closer to 100% efficiency on retail feeds
     return 100; 
 }
 
 function getLotMultiplier(instrumentKey) {
     if (!instrumentKey) return 1;
-    
     if (instrumentKey.includes('MCX_FO')) {
         const id = instrumentKey.split('|')[1];
         if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
@@ -74,7 +69,7 @@ async function getAccessToken() {
 async function fetchDailyCandles(instrumentKey, accessToken) {
     const toDate = new Date().toISOString().split('T')[0];
     const fromDateObj = new Date();
-    fromDateObj.setDate(fromDateObj.getDate() - 45); // Fetching 45 days is plenty for a 10-day trading average
+    fromDateObj.setDate(fromDateObj.getDate() - 45);
     const fromDate = fromDateObj.toISOString().split('T')[0];
 
     const encodedKey = encodeURIComponent(instrumentKey);
@@ -131,22 +126,17 @@ async function main() {
                 continue;
             }
 
-            // Upstox EOD is returned reverse-chronological (newest first). 
-            // We slice the first 10 candles representing the most recent 10 trading days.
             const last10Candles = candlesRaw.slice(0, 10);
-            
-            const multiplier = getLotMultiplier(inst.key);
             const divisor = getDivisor(inst.key);
             
             const sumVolumeLots = last10Candles.reduce((acc, c) => acc + (Number(c[5]) || 0), 0);
             const avgVolumeLots = sumVolumeLots / last10Candles.length;
-            const avgVolumeUnits = avgVolumeLots * multiplier;
 
-            // Compute dynamic 10-day rolling average target threshold
-            const targetVolumePerBar = Math.round(avgVolumeUnits / divisor);
+            // Compute dynamic 10-day rolling average target threshold (represented in lots, or shares for NSE EQ)
+            const targetVolumePerBar = Math.max(1, Math.round(avgVolumeLots / divisor));
 
-            console.log(`   -> Calculated 10-day average volume (lots): ${Math.round(avgVolumeLots).toLocaleString()}`);
-            console.log(`   -> Lot multiplier: ${multiplier} | Segment divisor: ${divisor}`);
+            console.log(`   -> Calculated 10-day average volume (lots/shares): ${Math.round(avgVolumeLots).toLocaleString()}`);
+            console.log(`   -> Segment divisor: ${divisor}`);
             console.log(`   -> Previous volumePerBar: ${inst.volumePerBar.toLocaleString()}`);
             console.log(`   -> New volumePerBar: ${targetVolumePerBar.toLocaleString()}`);
 

@@ -3,9 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES, runPriceActionBacktest, DEFAULT_PARAMS } = require('./priceActionStrategy');
 
+const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
+
 class StrategyBacktester {
     constructor(config) {
-        this.dataDir = config.dataDir || './candles_data';
+        this.dataDir = config?.dataDir || './candles_data';
         this.versionResultsDir = './version-backtest-results';
         this.resultsDir = './backtest_results';
         
@@ -16,7 +18,8 @@ class StrategyBacktester {
             fs.mkdirSync(this.versionResultsDir, { recursive: true });
         }
 
-        // FIX: Enroll all 5 parallel versions of twoLeggedPullback dynamically into strategies
+        // Merge class field strategies and dynamically enroll price action versions
+        this.strategies = { ...this.strategies };
         if (STRATEGIES) {
             delete this.strategies.twoLeggedPullback; // Remove generic placeholder
             for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
@@ -157,10 +160,7 @@ class StrategyBacktester {
             };
 
             // Calculate aggregations specifically for price action strategies
-            if (strategyName.startsWith("V1") || strategyName.startsWith("V2") || 
-                strategyName.startsWith("V3") || strategyName.startsWith("V4") || 
-                strategyName.startsWith("V5")) {
-                
+            if (strategyName.startsWith("V")) {
                 totalWinRate += parseFloat(results.winRate) || 0;
                 totalReturn += parseFloat(results.totalReturn) || 0;
                 totalRRR += parseFloat(results.avgRRR) || 1.50;
@@ -168,7 +168,7 @@ class StrategyBacktester {
             }
         }
         
-        // FIX: Compute aggregated metrics for each instrument/version file
+        // Compute aggregated metrics for each instrument/version file
         const averages = {
             avgWinRate: pActionStratCount > 0 ? parseFloat((totalWinRate / pActionStratCount).toFixed(2)) : 0,
             avgReturnPct: pActionStratCount > 0 ? parseFloat((totalReturn / pActionStratCount).toFixed(2)) : 0,
@@ -185,7 +185,7 @@ class StrategyBacktester {
             sourceFile: meta.baseName,
             candlesCount: candles.length,
             strategies: resultsByStrategy,
-            averages: averages, // Appended metrics
+            averages: averages, 
             timestamp: Date.now()
         }, null, 2));
         
@@ -474,7 +474,7 @@ class StrategyBacktester {
             if (drawdown > maxDrawdown) maxDrawdown = drawdown;
         }
 
-        // FIX: Structural RRR extraction algorithm
+        // Structural RRR extraction algorithm
         let totalRRR = 0;
         let rrrCount = 0;
         for (const trade of trades) {
@@ -515,7 +515,7 @@ class StrategyBacktester {
             avgConfidence,
             stopExits,
             targetExits,
-            avgRRR, // Appended field
+            avgRRR, 
             trades: trades
         };
     }

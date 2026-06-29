@@ -1,3 +1,4 @@
+// candleBuilderOffline.js
 const fs = require('fs');
 const path = require('path');
 
@@ -5,6 +6,34 @@ const path = require('path');
 const INPUT_DIR = './extracted';
 const OUTPUT_DIR = './candles';
 const CONFIG_FILE = './build-version-config.json';
+
+// MCX F&O lot-size multiplier map
+const MCX_LOT_MULTIPLIER_MAP = {
+    '538685': 1250, // Natural Gas
+    '520702': 100,  // Crude Oil
+    '464150': 30,   // Silver Standard
+    '464151': 5,    // Silver Mini
+    '477177': 1,    // Silver Micro
+    '552708': 2500, // Copper
+    '552711': 5000, // Zinc
+    '552709': 5000, // Lead
+    '552706': 5000, // Aluminium
+    '466583': 100,  // Gold Standard
+    '510764': 10,   // Gold Mini
+    '510464': 1,    // Gold Petal
+    '565898': 50,   // Bulldex
+};
+
+function getLotMultiplier(instrumentKey) {
+    if (!instrumentKey) return 1;
+    if (instrumentKey.includes('MCX_FO')) {
+        const id = instrumentKey.split('|')[1];
+        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
+            return MCX_LOT_MULTIPLIER_MAP[id];
+        }
+    }
+    return 1;
+}
 
 // Parse command line arguments for candle mode
 const args = process.argv.slice(2);
@@ -83,19 +112,18 @@ function readTicksFromFile(filePath) {
     let lastVolToday = null;
 
     for (const t of rawTicks) {
-        let volume = t.last_traded_quantity; // Default fallback for old files
+        const lotMultiplier = getLotMultiplier(t.instrument_key);
+        let volume = (t.last_traded_quantity || 0) / lotMultiplier; // Convert fallback LTQ unit quantity to lots
 
         if (t.volume_today !== null && !isNaN(t.volume_today) && t.volume_today > 0) {
             if (lastVolToday !== null) {
                 if (t.volume_today >= lastVolToday) {
-                    volume = t.volume_today - lastVolToday;
+                    volume = t.volume_today - lastVolToday; // Delta of volume_today is already in lots
                 } else {
-                    // Rollover fallback
-                    volume = t.last_traded_quantity;
+                    volume = (t.last_traded_quantity || 0) / lotMultiplier;
                 }
             } else {
-                // Initialize the baseline on first tick to prevent a massive volume spike
-                volume = t.last_traded_quantity;
+                volume = (t.last_traded_quantity || 0) / lotMultiplier;
             }
             lastVolToday = t.volume_today;
         }

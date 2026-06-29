@@ -4,6 +4,33 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
+const MCX_LOT_MULTIPLIER_MAP = {
+    '538685': 1250, // Natural Gas
+    '520702': 100,  // Crude Oil
+    '464150': 30,   // Silver Standard
+    '464151': 5,    // Silver Mini
+    '477177': 1,    // Silver Micro
+    '552708': 2500, // Copper
+    '552711': 5000, // Zinc
+    '552709': 5000, // Lead
+    '552706': 5000, // Aluminium
+    '466583': 100,  // Gold Standard
+    '510764': 10,   // Gold Mini
+    '510464': 1,    // Gold Petal
+    '565898': 50,   // Bulldex
+};
+
+function getLotMultiplier(instrumentKey) {
+    if (!instrumentKey) return 1;
+    if (instrumentKey.includes('MCX_FO')) {
+        const id = instrumentKey.split('|')[1];
+        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
+            return MCX_LOT_MULTIPLIER_MAP[id];
+        }
+    }
+    return 1;
+}
+
 class PriceBarBuilder extends EventEmitter {
     constructor(config) {
         super();
@@ -59,8 +86,8 @@ class PriceBarBuilder extends EventEmitter {
             this.stats.barsByInstrument.set(instrument.key, 0);
             this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
             
-            console.log(`📊 [PRICE BAR] ${instrument.name}:`);
-            console.log(`   Target: ${instrument.priceBarTicks || 500} price changes per bar`);
+            console.log("📊 [PRICE BAR] " + instrument.name + ":");
+            console.log("   Target: " + (instrument.priceBarTicks || 500) + " price changes per bar");
         }
     }
 
@@ -189,22 +216,23 @@ class PriceBarBuilder extends EventEmitter {
         
         let tickVolume = 0;
         const currentVolToday = parseInt(volume_today, 10);
+        const lotMultiplier = getLotMultiplier(instrument_key);
 
         if (!isNaN(currentVolToday) && currentVolToday > 0) {
             const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
             
             if (prevVolToday !== undefined && prevVolToday !== null) {
                 if (currentVolToday >= prevVolToday) {
-                    tickVolume = currentVolToday - prevVolToday;
+                    tickVolume = currentVolToday - prevVolToday; // Delta of volume_today is already in lots
                 } else {
-                    tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier; // Convert fallback LTQ units to lots
                 }
             } else {
-                tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
             }
             this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
         } else {
-            tickVolume = parseInt(last_traded_quantity, 10) || 0;
+            tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
         }
 
         let exchangeTimeMs = Number(exchange_timestamp);
@@ -427,7 +455,6 @@ class PriceBarBuilder extends EventEmitter {
         const safeKey = tickData.instrument_key.replace(/[^a-zA-Z0-9]/g, '_');
         const filename = path.join(this.rawDataDir, `${safeKey}_raw_ticks_${today}.csv`);
         
-        // Added 'volume_today' to track accurate real-time volume in raw tick traces
         const headers = [
            'receive_timestamp', 'receive_time_iso',
            'exchange_timestamp', 'exchange_time_iso',
@@ -451,7 +478,7 @@ class PriceBarBuilder extends EventEmitter {
             tickData.instrument_key,
             tickData.ltp,
             tickData.last_traded_quantity || 0,
-            tickData.volume_today || 0 // Log cumulative volume today (vtt)
+            tickData.volume_today || 0 
         ].join(',');
         
         writeStream.write(row + '\n');

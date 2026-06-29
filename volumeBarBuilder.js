@@ -4,6 +4,33 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
+const MCX_LOT_MULTIPLIER_MAP = {
+    '538685': 1250, // Natural Gas
+    '520702': 100,  // Crude Oil
+    '464150': 30,   // Silver Standard
+    '464151': 5,    // Silver Mini
+    '477177': 1,    // Silver Micro
+    '552708': 2500, // Copper
+    '552711': 5000, // Zinc
+    '552709': 5000, // Lead
+    '552706': 5000, // Aluminium
+    '466583': 100,  // Gold Standard
+    '510764': 10,   // Gold Mini
+    '510464': 1,    // Gold Petal
+    '565898': 50,   // Bulldex
+};
+
+function getLotMultiplier(instrumentKey) {
+    if (!instrumentKey) return 1;
+    if (instrumentKey.includes('MCX_FO')) {
+        const id = instrumentKey.split('|')[1];
+        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
+            return MCX_LOT_MULTIPLIER_MAP[id];
+        }
+    }
+    return 1;
+}
+
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {
         super();
@@ -60,7 +87,7 @@ class VolumeBarBuilder extends EventEmitter {
             this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
             
             console.log(`📊 [VOLUME BAR] ${instrument.name}:`);
-            console.log(`   Target: ${instrument.volumePerBar.toLocaleString()} units per bar`);
+            console.log(`   Target: ${instrument.volumePerBar.toLocaleString()} lots/shares per bar`);
         }
     }
 
@@ -188,22 +215,23 @@ class VolumeBarBuilder extends EventEmitter {
         
         let tickVolume = 0;
         const currentVolToday = parseInt(volume_today, 10);
+        const lotMultiplier = getLotMultiplier(instrument_key);
 
         if (!isNaN(currentVolToday) && currentVolToday > 0) {
             const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
             
             if (prevVolToday !== undefined && prevVolToday !== null) {
                 if (currentVolToday >= prevVolToday) {
-                    tickVolume = currentVolToday - prevVolToday;
+                    tickVolume = currentVolToday - prevVolToday; // Delta of volume_today is already in lots
                 } else {
-                    tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier; // Convert fallback LTQ units to lots
                 }
             } else {
-                tickVolume = parseInt(last_traded_quantity, 10) || 0;
+                tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
             }
             this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
         } else {
-            tickVolume = parseInt(last_traded_quantity, 10) || 0;
+            tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
         }
 
         if (tickVolume <= 0) return;
@@ -246,7 +274,7 @@ class VolumeBarBuilder extends EventEmitter {
                 console.log(`\n🕯️ [VOLUME BAR] New continuous bar #${bar.barNumber} for ${bar.name}`);
                 console.log(`   Starting price: ${price}`);
                 console.log(`   Start time (exchange): ${bar.startTimestamp}`);
-                console.log(`   Target volume: ${bar.targetVolume.toLocaleString()} units\n`);
+                console.log(`   Target volume: ${bar.targetVolume.toLocaleString()} lots/shares\n`);
             }
 
             const needed = bar.targetVolume - bar.currentVolume;
@@ -354,7 +382,7 @@ class VolumeBarBuilder extends EventEmitter {
             priceChanges: bar.priceChanges,
             avgTradeSize: bar.currentVolume / bar.transactions,
             startTime: bar.startTimestamp || new Date(bar.startTime).toISOString(),
-            endTime: bar.lastUpdateTimestamp || new Date(bar.lastUpdateTime).toISOString(),
+            endTime: bar.lastUpdateTimestamp || new Date(bar.lastUpdateTimestamp).toISOString(),
             durationMs: bar.lastUpdateTime - bar.startTime,
             durationSeconds: ((bar.lastUpdateTime - bar.startTime) / 1000).toFixed(1),
             priceChange: (bar.close - bar.open).toFixed(2),
@@ -375,7 +403,7 @@ class VolumeBarBuilder extends EventEmitter {
         this.emit('bar_close', completedBar);
         
         console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber}`);
-        console.log(`   Volume: ${bar.currentVolume.toLocaleString()} / ${bar.targetVolume.toLocaleString()} units`);
+        console.log(`   Volume: ${bar.currentVolume.toLocaleString()} / ${bar.targetVolume.toLocaleString()} lots/shares`);
         console.log(`   OHLC: ${bar.open.toFixed(2)} | ${bar.high.toFixed(2)} | ${bar.low.toFixed(2)} | ${bar.close.toFixed(2)}`);
         
         const strategyCandles = bar.bars.map(b => ({

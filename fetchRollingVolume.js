@@ -148,9 +148,8 @@ async function main() {
                 continue;
             }
 
-            const multiplier = getLotMultiplier(inst.instrument_key);
             const divisor = getDivisor(inst.instrument_key);
-            console.log(`   -> Parameters applied: Multiplier = ${multiplier}, Divisor = ${divisor}`);
+            console.log(`   -> Parameters applied: Divisor = ${divisor}`);
 
             const candles = [...candlesRaw].reverse();
             const rollingThresholds = {};
@@ -165,10 +164,9 @@ async function main() {
                 const sumVolumeLots = preceding10.reduce((acc, c) => acc + (Number(c[5]) || 0), 0);
                 
                 const avgVolumeLots = sumVolumeLots / 10;
-                const avgVolumeUnits = avgVolumeLots * multiplier;
 
-                // Segment-adjusted threshold
-                rollingThresholds[dateKey] = Math.round(avgVolumeUnits / divisor);
+                // Segment-adjusted threshold (stored as lots, or units for equity)
+                rollingThresholds[dateKey] = Math.max(1, Math.round(avgVolumeLots / divisor));
             }
 
             // Keep original thresholds in static array to prevent configuration loss
@@ -179,7 +177,7 @@ async function main() {
             }
 
             inst.thresholds = rollingThresholds;
-            console.log(`   ✅ Logged unit thresholds for ${Object.keys(rollingThresholds).length} sessions.`);
+            console.log(`   ✅ Logged dynamic lot-based thresholds for ${Object.keys(rollingThresholds).length} sessions.`);
         } catch (error) {
             console.error(`   ❌ Failed to process ${inst.name}:`, error.message);
         }
