@@ -33,6 +33,13 @@ class MarketChart {
         return key.replace(/_/g, '|');
     }
 
+    // Resolves chart server API paths dynamically on port 3001
+    getChartServerUrl(apiPath) {
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        return `${protocol}//${hostname}:3001${apiPath}`;
+    }
+
     async init() {
         await this.loadHistoricalData();
         this.setupWebSocket();
@@ -88,7 +95,7 @@ class MarketChart {
         if (this[cacheKey]) {
             const currentKey = this.normalizeKey(this.currentInstrument);
             
-            // Fetch the currently active configuration thresholds for this instrument
+            // Fetch active configuration thresholds for Scale-Guard filtering
             const activeTargets = this.activeThresholds.get(currentKey);
             const targetLimit = activeTargets 
                 ? (this.currentType === 'volume' ? activeTargets.volume : activeTargets.price) 
@@ -100,8 +107,7 @@ class MarketChart {
                     const normalizedInstKey = instKey ? instKey.replace(/_/g, '|') : null;
                     if (normalizedInstKey !== currentKey) return false;
                     
-                    // SCALE-GUARD FILTER: Dynamically discard any historical candles 
-                    // built with older, different configurations to prevent chart rendering crashes
+                    // SCALE-GUARD FILTER: Discard historical bars built with older thresholds
                     if (targetLimit !== null && targetLimit !== undefined) {
                         const candleTarget = this.currentType === 'volume'
                             ? (c.targetVolume || c.volume)
@@ -145,10 +151,8 @@ class MarketChart {
             bottomValue = parseFloat(candleData.volume) || 0;
         }
 
-        // Construct a synthetic strictly increasing time to prevent duplicate epoch crashes
         const syntheticTime = 1600000000 + (barNum * 60);
 
-        // Store the real timestamp translation inside our map
         let realTime = candleData.startTime || candleData.timestamp || candleData.end_time;
         if (realTime) {
             if (typeof realTime === 'string') {
@@ -179,7 +183,7 @@ class MarketChart {
     
     async loadHistoricalData() {
         try {
-            // 1. Fetch current active instruments directly from config.json via API
+            // 1. Fetch current active instruments directly from config.json on Web Server (Port 3000)
             const instRes = await fetch('/api/instruments');
             if (instRes.ok) {
                 const activeInstruments = await instRes.json();
@@ -191,7 +195,6 @@ class MarketChart {
                         exchange: inst.exchange || normalizedKey.split('|')[0]
                     });
                     
-                    // Track both active volume and price bar targets for Scale-Guard filtering
                     this.activeThresholds.set(normalizedKey, {
                         volume: inst.volumePerBar,
                         price: inst.priceBarTicks
@@ -199,37 +202,50 @@ class MarketChart {
                 });
             }
 
-            // 2. Fetch volume candles
-            const volumeRes = await fetch('/api/recent/volume?limit=500');
+            // 2. Fetch volume candles directly from Chart Server (Port 3001)
+            const volumeRes = await fetch(this.getChartServerUrl('/api/recent/volume?limit=500'));
             if (volumeRes.ok) {
                 const recentVolume = await volumeRes.json();
                 this.volume_candles = recentVolume.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return {
-                        ...c,
-                        instrument: normKey,
-                        instrument_key: normKey
-                    };
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
+                
+                this.volume_candles.forEach(candle => {
+                    const instKey = candle.instrument;
+                    if (instKey && !this.instruments.has(instKey)) {
+                        this.instruments.set(instKey, {
+                            key: instKey,
+                            name: candle.name || this.getInstrumentName(instKey),
+                            exchange: instKey.split('|')[0]
+                        });
+                    }
                 });
             }
             
-            // 3. Fetch price candles
-            const priceRes = await fetch('/api/recent/price?limit=500');
+            // 3. Fetch price candles directly from Chart Server (Port 3001)
+            const priceRes = await fetch(this.getChartServerUrl('/api/recent/price?limit=500'));
             if (priceRes.ok) {
                 const recentPrice = await priceRes.json();
                 this.price_candles = recentPrice.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return {
-                        ...c,
-                        instrument: normKey,
-                        instrument_key: normKey
-                    };
+                    return { ...c, instrument: normKey, instrument_key: normKey };
+                });
+
+                this.price_candles.forEach(candle => {
+                    const instKey = candle.instrument;
+                    if (instKey && !this.instruments.has(instKey)) {
+                        this.instruments.set(instKey, {
+                            key: instKey,
+                            name: candle.name || this.getInstrumentName(instKey),
+                            exchange: instKey.split('|')[0]
+                        });
+                    }
                 });
             }
             
             this.renderInstrumentSelector();
             
-            // Use active instruments to set current selection
             if (this.currentInstrument === null && this.instruments.size > 0) {
                 this.currentInstrument = this.instruments.keys().next().value;
                 this.setActiveInstrument(this.currentInstrument);
@@ -288,21 +304,13 @@ class MarketChart {
             if (data.volume_bars) {
                 this.volume_candles = data.volume_bars.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return {
-                        ...c,
-                        instrument: normKey,
-                        instrument_key: normKey
-                    };
+                    return { ...c, instrument: normKey, instrument_key: normKey };
                 });
             }
             if (data.price_bars) {
                 this.price_candles = data.price_bars.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return {
-                        ...c,
-                        instrument: normKey,
-                        instrument_key: normKey
-                    };
+                    return { ...c, instrument: normKey, instrument_key: normKey };
                 });
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
@@ -311,8 +319,13 @@ class MarketChart {
                 this.tracker.setupStrategyVersions(data.strategies);
             }
 
+            // Normalizes historical trade logs on WebSocket handshake
             if (data.trade_signals) {
-                this.tracker.renderSignals(data.trade_signals);
+                const normalizedSignals = data.trade_signals.map(sig => ({
+                    ...sig,
+                    instrument: this.normalizeKey(sig.instrument)
+                }));
+                this.tracker.renderSignals(normalizedSignals);
             }
         });
         
@@ -336,12 +349,12 @@ class MarketChart {
             const currentKey = this.normalizeKey(this.currentInstrument);
             
             if (normalizedKey === currentKey && candle.type === this.currentType && !candle.is_live) {
-                const candleCopy = {
+                const normalizedCandle = {
                     ...candle,
                     instrument: normalizedKey,
                     instrument_key: normalizedKey
                 };
-                const newCandle = this.convertToChartCandle(candleCopy);
+                const newCandle = this.convertToChartCandle(normalizedCandle);
                 if (newCandle) this.addCompletedCandle(newCandle);
             }
         });
@@ -355,7 +368,11 @@ class MarketChart {
         });
 
         this.socket.on('trade_status_update', (update) => {
-            this.tracker.handleStatusUpdate(update);
+            const normalizedUpdate = {
+                ...update,
+                instrument: this.normalizeKey(update.instrument)
+            };
+            this.tracker.handleStatusUpdate(normalizedUpdate);
         });
         
         this.socket.on('disconnect', () => {
