@@ -11,6 +11,7 @@ class MarketChart {
         
         this.socket = null;
         this.instruments = new Map();
+        this.activeThresholds = new Map(); // Tracks current active thresholds from config.json
         this.isInitialized = false;
         this.initialDataLoaded = false;
         this.lastSubscription = null;
@@ -85,13 +86,39 @@ class MarketChart {
     loadCandlesForCurrentInstrument() {
         const cacheKey = `${this.currentType}_candles`;
         if (this[cacheKey]) {
+            const currentKey = this.normalizeKey(this.currentInstrument);
+            
+            // Fetch the currently active configuration thresholds for this instrument
+            const activeTargets = this.activeThresholds.get(currentKey);
+            const targetLimit = activeTargets 
+                ? (this.currentType === 'volume' ? activeTargets.volume : activeTargets.price) 
+                : null;
+
             this.candles = this[cacheKey]
                 .filter(c => {
                     const instKey = c.instrument || c.instrument_key;
-                    return this.currentInstrument === (instKey ? instKey.replace(/_/g, '|') : null);
+                    const normalizedInstKey = instKey ? instKey.replace(/_/g, '|') : null;
+                    if (normalizedInstKey !== currentKey) return false;
+                    
+                    // SCALE-GUARD FILTER: Dynamically discard any historical candles 
+                    // built with older, different configurations to prevent chart rendering crashes
+                    if (targetLimit !== null && targetLimit !== undefined) {
+                        const candleTarget = this.currentType === 'volume'
+                            ? (c.targetVolume || c.volume)
+                            : (c.targetTicks || c.ticks);
+                        
+                        if (candleTarget !== undefined && candleTarget !== null) {
+                            if (Array.isArray(targetLimit)) {
+                                return targetLimit.includes(Number(candleTarget));
+                            }
+                            return Number(candleTarget) === Number(targetLimit);
+                        }
+                    }
+                    return true;
                 })
                 .map(c => this.convertToChartCandle(c))
                 .filter(c => null !== c);
+                
             this.candles.sort((a,b) => a.time - b.time);
             console.log(`Loaded ${this.candles.length} ${this.currentType} candles for ${this.currentInstrument}`);
             this.updateCharts();
@@ -163,6 +190,12 @@ class MarketChart {
                         name: inst.name,
                         exchange: inst.exchange || normalizedKey.split('|')[0]
                     });
+                    
+                    // Track both active volume and price bar targets for Scale-Guard filtering
+                    this.activeThresholds.set(normalizedKey, {
+                        volume: inst.volumePerBar,
+                        price: inst.priceBarTicks
+                    });
                 });
             }
 
@@ -172,18 +205,11 @@ class MarketChart {
                 const recentVolume = await volumeRes.json();
                 this.volume_candles = recentVolume.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return { ...c, instrument: normKey, instrument_key: normKey };
-                });
-                
-                this.volume_candles.forEach(candle => {
-                    const instKey = candle.instrument;
-                    if (instKey && !this.instruments.has(instKey)) {
-                        this.instruments.set(instKey, {
-                            key: instKey,
-                            name: candle.name || this.getInstrumentName(instKey),
-                            exchange: instKey.split('|')[0]
-                        });
-                    }
+                    return {
+                        ...c,
+                        instrument: normKey,
+                        instrument_key: normKey
+                    };
                 });
             }
             
@@ -193,18 +219,11 @@ class MarketChart {
                 const recentPrice = await priceRes.json();
                 this.price_candles = recentPrice.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return { ...c, instrument: normKey, instrument_key: normKey };
-                });
-
-                this.price_candles.forEach(candle => {
-                    const instKey = candle.instrument;
-                    if (instKey && !this.instruments.has(instKey)) {
-                        this.instruments.set(instKey, {
-                            key: instKey,
-                            name: candle.name || this.getInstrumentName(instKey),
-                            exchange: instKey.split('|')[0]
-                        });
-                    }
+                    return {
+                        ...c,
+                        instrument: normKey,
+                        instrument_key: normKey
+                    };
                 });
             }
             
@@ -214,6 +233,9 @@ class MarketChart {
             if (this.currentInstrument === null && this.instruments.size > 0) {
                 this.currentInstrument = this.instruments.keys().next().value;
                 this.setActiveInstrument(this.currentInstrument);
+            }
+
+            if (this.currentInstrument) {
                 this.loadCandlesForCurrentInstrument();
                 this.updateBottomChartLabel();
             }
@@ -242,7 +264,6 @@ class MarketChart {
         }
         let html = '';
         for (const [key, inst] of this.instruments) {
-            // Standardize output name display
             html += `<button class="instrument-btn" data-key="${key}">${inst.name || key.split('|')[1]}</button>`;
         }
         container.innerHTML = html;
@@ -267,13 +288,21 @@ class MarketChart {
             if (data.volume_bars) {
                 this.volume_candles = data.volume_bars.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return { ...c, instrument: normKey, instrument_key: normKey };
+                    return {
+                        ...c,
+                        instrument: normKey,
+                        instrument_key: normKey
+                    };
                 });
             }
             if (data.price_bars) {
                 this.price_candles = data.price_bars.map(c => {
                     const normKey = this.normalizeKey(c.instrument || c.instrument_key);
-                    return { ...c, instrument: normKey, instrument_key: normKey };
+                    return {
+                        ...c,
+                        instrument: normKey,
+                        instrument_key: normKey
+                    };
                 });
             }
             if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
@@ -282,13 +311,8 @@ class MarketChart {
                 this.tracker.setupStrategyVersions(data.strategies);
             }
 
-            // Normalizes historical trade logs on WebSocket handshake
             if (data.trade_signals) {
-                const normalizedSignals = data.trade_signals.map(sig => ({
-                    ...sig,
-                    instrument: this.normalizeKey(sig.instrument)
-                }));
-                this.tracker.renderSignals(normalizedSignals);
+                this.tracker.renderSignals(data.trade_signals);
             }
         });
         
@@ -297,13 +321,13 @@ class MarketChart {
             const currentKey = this.normalizeKey(this.currentInstrument);
             
             if (normalizedKey === currentKey && liveCandle.type === this.currentType) {
-                const normalizedCandle = {
+                const candleCopy = {
                     ...liveCandle,
                     instrument: normalizedKey,
                     instrument_key: normalizedKey
                 };
-                this.updateLiveCandle(normalizedCandle);
-                this.updateProgressBar(normalizedCandle);
+                this.updateLiveCandle(candleCopy);
+                this.updateProgressBar(candleCopy);
             }
         });
         
@@ -312,12 +336,12 @@ class MarketChart {
             const currentKey = this.normalizeKey(this.currentInstrument);
             
             if (normalizedKey === currentKey && candle.type === this.currentType && !candle.is_live) {
-                const normalizedCandle = {
+                const candleCopy = {
                     ...candle,
                     instrument: normalizedKey,
                     instrument_key: normalizedKey
                 };
-                const newCandle = this.convertToChartCandle(normalizedCandle);
+                const newCandle = this.convertToChartCandle(candleCopy);
                 if (newCandle) this.addCompletedCandle(newCandle);
             }
         });
@@ -331,11 +355,7 @@ class MarketChart {
         });
 
         this.socket.on('trade_status_update', (update) => {
-            const normalizedUpdate = {
-                ...update,
-                instrument: this.normalizeKey(update.instrument)
-            };
-            this.tracker.handleStatusUpdate(normalizedUpdate);
+            this.tracker.handleStatusUpdate(update);
         });
         
         this.socket.on('disconnect', () => {
