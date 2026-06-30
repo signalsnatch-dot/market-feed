@@ -125,6 +125,7 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (triggered) {
+                        // Slippage Correction: If price gapped past entry on open, fill at open price
                         let fillPrice = pending.entry;
                         if (pending.type === 'BUY_STOP' && bar.open > pending.entry) {
                             fillPrice = bar.open;
@@ -132,11 +133,10 @@ class DualCandleBuilder extends EventEmitter {
                             fillPrice = bar.open;
                         }
 
-                        const risk = Math.abs(fillPrice - pending.sl);
-                        let finalTP;
-                        if (pending.useStructuralTarget && pending.structuralTarget !== null) {
-                            finalTP = pending.structuralTarget;
-                        } else {
+                        // Maintain target reward ratio (RRR) based on actual filled price
+                        let finalTP = pending.tp;
+                        if (fillPrice !== pending.entry) {
+                            const risk = Math.abs(fillPrice - pending.sl);
                             finalTP = pending.type === 'BUY_STOP'
                                 ? fillPrice + risk * (pending.rewardRatio || 1.5)
                                 : fillPrice - risk * (pending.rewardRatio || 1.5);
@@ -165,7 +165,7 @@ class DualCandleBuilder extends EventEmitter {
                     }
                 }
 
-                // 2. Evaluate Active Exits
+                // 2. Evaluate Active Exits (with Gap-Opening Slippage Checks)
                 if (this.activeTrades.has(key)) {
                     const trade = this.activeTrades.get(key);
                     let exitPrice = null;
@@ -176,13 +176,15 @@ class DualCandleBuilder extends EventEmitter {
                         const tpReached = bar.high >= trade.tp;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = trade.sl;
+                            // Worst case scenario: exit at bar open (if opened below SL) or trade SL
+                            exitPrice = bar.open < trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = trade.sl;
+                            exitPrice = bar.open < trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = trade.tp;
+                            // If opened above TP, fill at open price
+                            exitPrice = bar.open > trade.tp ? bar.open : trade.tp;
                             exitReason = 'take_profit';
                         }
                     } else {
@@ -190,13 +192,13 @@ class DualCandleBuilder extends EventEmitter {
                         const tpReached = bar.low <= trade.tp;
 
                         if (stoppedOut && tpReached) {
-                            exitPrice = trade.sl;
+                            exitPrice = bar.open > trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
-                            exitPrice = trade.sl;
+                            exitPrice = bar.open > trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            exitPrice = trade.tp;
+                            exitPrice = bar.open < trade.tp ? bar.open : trade.tp;
                             exitReason = 'take_profit';
                         }
                     }
