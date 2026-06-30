@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-const MCX_LOT_MULTIPLIER_MAP = {
+
+const MASTER_MULTIPLIERS = {
+    // MCX Futures
     '538685': 1250, // Natural Gas
     '538686': 250,  // Natural Gas Mini
     '520702': 100,  // Crude Oil
@@ -13,19 +15,81 @@ const MCX_LOT_MULTIPLIER_MAP = {
     '471726': 5,    // Silver Mini
     '488788': 1,    // Silver Micro
     '568831': 2500, // Copper
-    '568836': 5,    // Zinc
-    '568833': 5,    // Lead
-    '568830': 5,    // Aluminium
-    '466583': 1,    // Gold Standard
+    '568836': 5000, // Zinc (Standard contract unit scaling)
+    '568833': 5000, // Lead
+    '568830': 5000, // Aluminium
+    '466583': 100,  // Gold Standard
     '510764': 10,   // Gold Mini
-    '552721': 1     // Gold Petal
+    '552721': 1,    // Gold Petal
+    
+    // Legacy MCX Keys
+    '552706': 5000, '552709': 5000, '552708': 2500, '552711': 5000, 
+    '464151': 5, '477177': 1, '510464': 1,
+
+    // NSE Index Futures
+    '61093': 75,   // Nifty 50
+    '61088': 30,   // Nifty Bank
+    '61091': 40,   // Fin Nifty
+    '61092': 120,  // Midcap Nifty
+
+    // NSE Stock Futures
+    '61284': 500,  // Reliance Future
+    '61189': 650,  // HDFC Bank Future
+    '61197': 700,  // ICICI Bank Future
+    '61289': 750,  // SBI Future
+    '61304': 225,  // TCS Future
+    '61209': 400,  // Infosys Future
+    '61216': 1725, // ITC Future
+    '61127': 475,  // Bharti Airtel Future
+    '61114': 625,  // Axis Bank Future
+    '61232': 175,  // L&T Future
+    '61303': 2750, // Tata Steel Future
+    '61235': 300,  // Tata Motors Future
+    '61118': 750,  // Bajaj Finance Future
+    '61226': 2000, // Kotak Bank Future
+    '61296': 350,  // Sun Pharma Future
+    '61220': 675,  // JSW Steel Future
+    '61143': 1350, // Coal India Future
+    '61099': 309,  // Adani Enterprises Future
+    '61101': 475,  // Adani Ports Future
+    '61192': 700,  // Hindalco Future
+    '61108': 125,  // Apollo Hospitals Future
+    '61274': 8000, // PNB Future
+    '61286': 4700, // SAIL Future
+    '61298': 12700,// SUZLON Future
+    '61265': 725,  // PAYTM Future
+    '61285': 1925, // RVNL Future
+    '61215': 5425, // IRFC Future
+    '61214': 4525, // IREDA Future
+    '61128': 2625, // BHEL Future
+    '61170': 3550, // GAIL Future
+    '61310': 225   // TRENT Future
 };
 
 function getLotMultiplier(instrumentKey) {
     if (!instrumentKey) return 1;
-    const id = instrumentKey.split('|')[1];
-    if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
-        return MCX_LOT_MULTIPLIER_MAP[id];
+
+    // 1. Attempt dynamic check against config.json
+    try {
+        const configPath = path.resolve(__dirname, 'config.json');
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            const inst = config.instruments?.find(i => i.key === instrumentKey);
+            if (inst && inst.lotSize !== undefined) {
+                // Return lot size for NSE derivatives (NSE_FO) or standard cash segments
+                if (instrumentKey.includes('NSE_FO')) {
+                    return inst.lotSize;
+                }
+            }
+        }
+    } catch (e) {
+        // Fall back gracefully
+    }
+
+    // 2. Local Master Fallback check
+    const id = instrumentKey.includes('|') ? instrumentKey.split('|')[1] : instrumentKey;
+    if (MASTER_MULTIPLIERS[id] !== undefined) {
+        return MASTER_MULTIPLIERS[id];
     }
     return 1;
 }

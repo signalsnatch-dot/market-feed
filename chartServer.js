@@ -139,7 +139,11 @@ class ChartServer {
         });
         
         this.app.get('/api/signals', (req, res) => {
-            res.json(this.tradeSignals);
+            const enriched = this.tradeSignals.map(sig => ({
+                ...sig,
+                name: this.getInstrumentName(sig.instrument)
+            }));
+            res.json(enriched);
         });
         
         this.app.get('/health', (req, res) => {
@@ -161,11 +165,16 @@ class ChartServer {
         this.io.on('connection', (socket) => {
             console.log(`Client connected: ${socket.id}`);
             
+            const enrichedSignals = this.tradeSignals.map(sig => ({
+                ...sig,
+                name: this.getInstrumentName(sig.instrument)
+            }));
+            
             socket.emit('historical_candles', {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
-                trade_signals: this.tradeSignals,
+                trade_signals: enrichedSignals,
                 strategies: Object.keys(STRATEGIES)
             });
             
@@ -485,12 +494,90 @@ class ChartServer {
     }
     
     getInstrumentName(key) {
-        const names = {
-            'MCX_FO|538685': 'Natural Gas Future',
-            'NSE_FO|62329': 'Nifty 50 Future',
-            'NSE_FO|62326': 'Nifty Bank Future'
+        if (!key) return 'N/A';
+
+        // 1. Dynamic Check against config.json
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            let configPath = path.resolve(__dirname, 'config.json');
+            if (!fs.existsSync(configPath)) {
+                configPath = path.resolve(__dirname, '../config.json');
+            }
+            if (fs.existsSync(configPath)) {
+                const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                const inst = config.instruments?.find(i => 
+                    i.key === key || 
+                    i.key.includes(key) || 
+                    key.includes(i.key)
+                );
+                if (inst && inst.name) {
+                    return inst.name;
+                }
+            }
+        } catch (e) {
+            // Log issues quietly and fall back to local database mapping
+        }
+
+        // 2. Comprehensive Master Name Fallback Mapping
+        const MASTER_FALLBACK_NAMES = {
+            '538685': 'Natural Gas Future',
+            '538686': 'Natural Gas Mini Future',
+            '520702': 'Crude Oil Future',
+            '520703': 'Crude Oil Mini Future',
+            '464150': 'Silver Future',
+            '471726': 'Silver Mini Future',
+            '488788': 'Silver Micro Future',
+            '568831': 'Copper Future',
+            '568836': 'Zinc Future',
+            '568833': 'Lead Future',
+            '568830': 'Aluminium Future',
+            '466583': 'Gold Future',
+            '510764': 'Gold Mini Future',
+            '552721': 'Gold Petal Future',
+            '61093': 'Nifty 50 Future',
+            '61088': 'Nifty Bank Future',
+            '61091': 'Fin Nifty Future',
+            '61092': 'Midcap Nifty Future',
+            
+            // ISINs/Tokens to cash equity name mapping
+            'INE002A01018': 'Reliance Cash Equity',
+            'INE040A01034': 'HDFC Bank Cash Equity',
+            'INE090A01021': 'ICICI Bank Cash Equity',
+            'INE062A01020': 'SBI Cash Equity',
+            'INE467B01029': 'TCS Cash Equity',
+            'INE009A01021': 'Infosys Cash Equity',
+            'INE154A01025': 'ITC Cash Equity',
+            'INE397D01024': 'Bharti Airtel Cash Equity',
+            'INE238A01034': 'Axis Bank Cash Equity',
+            'INE018A01030': 'L&T Cash Equity',
+            'INE081A01020': 'Tata Steel Cash Equity',
+            'INE1TAE01010': 'Tata Motors Cash Equity',
+            'INE296A01032': 'Bajaj Finance Cash Equity',
+            'INE237A01036': 'Kotak Bank Cash Equity',
+            'INE044A01036': 'Sun Pharma Cash Equity',
+            'INE019A01038': 'JSW Steel Cash Equity',
+            'INE522F01014': 'Coal India Cash Equity',
+            'INE423A01024': 'Adani Enterprises Cash Equity',
+            'INE742F01042': 'Adani Ports Cash Equity',
+            'INE038A01020': 'Hindalco Cash Equity',
+            'INE437A01024': 'Apollo Hospitals Cash Equity',
+            'INE160A01022': 'PNB Cash Equity',
+            'INE114A01011': 'SAIL Cash Equity',
+            'INE040H01021': 'SUZLON Cash Equity',
+            'INE928J01020': 'PAYTM Cash Equity',
+            'INE415G01027': 'RVNL Cash Equity',
+            'INE053F01010': 'IRFC Cash Equity',
+            'INE202E01016': 'IREDA Cash Equity',
+            'INE257A01026': 'BHEL Cash Equity',
+            'INE129A01025': 'GAIL Cash Equity',
+            'INE849A01020': 'TRENT Cash Equity'
         };
-        return names[key] || key.split('|')[1];
+
+        const id = key.includes('|') ? key.split('|')[1] : key;
+        const normalizedId = id.replace(/_raw_ticks$/, '');
+        
+        return MASTER_FALLBACK_NAMES[normalizedId] || normalizedId;
     }
     
     getInstrumentsFromFiles() {
@@ -573,6 +660,9 @@ class ChartServer {
     }
 
     broadcastTradeSignal(signalData) {
+        // Ensure name is dynamically verified on incoming alerts
+        signalData.name = this.getInstrumentName(signalData.instrument);
+        
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
             sig.bar_type === signalData.bar_type &&

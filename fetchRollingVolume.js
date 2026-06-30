@@ -6,38 +6,42 @@ require('dotenv').config();
 
 const CONFIG_FILE = './build-version-config.json';
 
-// MCX F&O lot-size multiplier map to scale daily REST lot volume to matching unit volume
-const MCX_LOT_MULTIPLIER_MAP = {
-    '538685': 1250, // Natural Gas
-    '520702': 100,  // Crude Oil
-    '464150': 30,   // Silver Standard
-    '464151': 5,    // Silver Mini
-    '477177': 1,    // Silver Micro
-    '552708': 2500, // Copper
-    '552711': 5000, // Zinc
-    '552709': 5000, // Lead
-    '552706': 5000, // Aluminium
-    '466583': 100,  // Gold Standard
-    '510764': 10,   // Gold Mini
-    '510464': 1,    // Gold Petal
-    '565898': 50,   // Bulldex
-};
-
 // Segment-aware divisor to adjust for feed sampling rates
 function getDivisor(instrumentKey) {
     return 100; 
 }
-
-function getLotMultiplier(instrumentKey) {
+function getLotMultiplierFromConfig(instrumentKey) {
     if (!instrumentKey) return 1;
-    
-    if (instrumentKey.includes('MCX_FO')) {
-        const id = instrumentKey.split('|')[1];
-        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
-            return MCX_LOT_MULTIPLIER_MAP[id];
+
+    const MULTIPLIERS = {
+        '538685': 1250, '538686': 250, '520702': 100, '520703': 10,
+        '464150': 30, '471726': 5, '488788': 1, '568831': 2500,
+        '568836': 5000, '568833': 5000, '568830': 5000, '466583': 100,
+        '510764': 10, '552721': 1, '61093': 75, '61088': 30,
+        '61091': 40, '61092': 120, '61284': 500, '61189': 650,
+        '61197': 700, '61289': 750, '61304': 225, '61209': 400,
+        '61216': 1725, '61127': 475, '61114': 625, '61232': 175,
+        '61303': 2750, '61235': 300, '61118': 750, '61226': 2000,
+        '61296': 350, '61220': 675, '61143': 1350, '61099': 309,
+        '61101': 475, '61192': 700, '61108': 125, '61274': 8000,
+        '61286': 4700, '61298': 12700, '61265': 725, '61285': 1925,
+        '61215': 5425, '61214': 4525, '61128': 2625, '61170': 3550,
+        '61310': 225
+    };
+
+    try {
+        const configPath = path.resolve(__dirname, 'config.json');
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            const inst = config.instruments?.find(i => i.key === instrumentKey);
+            if (inst && inst.lotSize !== undefined) {
+                return inst.lotSize;
+            }
         }
-    }
-    return 1;
+    } catch (e) {}
+
+    const id = instrumentKey.includes('|') ? instrumentKey.split('|')[1] : instrumentKey;
+    return MULTIPLIERS[id] || 1;
 }
 
 function formatISOToDDMMYY(dateStr) {
@@ -153,6 +157,7 @@ async function main() {
 
             const candles = [...candlesRaw].reverse();
             const rollingThresholds = {};
+            const lotMultiplier = getLotMultiplierFromConfig(inst.instrument_key);
 
             for (let i = 10; i < candles.length; i++) {
                 const currentDayCandle = candles[i];
@@ -161,8 +166,9 @@ async function main() {
 
                 // Preceding 10 days
                 const preceding10 = candles.slice(i - 10, i);
-                const sumVolumeLots = preceding10.reduce((acc, c) => acc + (Number(c[5]) || 0), 0);
                 
+                // Convert daily raw volume units to lots using configuration parameters
+                const sumVolumeLots = preceding10.reduce((acc, c) => acc + ((Number(c[5]) || 0) / lotMultiplier), 0);
                 const avgVolumeLots = sumVolumeLots / 10;
 
                 // Segment-adjusted threshold (stored as lots, or units for equity)

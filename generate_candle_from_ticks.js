@@ -7,34 +7,52 @@ const INPUT_DIR = './extracted';
 const OUTPUT_DIR = './candles';
 const CONFIG_FILE = './build-version-config.json';
 
-// MCX F&O lot-size multiplier map
-const MCX_LOT_MULTIPLIER_MAP = {
-    '538685': 1250, // Natural Gas
-    '520702': 100,  // Crude Oil
-    '464150': 30,   // Silver Standard
-    '464151': 5,    // Silver Mini
-    '477177': 1,    // Silver Micro
-    '552708': 2500, // Copper
-    '552711': 5000, // Zinc
-    '552709': 5000, // Lead
-    '552706': 5000, // Aluminium
-    '466583': 100,  // Gold Standard
-    '510764': 10,   // Gold Mini
-    '510464': 1,    // Gold Petal
-    '565898': 50,   // Bulldex
-};
-
 function getLotMultiplier(instrumentKey) {
     if (!instrumentKey) return 1;
-    if (instrumentKey.includes('MCX_FO')) {
-        const id = instrumentKey.split('|')[1];
-        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
-            return MCX_LOT_MULTIPLIER_MAP[id];
+
+    // Standard local MCX multipliers
+    const MCX_MULTIPLIERS = {
+        '538685': 1250, '538686': 250, '520702': 100, '520703': 10,
+        '464150': 30, '471726': 5, '488788': 1, '568831': 2500,
+        '568836': 5000, '568833': 5000, '568830': 5000, '466583': 100,
+        '510764': 10, '552721': 1, '552706': 5000, '552709': 5000,
+        '552708': 2500, '552711': 5000, '464151': 5, '477177': 1, '510464': 1
+    };
+
+    try {
+        const configPath = path.resolve(__dirname, 'config.json');
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            const inst = config.instruments?.find(i => i.key === instrumentKey);
+            if (inst && inst.lotSize !== undefined) {
+                return inst.lotSize;
+            }
         }
+    } catch (e) {}
+
+    try {
+        const buildConfigPath = path.resolve(__dirname, CONFIG_FILE);
+        if (fs.existsSync(buildConfigPath)) {
+            const config = JSON.parse(fs.readFileSync(buildConfigPath, 'utf8'));
+            const inst = config.find(i => i.instrument_key === instrumentKey || i.key === instrumentKey);
+            if (inst && inst.lotSize !== undefined) {
+                return inst.lotSize;
+            }
+        }
+    } catch (e) {}
+
+    const id = instrumentKey.includes('|') ? instrumentKey.split('|')[1] : instrumentKey;
+    if (MCX_MULTIPLIERS[id] !== undefined) {
+        return MCX_MULTIPLIERS[id];
+    }
+    
+    // Check master index multipliers if NSE token
+    const indexMultipliers = { '61093': 75, '61088': 30, '61091': 40, '61092': 120 };
+    if (indexMultipliers[id] !== undefined) {
+        return indexMultipliers[id];
     }
     return 1;
 }
-
 // Parse command line arguments for candle mode
 const args = process.argv.slice(2);
 const CANDLE_MODE = args.includes('--continuous') ? 'continuous' : 'discrete';

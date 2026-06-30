@@ -198,12 +198,38 @@ class MarketChart {
     }
     
     getInstrumentName(key) {
-        const names = {
-            'MCX_FO|538685': 'Natural Gas Future',
-            'NSE_FO|62329': 'Nifty 50 Future',
-            'NSE_FO|62326': 'Nifty Bank Future'
+        if (!key) return 'N/A';
+
+        // 1. Dynamic check against the backend instrument state array
+        if (this.instrumentsList && this.instrumentsList.length > 0) {
+            const inst = this.instrumentsList.find(i => i.key === key);
+            if (inst && inst.name) return inst.name;
+        }
+
+        // 2. Local Fallback Database
+        const fallbackNames = {
+            '538685': 'Natural Gas Future',
+            '538686': 'Natural Gas Mini Future',
+            '520702': 'Crude Oil Future',
+            '520703': 'Crude Oil Mini Future',
+            '464150': 'Silver Future',
+            '471726': 'Silver Mini Future',
+            '488788': 'Silver Micro Future',
+            '61093': 'Nifty 50 Future',
+            '61088': 'Nifty Bank Future',
+            '61091': 'Fin Nifty Future',
+            '61092': 'Midcap Nifty Future',
+            'INE002A01018': 'Reliance Cash Equity',
+            'INE040A01034': 'HDFC Bank Cash Equity',
+            'INE090A01021': 'ICICI Bank Cash Equity',
+            'INE062A01020': 'SBI Cash Equity',
+            'INE467B01029': 'TCS Cash Equity',
+            'INE009A01021': 'Infosys Cash Equity'
         };
-        return names[key] || key.split('|')[1];
+
+        const id = key.includes('|') ? key.split('|')[1] : key;
+        const normalizedId = id.replace(/_raw_ticks$/, '');
+        return fallbackNames[normalizedId] || normalizedId;
     }
     
     renderInstrumentSelector() {
