@@ -5,35 +5,28 @@ const path = require('path');
 const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-06-30.json'; 
 const OUTPUT_DIR = './live-performance-report';
 
-const startTime = '15:45'; // Session Start (HH:MM in 24h IST format)
+const startTime = '19:20'; // Session Start (HH:MM in 24h IST format)
 const endTime = '23:55';   // Session End (HH:MM in 24h IST format). Set to null to use current time.
 
-// Matches any V1 to V43 strategy
-const versionRegex =  /^V([1-9]|[1-4]\d|50):/;
+// Matches any V1 to V50 strategy
+const versionRegex = /^V([1-9]|[1-4]\d|50):/;
 
+// Exactly the 10 active High Confidence versions producing confidence metric outputs
 const confidenceVersions = [
     'V3: High Confidence', 
     'V8: High Confidence (Strict)', 
     'V13: High Confidence (Calibrated)', 
     'V18: High Confidence (Strict-Calibrated)',
-    'V21: 65-70% confidence of V3',
-    'V22: More than 80% confidence of V3',
-    'V23: 65-70% and More than 80% confidence of V3',
-    'V24: 65-70% confidence of V8',
-    'V25: More than 80% confidence of V8',
-    'V26: 65-70% and More than 80% confidence of V8',
-    'V27: 65-70% confidence of V13',
-    'V28: More than 80% confidence of V13',
-    'V29: 65-70% and More than 80% confidence of V13',
-    'V30: 65-70% confidence of V18',
-    'V31: More than 80% confidence of V18',
-    'V32: 65-70% and More than 80% confidence of V18',
-    'V35: High Confidence (Structural-Calibrated)',
-    'V40: High Confidence (Strict Structural-Calibrated)',
-    'V43: 65-70% and More than 80% confidence of V35'
+    'V23: High Confidence (Structural-Calibrated)',
+    'V28: High Confidence (Strict Structural-Calibrated)',
+    'V33: High Confidence (Upgraded)',
+    'V38: High Confidence (Strict Upgraded)',
+    'V43: High Confidence (Structural-Calibrated Upgraded)',
+    'V48: High Confidence (Strict Structural-Calibrated Upgraded)'
 ];
+
 const INSTRUMENT_NAMES = {
-    // Standard ISINs mapped directly to Stock Names
+    // Standard ISINs
     'INE002A01018': 'Reliance Industries',
     'INE040A01034': 'HDFC Bank',
     'INE090A01021': 'ICICI Bank',
@@ -67,7 +60,7 @@ const INSTRUMENT_NAMES = {
     'INE129A01025': 'GAIL',
     'INE849A01020': 'TRENT',
 
-    // F&O Segment-Level Numerical Tokens mapped directly to contract names
+    // Standard F&O Segment Tokens
     '538685': 'Natural Gas Future',
     '538686': 'Natural Gas Mini Future',
     '520702': 'Crude Oil Future',
@@ -117,8 +110,8 @@ const INSTRUMENT_NAMES = {
     '61128': 'BHEL Future',
     '61170': 'GAIL Future',
     '61310': 'TRENT Future',
-
-    // Legacy Support Keys
+    
+    // Legacy support keys
     '552706': 'Aluminium (MCX)',
     '552709': 'Lead (MCX)',
     '552708': 'Copper (MCX)',
@@ -126,10 +119,10 @@ const INSTRUMENT_NAMES = {
     '464151': 'Silver Mini (MCX)',
     '477177': 'Silver Micro (MCX)',
     '510464': 'Gold Petal (MCX)',
-    '62326': 'Bank Nifty',
     '62329': 'Nifty 50',
-    '62328': 'Midcap Nifty',
-    '62327': 'Fin Nifty'
+    '62326': 'Bank Nifty',
+    '62327': 'Fin Nifty',
+    '62328': 'Midcap Nifty'
 };
 
 // Strict non-overlapping confidence buckets
@@ -415,11 +408,11 @@ const getRankingsMarkdown = (trades, label) => {
 
 async function main() {
     try {
-        console.log(`Fetching live trade objects from: ${DATA_URL}`);
+        console.log("Fetching live trade objects from: " + DATA_URL);
         
         const response = await fetch(DATA_URL);
         if (!response.ok) {
-            throw new Error(`HTTP fetch failed with status: ${response.status}`);
+            throw new Error("HTTP fetch failed with status: " + response.status);
         }
         
         let data = await response.json();
@@ -428,7 +421,7 @@ async function main() {
         }
 
         const resolvedEndTime = endTime || getCurrentISTTime();
-        console.log(`Applying IST session filter: ${startTime} to ${resolvedEndTime}`);
+        console.log("Applying IST session filter: " + startTime + " to " + resolvedEndTime);
 
         data.forEach(signal => {
             if (!signal || !signal.version) return;
@@ -467,7 +460,7 @@ async function main() {
             process.exit(0);
         }
 
-        console.log(`Processing ${flatTrades.length} trades within the session window...`);
+        console.log("Processing " + flatTrades.length + " trades within the session window...");
 
         // Check if MAE/MAFE metric details are present across any of the trade items
         const hasMaeMafe = flatTrades.some(t => 
@@ -489,6 +482,7 @@ async function main() {
         let md = `# Portfolio Live Signals Performance Report\n\n`;
         md += `*Report Generated on (Local): ${new Date().toLocaleString()}*\n`;
         md += `*Session Filtering Window (IST):* ${startTime} to ${resolvedEndTime}\n`;
+        md += `*Rule Validation Model Range:* V1 to V50\n`;
         md += `*Analyzed Period Range:* ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}\n\n`;
 
         // ============================================================
@@ -510,7 +504,7 @@ async function main() {
         // ============================================================
         // SECTION 2: DETAILED VERSION PERFORMANCE (SPLIT BY BAR TYPE)
         // ============================================================
-        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V43)\n\n`;
+        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V50)\n\n`;
 
         uniqueVersions.forEach(v => {
             const vTrades = flatTrades.filter(t => t.strategy === v);
@@ -523,7 +517,7 @@ async function main() {
                 const m = computeMetrics(trades.map(t => t.trade));
                 let block = `#### **${typeLabel} Analysis**\n`;
                 if (m.totalTrades === 0) {
-                    return block + `*No ${typeLabel.toLowerCase()} trades completed for this strategy.*\n\n`;
+                    return block + "*No " + typeLabel.toLowerCase() + " trades completed for this strategy.*\n\n";
                 }
                 block += `*   **Cumulative Trades:** ${m.totalTrades}\n`;
                 block += `*   **Cumulative Win Rate:** ${m.winRate.toFixed(2)}%\n`;
@@ -582,7 +576,7 @@ async function main() {
             const renderConfidenceBlock = (trades, label) => {
                 let block = `#### **${label} Confidence Spread**\n`;
                 if (trades.length === 0) {
-                    return block + `*No completed ${label.toLowerCase()} trades found.* \n\n`;
+                    return block + "*No completed " + label.toLowerCase() + " trades found.* \n\n";
                 }
                 block += buildConfidenceTable(trades);
                 
@@ -658,7 +652,7 @@ async function main() {
                     const thm = computeMetrics(trades.map(t => t.trade));
                     let block = `##### **${label} Performance**\n`;
                     if (thm.totalTrades === 0) {
-                        return block + `*No completed trades configured with ${label.toLowerCase()} bars under this threshold.*\n\n`;
+                        return block + "*No completed trades configured with " + label.toLowerCase() + " bars under this threshold.*\n\n";
                     }
                     block += `*   **Cumulative Trades:** ${thm.totalTrades}\n`;
                     block += `*   **Cumulative Win Rate:** ${thm.winRate.toFixed(2)}%\n`;
@@ -714,7 +708,7 @@ async function main() {
         const targetFile = path.join(OUTPUT_DIR, `live_signals_report_${timestamp}.md`);
 
         fs.writeFileSync(targetFile, md, 'utf8');
-        console.log(`Success! Complete live signals performance analysis compiled inside: '${targetFile}'`);
+        console.log("Success! Complete live signals performance analysis compiled inside: '" + targetFile + "'");
 
     } catch (error) {
         console.error("Execution stopped due to error:", error.message);

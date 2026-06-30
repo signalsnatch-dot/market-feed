@@ -5,9 +5,24 @@ const path = require('path');
 const fs = require('fs');
 const { STRATEGIES } = require('./priceActionStrategy');
 
+// Standalone timezone and scale-safe helpers placed at the top of chartServer.js or as class methods
 function getTodayISTDateString() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Strictly YYYY-MM-DD in India
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
+
+
+function getSignalISTDateString(ts) {
+    if (!ts) return '';
+    let ms = typeof ts === 'number' ? ts : Number(ts);
+    if (isNaN(ms)) {
+        const parsed = Date.parse(ts);
+        if (!isNaN(parsed)) ms = parsed;
+    }
+    if (isNaN(ms) || ms <= 0) return '';
+    if (ms < 10000000000) ms *= 1000; // Convert seconds to milliseconds
+    return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
 
 class ChartServer {
     constructor(port = 3001, candlesDataDir = './candles_data', options = {}) {
@@ -145,12 +160,12 @@ class ChartServer {
             const todayIST = getTodayISTDateString();
             const todaySignals = this.tradeSignals
                 .filter(sig => {
-                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const sigDate = getSignalISTDateString(sig.timestamp);
                     return sigDate === todayIST;
                 })
                 .map(sig => ({
                     ...sig,
-                    name: this.getInstrumentName(sig.instrument) // Retain name mapping
+                    name: this.getInstrumentName(sig.instrument)
                 }));
             res.json(todaySignals);
         });
@@ -177,12 +192,12 @@ class ChartServer {
             const todayIST = getTodayISTDateString();
             const todaySignals = this.tradeSignals
                 .filter(sig => {
-                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const sigDate = getSignalISTDateString(sig.timestamp);
                     return sigDate === todayIST;
                 })
                 .map(sig => ({
                     ...sig,
-                    name: this.getInstrumentName(sig.instrument) // Retain name mapping
+                    name: this.getInstrumentName(sig.instrument)
                 }));
             
             socket.emit('historical_candles', {
@@ -301,8 +316,8 @@ class ChartServer {
                             if (!candle) return;
 
                             // Filter: only generate historical signals belonging strictly to today's IST session
-                            const candDate = new Date(candle.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-                            if (candDate !== todayIST) return;
+                            const candDate = getSignalISTDateString(candle.timestamp);
+                            if (candDate !== todayIST) return; // Ignore legacy bars
 
                             let confidence = 50;
                             const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
@@ -362,7 +377,7 @@ class ChartServer {
                 
                 const todayIST = getTodayISTDateString();
                 this.tradeSignals = loaded.filter(sig => {
-                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    const sigDate = getSignalISTDateString(sig.timestamp);
                     return sigDate === todayIST;
                 });
             } catch (err) {
@@ -379,7 +394,7 @@ class ChartServer {
             
             const signalMap = new Map();
             const filteredSignals = this.tradeSignals.filter(sig => {
-                const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                const sigDate = getSignalISTDateString(sig.timestamp);
                 return sigDate === todayIST;
             });
             

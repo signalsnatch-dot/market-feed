@@ -4,18 +4,25 @@ const path = require('path');
 const RESULTS_DIR = './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
 
-// Matches any V1 to V43 strategy
-const versionRegex =  /^V([1-9]|[1-4]\d|50):/;
+// Matches any V1 to V50 strategy strictly
+const versionRegex = /^V([1-9]|[1-4]\d|50):/;
 
+// Exactly the 10 active High Confidence versions producing confidence metric outputs
 const confidenceVersions = [
     'V3: High Confidence', 
     'V8: High Confidence (Strict)', 
     'V13: High Confidence (Calibrated)', 
-    'V18: High Confidence (Strict-Calibrated)'
+    'V18: High Confidence (Strict-Calibrated)',
+    'V23: High Confidence (Structural-Calibrated)',
+    'V28: High Confidence (Strict Structural-Calibrated)',
+    'V33: High Confidence (Upgraded)',
+    'V38: High Confidence (Strict Upgraded)',
+    'V43: High Confidence (Structural-Calibrated Upgraded)',
+    'V48: High Confidence (Strict Structural-Calibrated Upgraded)'
 ];
 
 const INSTRUMENT_NAMES = {
-    // Standard ISINs mapped directly to Stock Names
+    // Standard ISINs
     'INE002A01018': 'Reliance Industries',
     'INE040A01034': 'HDFC Bank',
     'INE090A01021': 'ICICI Bank',
@@ -49,7 +56,7 @@ const INSTRUMENT_NAMES = {
     'INE129A01025': 'GAIL',
     'INE849A01020': 'TRENT',
 
-    // F&O Segment-Level Numerical Tokens mapped directly to contract names
+    // Standard F&O Segment Tokens
     '538685': 'Natural Gas Future',
     '538686': 'Natural Gas Mini Future',
     '520702': 'Crude Oil Future',
@@ -99,8 +106,8 @@ const INSTRUMENT_NAMES = {
     '61128': 'BHEL Future',
     '61170': 'GAIL Future',
     '61310': 'TRENT Future',
-
-    // Legacy Support Keys
+    
+    // Legacy support keys
     '552706': 'Aluminium (MCX)',
     '552709': 'Lead (MCX)',
     '552708': 'Copper (MCX)',
@@ -108,10 +115,10 @@ const INSTRUMENT_NAMES = {
     '464151': 'Silver Mini (MCX)',
     '477177': 'Silver Micro (MCX)',
     '510464': 'Gold Petal (MCX)',
-    '62326': 'Bank Nifty',
     '62329': 'Nifty 50',
-    '62328': 'Midcap Nifty',
-    '62327': 'Fin Nifty'
+    '62326': 'Bank Nifty',
+    '62327': 'Fin Nifty',
+    '62328': 'Midcap Nifty'
 };
 
 // Strict non-overlapping confidence buckets
@@ -381,7 +388,7 @@ md += `\n`;
 // ============================================================
 // SECTION 2: DETAILED VERSION PERFORMANCE WITH DAILY BREAKDOWNS
 // ============================================================
-md += `## Section 2: Detailed Performance by Strategy Version (V1 to V43)\n\n`;
+md += `## Section 2: Detailed Performance by Strategy Version (V1 to V50)\n\n`;
 
 uniqueVersions.forEach(v => {
     const vTrades = flatTrades.filter(t => t.strategy === v);
@@ -491,7 +498,7 @@ md += `---\n\n`;
 // Version-specific distributions (including daily split)
 md += `### **MAE/MAFE Distributions By Strategy Version**\n\n`;
 uniqueVersions.forEach(v => {
-    const vTrades = flatTrades.filter(t => t.strategy === v);
+    const vTrades = flatTrades.filter(t => t.date === d);
     md += `### **${v} MAE/MAFE Distributions**\n\n`;
     
     md += `#### **Cumulative (All Dates)**\n\n`;
