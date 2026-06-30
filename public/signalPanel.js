@@ -266,7 +266,16 @@ class LiveTradeTracker {
             return matchesVersion && matchesInstrument && matchesBarType && matchesThreshold;
         });
 
-        const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
+        // Unified timestamp normalization to prevent NaN sorting bugs
+        const getMs = (t) => {
+            if (!t) return 0;
+            const parsed = new Date(t).getTime();
+            return isNaN(parsed) ? Number(t) || 0 : parsed;
+        };
+
+        // Sort descending (newest first) safely
+        const sorted = [...filtered].sort((a, b) => getMs(b.timestamp) - getMs(a.timestamp));
+        
         sorted.forEach(sig => {
             this.addCardToDOM(sig, listContainer);
             if (sig.status === 'active') {

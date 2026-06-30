@@ -687,10 +687,11 @@ class ChartServer {
     }
 
     broadcastTradeStatusUpdate(updateData) {
+        // Stringify thresholds to prevent Type mismatch (String vs Number) comparison drops
         const matchIndex = this.tradeSignals.findIndex(sig => 
             sig.instrument === updateData.instrument &&
             sig.bar_type === updateData.bar_type &&
-            sig.threshold === updateData.threshold &&
+            String(sig.threshold) === String(updateData.threshold) &&
             sig.barNumber === updateData.barNumber &&
             sig.type === updateData.type &&
             sig.version === updateData.version
@@ -705,6 +706,9 @@ class ChartServer {
             
             this.saveSignalsToDisk();
             this.io.emit('trade_status_update', this.tradeSignals[matchIndex]);
+        } else {
+            // Fallback: If not indexed in cache, broadcast directly so client UI updates instantly
+            this.io.emit('trade_status_update', updateData);
         }
     }
     
