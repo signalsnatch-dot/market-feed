@@ -266,7 +266,7 @@ class LiveTradeTracker {
             return matchesVersion && matchesInstrument && matchesBarType && matchesThreshold;
         });
 
-        // Safe parser to normalize numbers, strings, and regional slash dates to milliseconds
+        // Safe browser-compatible timestamp parser
         const getMs = (t) => {
             if (!t) return 0;
             if (typeof t === 'number') {
@@ -276,58 +276,12 @@ class LiveTradeTracker {
             if (!isNaN(num)) {
                 return num < 10000000000 ? num * 1000 : num;
             }
-            
-            let parsed = Date.parse(t);
-            if (!isNaN(parsed)) return parsed;
-
-            // Robust parser fallback for European/Indian slash formats (e.g., DD/MM/YY)
-            const parts = t.split(/[\/\-\s:]/);
-            if (parts.length >= 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1;
-                let year = parseInt(parts[2], 10);
-                if (year < 100) year += 2000;
-
-                const hour = parseInt(parts[3], 10) || 0;
-                const minute = parseInt(parts[4], 10) || 0;
-                const second = parseInt(parts[5], 10) || 0;
-
-                const date = new Date(year, month, day, hour, minute, second);
-                if (!isNaN(date.getTime())) {
-                    return date.getTime();
-                }
-            }
-            return 0;
+            const parsed = Date.parse(t);
+            return isNaN(parsed) ? 0 : parsed;
         };
 
-        // Stable Multi-Key Sorting
-        const sorted = [...filtered].sort((a, b) => {
-            const isLiveA = a.status === 'active';
-            const isLiveB = b.status === 'active';
-
-            // 1. Pin active trades to the top of the panel
-            if (isLiveA && !isLiveB) return -1;
-            if (!isLiveA && isLiveB) return 1;
-
-            // 2. Primary sort: Timestamp descending (newest first)
-            const timeA = getMs(a.timestamp);
-            const timeB = getMs(b.timestamp);
-            if (timeA !== timeB) {
-                return timeB - timeA;
-            }
-
-            // 3. Secondary sort: Bar Number descending
-            const barA = Number(a.barNumber) || 0;
-            const barB = Number(b.barNumber) || 0;
-            if (barA !== barB) {
-                return barB - barA;
-            }
-
-            // 4. Tertiary sort: Alphabetical strategy version
-            const verA = String(a.version || "");
-            const verB = String(b.version || "");
-            return verA.localeCompare(verB);
-        });
+        // Strict chronological sorting: newest first (no pinning)
+        const sorted = [...filtered].sort((a, b) => getMs(b.timestamp) - getMs(a.timestamp));
 
         sorted.forEach(sig => {
             this.addCardToDOM(sig, listContainer);

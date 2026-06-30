@@ -987,7 +987,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (passesScore) {
                                         const triggerPrice = structureHigh + triggerOffset;
-                                        const stopLoss = sBar.low - stopOffset;
+                                        const stopLoss = Math.min(sBar.low, structureHigh) - stopOffset;
                                         
                                         let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
                                         let structuralTarget = null;
@@ -1069,7 +1069,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (passesScore) {
                                         const triggerPrice = structureLow - triggerOffset;
-                                        const stopLoss = sBar.high + stopOffset;
+                                        const stopLoss = Math.max(sBar.high, structureLow) + stopOffset;
                                         
                                         let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
                                         let structuralTarget = null;
