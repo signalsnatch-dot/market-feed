@@ -1,5 +1,3 @@
-
-// candleBuilder.js
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
@@ -11,6 +9,7 @@ class DualCandleBuilder extends EventEmitter {
         
         this.pendingOrders = new Map(); // key: `${instrument}_${bar_type}_${threshold}_${version}`
         this.activeTrades = new Map();  // key: `${instrument}_${bar_type}_${threshold}_${version}`
+        this.lastCompletedTimes = new Map(); // key: `${instrument}_${bar_type}_${threshold}_${version}` -> timestamp (ms)
         
         this.priceBuilder = new PriceBarBuilder({
             instruments: config.instruments,
@@ -84,10 +83,16 @@ class DualCandleBuilder extends EventEmitter {
     processIncomingSignal(signal, barType) {
         const threshold = signal.threshold;
         const key = `${signal.instrument}_${barType}_${threshold}_${signal.version}`;
+        const currentTime = signal.timestamp || Date.now();
+
         const hasActive = this.activeTrades.has(key);
         const hasPending = this.pendingOrders.has(key);
 
-        const isOverlapping = hasActive || hasPending;
+        // Cool-down check: prevent identical intra-version re-execution within 45 seconds of completion
+        const lastCompletedTime = this.lastCompletedTimes.get(key) || 0;
+        const isCooldownActive = lastCompletedTime > 0 && (currentTime - lastCompletedTime < 45000);
+
+        const isOverlapping = hasActive || hasPending || isCooldownActive;
 
         const trackedSignal = {
             ...signal,
@@ -125,7 +130,6 @@ class DualCandleBuilder extends EventEmitter {
                     }
 
                     if (triggered) {
-                        // Slippage Correction: If price gapped past entry on open, fill at open price
                         let fillPrice = pending.entry;
                         if (pending.type === 'BUY_STOP' && bar.open > pending.entry) {
                             fillPrice = bar.open;
@@ -133,7 +137,6 @@ class DualCandleBuilder extends EventEmitter {
                             fillPrice = bar.open;
                         }
 
-                        // Maintain target reward ratio (RRR) based on actual filled price
                         let finalTP = pending.tp;
                         if (fillPrice !== pending.entry) {
                             const risk = Math.abs(fillPrice - pending.sl);
@@ -176,14 +179,12 @@ class DualCandleBuilder extends EventEmitter {
                         const tpReached = bar.high >= trade.tp;
 
                         if (stoppedOut && tpReached) {
-                            // Worst case scenario: exit at bar open (if opened below SL) or trade SL
                             exitPrice = bar.open < trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (stoppedOut) {
                             exitPrice = bar.open < trade.sl ? bar.open : trade.sl;
                             exitReason = 'stop_loss';
                         } else if (tpReached) {
-                            // If opened above TP, fill at open price
                             exitPrice = bar.open > trade.tp ? bar.open : trade.tp;
                             exitReason = 'take_profit';
                         }
@@ -223,6 +224,7 @@ class DualCandleBuilder extends EventEmitter {
                         };
 
                         this.activeTrades.delete(key);
+                        this.lastCompletedTimes.set(key, bar.timestamp || Date.now()); // Set completed cooldown baseline
                         this.emit('trade_status_update', statusUpdate);
                     }
                 }
@@ -243,6 +245,7 @@ class DualCandleBuilder extends EventEmitter {
                         };
 
                         this.pendingOrders.delete(key);
+                        this.lastCompletedTimes.set(key, bar.timestamp || Date.now()); // Set cancelled cooldown baseline
                         this.emit('trade_status_update', expiredSignal);
                     }
                 }

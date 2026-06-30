@@ -5,29 +5,15 @@ const RESULTS_DIR = './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
 
 // Matches any V1 to V43 strategy
-const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
+const versionRegex =  /^V([1-9]|[1-4]\d|50):/;
 
 const confidenceVersions = [
     'V3: High Confidence', 
     'V8: High Confidence (Strict)', 
     'V13: High Confidence (Calibrated)', 
-    'V18: High Confidence (Strict-Calibrated)',
-    'V21: 65-70% confidence of V3',
-    'V22: More than 80% confidence of V3',
-    'V23: 65-70% and More than 80% confidence of V3',
-    'V24: 65-70% confidence of V8',
-    'V25: More than 80% confidence of V8',
-    'V26: 65-70% and More than 80% confidence of V8',
-    'V27: 65-70% confidence of V13',
-    'V28: More than 80% confidence of V13',
-    'V29: 65-70% and More than 80% confidence of V13',
-    'V30: 65-70% confidence of V18',
-    'V31: More than 80% confidence of V18',
-    'V32: 65-70% and More than 80% confidence of V18',
-    'V35: High Confidence (Structural-Calibrated)',
-    'V40: High Confidence (Strict Structural-Calibrated)',
-    'V43: 65-70% and More than 80% confidence of V35'
+    'V18: High Confidence (Strict-Calibrated)'
 ];
+
 const INSTRUMENT_NAMES = {
     // Standard ISINs mapped directly to Stock Names
     'INE002A01018': 'Reliance Industries',

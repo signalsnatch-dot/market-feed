@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES, runPriceActionBacktest, DEFAULT_PARAMS } = require('./priceActionStrategy');
 
-const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
+const versionRegex = /^V([1-9]|[1-4]\d|50):/;
 
 class StrategyBacktester {
     constructor(config) {

@@ -68,7 +68,7 @@ const DEFAULT_PARAMS = {
     // === Confidence Filter ===
     minConfidenceThreshold: 45,         // Only execute setups that score >= 45/100 on the Confluence Matrix
     enableConfidenceScoring: true,      // Toggles scoring calculations
-    
+     
     // === Risk Management ===
     maxRiskPerTrade: 0.01,              // Risk 1% of equity per trade
     maxConsecutiveLosses: 3,            // Cool-down after consecutive losses
@@ -169,7 +169,16 @@ function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
     return bestIdx;
 }
 
+// === Trend Evaluation Selection Helper ===
 function assessTrend(candles, ema, i, params) {
+    if (params.useBrooksTrend) {
+        return assessTrendBrooks(candles, ema, i, params);
+    }
+    return assessTrendLegacy(candles, ema, i, params);
+}
+
+// === Legacy Trend Logic (Strictly preserved for V1-V30) ===
+function assessTrendLegacy(candles, ema, i, params) {
     const { emaPeriod, minTrendBars } = params;
     if (i < emaPeriod + minTrendBars || ema[i] == null || ema[i - 5] == null) {
         return { bullish: false, bearish: false };
@@ -189,6 +198,92 @@ function assessTrend(candles, ema, i, params) {
     const bearish = belowEma && lowerEMA >= 4 && emaSlope < -0.00002;
     
     return { bullish, bearish };
+}
+
+// === New Al Brooks Trend Logic (Upgraded for V31-V50) ===
+function assessTrendBrooks(candles, ema, i, params) {
+    const { emaPeriod, minTrendBars } = params;
+    
+    const macroLookback = minTrendBars || 18;
+    if (i < emaPeriod + macroLookback || ema[i] == null || ema[i - 15] == null) {
+        return { bullish: false, bearish: false };
+    }
+
+    const avgRange = getAverageBarRange(candles, i, 10);
+    if (avgRange <= 0) return { bullish: false, bearish: false };
+
+    // ABR-Normalized Slope
+    const emaDelta = ema[i] - ema[i - 15];
+    const normalizedSlope = emaDelta / (avgRange * 15);
+
+    let barsAbove = 0;
+    let barsBelow = 0;
+    const trendStart = i - macroLookback;
+    for (let j = trendStart; j <= i; j++) {
+        if (candles[j].close > ema[j]) barsAbove++;
+        if (candles[j].close < ema[j]) barsBelow++;
+    }
+
+    let hasBullishGapBar = false;
+    let hasBearishGapBar = false;
+    for (let j = i - 15; j < i; j++) {
+        if (candles[j].low > ema[j]) hasBullishGapBar = true;
+        if (candles[j].high < ema[j]) hasBearishGapBar = true;
+    }
+
+    const bullish = (barsAbove / (macroLookback + 1)) >= 0.80 && normalizedSlope > 0.08 && hasBullishGapBar;
+    const bearish = (barsBelow / (macroLookback + 1)) >= 0.80 && normalizedSlope < -0.08 && hasBearishGapBar;
+
+    return { bullish, bearish };
+}
+
+// === Whipsaw Filter Selector ===
+function isWhipsawing(candles, ema, i, p) {
+    if (!p.enableWhipsawFilter) return false;
+    if (p.useBrooksTrend) {
+        return isWhipsawingBrooks(candles, ema, i, p);
+    }
+    return isWhipsawingLegacy(candles, ema, i, p);
+}
+
+function isWhipsawingLegacy(candles, ema, i, p) {
+    const emaSlope = (ema[i] - ema[i - 5]) / ema[i - 5];
+    const isFlat = Math.abs(emaSlope) < p.flatEmaSlopeThreshold;
+
+    if (!isFlat) return false;
+
+    let emaCrosses = 0;
+    for (let j = i - p.whipsawLookback; j < i; j++) {
+        if (!ema[j] || !ema[j - 1]) continue;
+        const crossedAbove = candles[j].close > ema[j] && candles[j - 1].close < ema[j - 1];
+        const crossedBelow = candles[j].close < ema[j] && candles[j - 1].close > ema[j - 1];
+        if (crossedAbove || crossedBelow) {
+            emaCrosses++;
+        }
+    }
+    return emaCrosses > p.maxEmaCrosses;
+}
+
+function isWhipsawingBrooks(candles, ema, i, p) {
+    const avgRange = getAverageBarRange(candles, i, 10);
+    if (avgRange <= 0) return false;
+
+    const emaDelta = ema[i] - ema[i - 5];
+    const normalizedSlope = emaDelta / (avgRange * 5);
+    const isFlat = Math.abs(normalizedSlope) < 0.05;
+
+    if (!isFlat) return false;
+
+    let emaCrosses = 0;
+    for (let j = i - p.whipsawLookback; j < i; j++) {
+        if (!ema[j] || !ema[j - 1]) continue;
+        const crossedAbove = candles[j].close > ema[j] && candles[j - 1].close < ema[j - 1];
+        const crossedBelow = candles[j].close < ema[j] && candles[j - 1].close > ema[j - 1];
+        if (crossedAbove || crossedBelow) {
+            emaCrosses++;
+        }
+    }
+    return emaCrosses > p.maxEmaCrosses;
 }
 
 // ============================================================
@@ -322,28 +417,6 @@ function validateSignalBar(sBar, type, p) {
 
     return true;
 }
-
-function isWhipsawing(candles, ema, i, p) {
-    if (!p.enableWhipsawFilter) return false;
-
-    const slope = (ema[i] - ema[i - 5]) / ema[i - 5];
-    const isFlat = Math.abs(slope) < p.flatEmaSlopeThreshold;
-
-    if (!isFlat) return false;
-
-    let emaCrosses = 0;
-    for (let j = i - p.whipsawLookback; j < i; j++) {
-        if (!ema[j] || !ema[j - 1]) continue;
-        const crossedAbove = candles[j].close > ema[j] && candles[j - 1].close < ema[j - 1];
-        const crossedBelow = candles[j].close < ema[j] && candles[j - 1].close > ema[j - 1];
-        if (crossedAbove || crossedBelow) {
-            emaCrosses++;
-        }
-    }
-
-    return emaCrosses > p.maxEmaCrosses;
-}
-
 // ============================================================
 // STRUCTURAL LEG COMPLETION WITH TIME & Acceptance Filters
 // ============================================================
@@ -1121,257 +1194,219 @@ function twoLeggedPullbackCore(candles, params = {}) {
 // STRATEGY VERSIONS MAP (PARALLEL CONFIGS)
 // ============================================================
 
+// === STRATEGIES DICTIONARY (V1 to V50) ===
 const STRATEGIES = {
-    // ==================== V1 to V10: Original Absolute Ticks ====================
+    // === V1 to V10: Original Absolute Ticks ===
     "V1: Double Traps": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true });
     },
     "V2: EMA Pullback": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false });
     },
     "V3: High Confidence": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
     },
     "V4: Aggressive": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, minSignalBarCloseRatio: 0.50 });
     },
     "V5: Wade Structural": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true, 
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, useStructuralTarget: true });
     },
     "V6: Double Traps (Strict)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true });
     },
     "V7: EMA Pullback (Strict)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true });
     },
     "V8: High Confidence (Strict)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
     },
     "V9: Aggressive (Strict)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true, minSignalBarCloseRatio: 0.50 });
     },
     "V10: Wade Structural (Strict)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            useRatios: false,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
     },
 
-    // ==================== V11-V20: CALIBRATED RATIO EDITIONS ====================
-
+    // === V11-V20: Original Calibrated Ratio Editions ===
     "V11: Double Traps (Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true });
     },
     "V12: EMA Pullback (Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false });
     },
     "V13: High Confidence (Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
     },
     "V14: Aggressive (Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, minSignalBarCloseRatio: 0.50 });
     },
     "V15: Wade Structural (Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true, 
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralTarget: true });
     },
     "V16: Double Traps (Strict-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true });
     },
     "V17: EMA Pullback (Strict-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, requireStrictSecondLeg: true });
     },
     "V18: High Confidence (Strict-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
     },
     "V19: Aggressive (Strict-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, requireStrictSecondLeg: true, minSignalBarCloseRatio: 0.50 });
     },
     "V20: Wade Structural (Strict-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
+    },
+
+    // === V21-V30: Structural Calibrated Editions (Shifted down from V33-V42) ===
+    "V21: Double Traps (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true });
+    },
+    "V22: EMA Pullback (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true });
+    },
+    "V23: High Confidence (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
+    },
+    "V24: Aggressive (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, minSignalBarCloseRatio: 0.50 });
+    },
+    "V25: Wade Structural (Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, useStructuralTarget: true });
+    },
+    "V26: Double Traps (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true });
+    },
+    "V27: EMA Pullback (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true });
+    },
+    "V28: High Confidence (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, enableConfidenceScoring: true, minConfidenceThreshold: 45 });
+    },
+    "V29: Aggressive (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true, minSignalBarCloseRatio: 0.50 });
+    },
+    "V30: Wade Structural (Strict Structural-Calibrated)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
+    },
+
+    // === V31-V40: Upgraded Clones of V1-V10 (With Al Brooks Trend & Parameter Optimization) ===
+    "V31: Double Traps (Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V32: EMA Pullback (Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V33: High Confidence (Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, enableConfidenceScoring: true, minConfidenceThreshold: 45, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V34: Aggressive (Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, minSignalBarCloseRatio: 0.50, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V35: Wade Structural (Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V36: Double Traps (Strict Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V37: EMA Pullback (Strict Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V38: High Confidence (Strict Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, enableConfidenceScoring: true, minConfidenceThreshold: 45, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V39: Aggressive (Strict Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true, minSignalBarCloseRatio: 0.50, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V40: Wade Structural (Strict Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+
+    // === V41-V50: Upgraded Clones of V21-V30 (With Al Brooks Trend & Parameter Optimization) ===
+    "V41: Double Traps (Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V42: EMA Pullback (Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V43: High Confidence (Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, enableConfidenceScoring: true, minConfidenceThreshold: 45, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V44: Aggressive (Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, minSignalBarCloseRatio: 0.50, useStructuralTarget: false, useBrooksTrend: true, useBrooksTrend: true });
+    },
+    "V45: Wade Structural (Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: true,
+            useRatios: true,
+            useStructuralRules: true
+        });
+    },
+    "V46: Double Traps (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true,
+            useRatios: true,
+            useStructuralRules: true
+        });
+    },
+    "V47: EMA Pullback (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            useRatios: true,
+            useStructuralRules: true
+        });
+    },
+    "V48: High Confidence (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: true,
+            enableConfidenceScoring: true,
+            enableFVGConfluence: true,
+            enableLiquiditySweeps: true,
+            minConfidenceThreshold: 45,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true,
+            useRatios: true,
+            useStructuralRules: true
+        });
+    },
+    "V49: Aggressive (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, {
+            ...params,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            enableFVGConfluence: false,
+            enableLiquiditySweeps: false,
+            useStructuralTarget: false,
+            requireStrictSecondLeg: true,
+            minSignalBarCloseRatio: 0.50,
+            useRatios: true,
+            useStructuralRules: true
+        });
+    },
+    "V50: Wade Structural (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
             enableTraps: true,
@@ -1381,312 +1416,9 @@ const STRATEGIES = {
             minConfidenceThreshold: 45,
             useStructuralTarget: true,
             requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-
-    // ==================== V21-V23: V3 WITH DYNAMIC CONFIDENCE FILTERING ====================
-    "V21: 65-70% confidence of V3": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score >= 65 && score <= 70,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V22: More than 80% confidence of V3": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score > 80,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V23: 65-70% and More than 80% confidence of V3": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-
-    // ==================== V24-V26: V8 WITH DYNAMIC CONFIDENCE FILTERING ====================
-    "V24: 65-70% confidence of V8": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score >= 65 && score <= 70,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V25: More than 80% confidence of V8": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score > 80,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V26: 65-70% and More than 80% confidence of V8": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-
-    // ==================== V27-V29: V13 WITH DYNAMIC CONFIDENCE FILTERING ====================
-    "V27: 65-70% confidence of V13": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score >= 65 && score <= 70,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V28: More than 80% confidence of V13": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score > 80,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V29: 65-70% and More than 80% confidence of V13": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-
-    // ==================== V30-V32: V18 WITH DYNAMIC CONFIDENCE FILTERING ====================
-    "V30: 65-70% confidence of V18": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score >= 65 && score <= 70,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V31: More than 80% confidence of V18": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => score > 80,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V32: 65-70% and More than 80% confidence of V18": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-
-    // ==================== V33-V42: NEW NOISE-CANCELLED STRUCTURAL CALIBRATED EDITIONS ====================
-    "V33: Double Traps (Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V34: EMA Pullback (Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V35: High Confidence (Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V36: Aggressive (Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false
-        });
-    },
-    "V37: Wade Structural (Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true, 
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
-        });
-    },
-    "V38: Double Traps (Strict Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V39: EMA Pullback (Strict Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
-    },
-    "V40: High Confidence (Strict Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-    "V41: Aggressive (Strict Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableGiantBarFilter: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false,
-            minSignalBarCloseRatio: 0.50,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true
-        });
-    },
-    "V42: Wade Structural (Strict Structural-Calibrated)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true
-        });
-    },
-
-    // ==================== V43: PREMIUM STRUCTURAL FILTER EDITION ====================
-    "V43: 65-70% and More than 80% confidence of V35": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            confidenceFilter: (score) => (score >= 65 && score <= 70) || score > 80,
-            useStructuralTarget: false,
-            enableWhipsawFilter: false,
-            enableBodyToRangeFilter: false
+            requireDoubleTopBottomTrap: true,
+            useRatios: true,
+            useStructuralRules: true
         });
     }
 };
@@ -1695,21 +1427,22 @@ const STRATEGIES = {
 Object.keys(STRATEGIES).forEach(key => {
     const isCalibrated = key.includes("(Calibrated)") || 
                          key.includes("-Calibrated)") || 
-                         key.includes("of V13") || 
-                         key.includes("of V18") ||
-                         key.includes("Structural-Calibrated") ||
-                         key.includes("of V35");
+                         key.includes("Structural-Calibrated");
 
-    const isStructural = key.includes("Structural-Calibrated") ||
-                         key.includes("of V35");
+    const isStructural = key.includes("Structural-Calibrated");
+    
+    const isBrooksTrend = key.includes("Upgraded");
 
     const originalFunc = STRATEGIES[key];
     STRATEGIES[key] = (candles, params = {}) => {
-        return originalFunc(candles, { 
+        const mergedParams = {
             useRatios: isCalibrated, 
             useStructuralRules: isStructural,
+            useBrooksTrend: isBrooksTrend,
+            ...(isBrooksTrend ? { minTrendBars: 18, swingLookback: 12 } : {}),
             ...params 
-        });
+        };
+        return originalFunc(candles, mergedParams);
     };
 });
 

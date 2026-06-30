@@ -2,14 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 // --- User Configurations ---
-const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-06-29.json'; 
+const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-06-30.json'; 
 const OUTPUT_DIR = './live-performance-report';
 
-const startTime = '20:30'; // Session Start (HH:MM in 24h IST format)
+const startTime = '15:45'; // Session Start (HH:MM in 24h IST format)
 const endTime = '23:55';   // Session End (HH:MM in 24h IST format). Set to null to use current time.
 
 // Matches any V1 to V43 strategy
-const versionRegex = /^V([1-9]|[1-3]\d|4[0-3]):/;
+const versionRegex =  /^V([1-9]|[1-4]\d|50):/;
 
 const confidenceVersions = [
     'V3: High Confidence', 

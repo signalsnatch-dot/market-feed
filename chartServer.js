@@ -1,10 +1,13 @@
-// chartServer.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const { STRATEGIES } = require('./priceActionStrategy');
+
+function getTodayISTDateString() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Strictly YYYY-MM-DD in India
+}
 
 class ChartServer {
     constructor(port = 3001, candlesDataDir = './candles_data', options = {}) {
@@ -64,7 +67,7 @@ class ChartServer {
         try {
             fs.accessSync(resolvedPath, fs.constants.W_OK);
         } catch (err) {
-            throw new Error(`Data directory not writable: ${resolvedPath}`);
+            throw new Error("Data directory not writable: " + resolvedPath);
         }
         
         this.candlesDataDir = resolvedPath;
@@ -83,7 +86,7 @@ class ChartServer {
         );
         
         if (!isAllowed) {
-            throw new Error(`Security violation: Unauthorized path: ${filepath}`);
+            throw new Error("Security violation: Unauthorized path: " + filepath);
         }
         
         return resolvedPath;
@@ -93,7 +96,7 @@ class ChartServer {
         const match = filename.match(/^(MCX_FO|NSE_FO|NSE_EQ)_([^_]+)_(\d+)_(volume|price)_bars\.csv$/);
         if (match) {
             return {
-                instrumentKey: `${match[1]}|${match[2]}`,
+                instrumentKey: match[1] + '|' + match[2],
                 threshold: parseInt(match[3], 10),
                 type: match[4]
             };
@@ -101,7 +104,7 @@ class ChartServer {
         const legacyMatch = filename.match(/^(MCX_FO|NSE_FO|NSE_EQ)_([^_]+)/);
         if (legacyMatch) {
             return {
-                instrumentKey: `${legacyMatch[1]}|${legacyMatch[2]}`,
+                instrumentKey: legacyMatch[1] + '|' + legacyMatch[2],
                 threshold: null,
                 type: filename.includes('volume') ? 'volume' : 'price'
             };
@@ -123,7 +126,7 @@ class ChartServer {
         this.app.get('/api/recent/:type', (req, res) => {
             const type = req.params.type;
             if (type === 'price' || type === 'volume') {
-                const storeKey = `${type}_bars`;
+                const storeKey = type + '_bars';
                 res.json(this.recentCandles[storeKey]);
             } else {
                 res.status(400).json({ error: 'Invalid type' });
@@ -139,11 +142,17 @@ class ChartServer {
         });
         
         this.app.get('/api/signals', (req, res) => {
-            const enriched = this.tradeSignals.map(sig => ({
-                ...sig,
-                name: this.getInstrumentName(sig.instrument)
-            }));
-            res.json(enriched);
+            const todayIST = getTodayISTDateString();
+            const todaySignals = this.tradeSignals
+                .filter(sig => {
+                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    return sigDate === todayIST;
+                })
+                .map(sig => ({
+                    ...sig,
+                    name: this.getInstrumentName(sig.instrument) // Retain name mapping
+                }));
+            res.json(todaySignals);
         });
         
         this.app.get('/health', (req, res) => {
@@ -163,18 +172,24 @@ class ChartServer {
         });
         
         this.io.on('connection', (socket) => {
-            console.log(`Client connected: ${socket.id}`);
+            console.log("Client connected: " + socket.id);
             
-            const enrichedSignals = this.tradeSignals.map(sig => ({
-                ...sig,
-                name: this.getInstrumentName(sig.instrument)
-            }));
+            const todayIST = getTodayISTDateString();
+            const todaySignals = this.tradeSignals
+                .filter(sig => {
+                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    return sigDate === todayIST;
+                })
+                .map(sig => ({
+                    ...sig,
+                    name: this.getInstrumentName(sig.instrument) // Retain name mapping
+                }));
             
             socket.emit('historical_candles', {
                 volume_bars: this.recentCandles.volume_bars,
                 price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
-                trade_signals: enrichedSignals,
+                trade_signals: todaySignals,
                 strategies: Object.keys(STRATEGIES)
             });
             
@@ -184,14 +199,14 @@ class ChartServer {
                     socket.emit('error', { message: 'Invalid subscription' });
                     return;
                 }
-                socket.join(`${instrument}_${type}_${threshold}`);
-                console.log(`Client subscribed to ${instrument} ${type} (Threshold: ${threshold})`);
+                socket.join(instrument + '_' + type + '_' + threshold);
+                console.log("Client subscribed to " + instrument + " " + type + " (Threshold: " + threshold + ")");
             });
             
             socket.on('unsubscribe', (data) => {
                 const { instrument, type, threshold } = data;
                 if (instrument && type && threshold) {
-                    socket.leave(`${instrument}_${type}_${threshold}`);
+                    socket.leave(instrument + '_' + type + '_' + threshold);
                 }
             });
         });
@@ -215,7 +230,7 @@ class ChartServer {
                         const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
                         this.recentCandles.volume_bars.push(...limitedCandles);
                     } catch (err) {
-                        console.error(`Error loading ${file}:`, err.message);
+                        console.error("Error loading " + file + ":", err.message);
                     }
                 }
             });
@@ -235,7 +250,7 @@ class ChartServer {
                         const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
                         this.recentCandles.price_bars.push(...limitedCandles);
                     } catch (err) {
-                        console.error(`Error loading ${file}:`, err.message);
+                        console.error("Error loading " + file + ":", err.message);
                     }
                 }
             });
@@ -248,8 +263,15 @@ class ChartServer {
     generateHistoricalSignals() {
         console.log('⚡ Generating signals on history...');
         const seenSignals = new Set();
-        this.tradeSignals.forEach(sig => {
-            const key = `${sig.instrument}_${sig.bar_type}_${sig.threshold}_${sig.barNumber}_${sig.type}_${sig.version}`;
+        
+        const todayIST = getTodayISTDateString();
+        const filteredSignals = this.tradeSignals.filter(sig => {
+            const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            return sigDate === todayIST;
+        });
+
+        filteredSignals.forEach(sig => {
+            const key = sig.instrument + '_' + sig.bar_type + '_' + sig.threshold + '_' + sig.barNumber + '_' + sig.type + '_' + sig.version;
             seenSignals.add(key);
         });
 
@@ -258,14 +280,16 @@ class ChartServer {
             candles.forEach(c => {
                 const inst = c.instrument || c.instrument_key;
                 const thresh = c.threshold || (barType === 'volume' ? c.targetVolume : c.targetTicks);
-                const key = `${inst}_${thresh}`;
+                const key = inst + '_' + thresh;
                 if (!grouped[key]) grouped[key] = [];
                 grouped[key].push(c);
             });
 
             for (const [groupKey, list] of Object.entries(grouped)) {
                 if (list.length < 32) continue;
-                const [instKey, threshStr] = groupKey.split('_');
+                const parts = groupKey.split('_');
+                const instKey = parts[0] + '_' + parts[1];
+                const threshStr = parts[2];
                 const threshold = parseInt(threshStr, 10);
                 
                 try {
@@ -275,6 +299,10 @@ class ChartServer {
                         signals.forEach(sig => {
                             const candle = list[sig.index];
                             if (!candle) return;
+
+                            // Filter: only generate historical signals belonging strictly to today's IST session
+                            const candDate = new Date(candle.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                            if (candDate !== todayIST) return;
 
                             let confidence = 50;
                             const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
@@ -289,7 +317,7 @@ class ChartServer {
                                 sl: sig.stopLoss,
                                 tp: sig.takeProfit,
                                 confidence: confidence,
-                                reason: sig.reason.replace('Conf:', `${barType === 'volume' ? 'Volume' : 'Price'}, Conf:`),
+                                reason: sig.reason.replace('Conf:', (barType === 'volume' ? 'Volume' : 'Price') + ', Conf:'),
                                 timestamp: candle.timestamp,
                                 barNumber: candle.barNumber,
                                 bar_type: barType,
@@ -298,7 +326,7 @@ class ChartServer {
                                 overlapping: false
                             };
 
-                            const uniqueKey = `${instKey}_${barType}_${threshold}_${candle.barNumber}_${sig.type}_${versionName}`;
+                            const uniqueKey = instKey + '_' + barType + '_' + threshold + '_' + candle.barNumber + '_' + sig.type + '_' + versionName;
                             if (!seenSignals.has(uniqueKey)) {
                                 seenSignals.add(uniqueKey);
                                 this.tradeSignals.push(signalEvent);
@@ -306,7 +334,7 @@ class ChartServer {
                         });
                     }
                 } catch (err) {
-                    console.error(`Error processing history signals:`, err.message);
+                    console.error("Error processing history signals:", err.message);
                 }
             }
         };
@@ -315,19 +343,28 @@ class ChartServer {
         processStrategyOnHistory(this.recentCandles.price_bars, 'price');
         this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
 
-        if (this.tradeSignals.length > 2000) {
-            this.tradeSignals = this.tradeSignals.slice(-2000);
-        }
+        // Filter trade signals so list remains clean of legacy caches
+        this.tradeSignals = this.tradeSignals.filter(sig => {
+            const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            return sigDate === todayIST;
+        });
+
         this.saveSignalsToDisk();
     }
 
     loadSavedSignals() {
-        const jsonFile = 'signals_today_' + new Date().toISOString().split('T')[0] + '.json';
+        const jsonFile = 'signals_today_' + getTodayISTDateString() + '.json';
         const signalsFile = path.join(this.candlesDataDir, jsonFile);
         if (fs.existsSync(signalsFile)) {
             try {
                 const fileData = fs.readFileSync(signalsFile, 'utf8');
-                this.tradeSignals = JSON.parse(fileData);
+                const loaded = JSON.parse(fileData);
+                
+                const todayIST = getTodayISTDateString();
+                this.tradeSignals = loaded.filter(sig => {
+                    const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    return sigDate === todayIST;
+                });
             } catch (err) {
                 this.tradeSignals = [];
             }
@@ -336,31 +373,23 @@ class ChartServer {
 
     saveSignalsToDisk() {
         try {
-            const localDate = new Date().toLocaleDateString('en-CA');
-            const jsonFile = `signals_today_${localDate}.json`;
+            const todayIST = getTodayISTDateString();
+            const jsonFile = 'signals_today_' + todayIST + '.json';
             const signalsFile = path.join(this.candlesDataDir, jsonFile);
             
-            let existingSignals = [];
-            if (fs.existsSync(signalsFile)) {
-                try {
-                    const content = fs.readFileSync(signalsFile, 'utf8');
-                    existingSignals = JSON.parse(content);
-                } catch (err) {}
-            }
-            
             const signalMap = new Map();
-            for (const signal of existingSignals) {
-                const key = `${signal.timestamp}_${signal.instrument}_${signal.threshold}_${signal.version}`;
-                signalMap.set(key, signal);
-            }
+            const filteredSignals = this.tradeSignals.filter(sig => {
+                const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                return sigDate === todayIST;
+            });
             
-            for (const signal of this.tradeSignals) {
-                const key = `${signal.timestamp}_${signal.instrument}_${signal.threshold}_${signal.version}`;
+            for (const signal of filteredSignals) {
+                const key = signal.timestamp + '_' + signal.instrument + '_' + signal.threshold + '_' + signal.version;
                 signalMap.set(key, signal);
             }
             
             const allSignals = Array.from(signalMap.values());
-            const tempFile = `${signalsFile}.tmp`;
+            const tempFile = signalsFile + '.tmp';
             fs.writeFileSync(tempFile, JSON.stringify(allSignals, null, 2), 'utf8');
             fs.renameSync(tempFile, signalsFile);
         } catch (err) {
@@ -494,16 +523,8 @@ class ChartServer {
     }
     
     getInstrumentName(key) {
-        if (!key) return 'N/A';
-
-        // 1. Dynamic Check against config.json
         try {
-            const fs = require('fs');
-            const path = require('path');
-            let configPath = path.resolve(__dirname, 'config.json');
-            if (!fs.existsSync(configPath)) {
-                configPath = path.resolve(__dirname, '../config.json');
-            }
+            const configPath = path.resolve(__dirname, 'config.json');
             if (fs.existsSync(configPath)) {
                 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
                 const inst = config.instruments?.find(i => 
@@ -515,69 +536,16 @@ class ChartServer {
                     return inst.name;
                 }
             }
-        } catch (e) {
-            // Log issues quietly and fall back to local database mapping
-        }
+        } catch (e) {}
 
-        // 2. Comprehensive Master Name Fallback Mapping
-        const MASTER_FALLBACK_NAMES = {
-            '538685': 'Natural Gas Future',
-            '538686': 'Natural Gas Mini Future',
-            '520702': 'Crude Oil Future',
-            '520703': 'Crude Oil Mini Future',
-            '464150': 'Silver Future',
-            '471726': 'Silver Mini Future',
-            '488788': 'Silver Micro Future',
-            '568831': 'Copper Future',
-            '568836': 'Zinc Future',
-            '568833': 'Lead Future',
-            '568830': 'Aluminium Future',
-            '466583': 'Gold Future',
-            '510764': 'Gold Mini Future',
-            '552721': 'Gold Petal Future',
-            '61093': 'Nifty 50 Future',
-            '61088': 'Nifty Bank Future',
-            '61091': 'Fin Nifty Future',
-            '61092': 'Midcap Nifty Future',
-            
-            // ISINs/Tokens to cash equity name mapping
-            'INE002A01018': 'Reliance Cash Equity',
-            'INE040A01034': 'HDFC Bank Cash Equity',
-            'INE090A01021': 'ICICI Bank Cash Equity',
-            'INE062A01020': 'SBI Cash Equity',
-            'INE467B01029': 'TCS Cash Equity',
-            'INE009A01021': 'Infosys Cash Equity',
-            'INE154A01025': 'ITC Cash Equity',
-            'INE397D01024': 'Bharti Airtel Cash Equity',
-            'INE238A01034': 'Axis Bank Cash Equity',
-            'INE018A01030': 'L&T Cash Equity',
-            'INE081A01020': 'Tata Steel Cash Equity',
-            'INE1TAE01010': 'Tata Motors Cash Equity',
-            'INE296A01032': 'Bajaj Finance Cash Equity',
-            'INE237A01036': 'Kotak Bank Cash Equity',
-            'INE044A01036': 'Sun Pharma Cash Equity',
-            'INE019A01038': 'JSW Steel Cash Equity',
-            'INE522F01014': 'Coal India Cash Equity',
-            'INE423A01024': 'Adani Enterprises Cash Equity',
-            'INE742F01042': 'Adani Ports Cash Equity',
-            'INE038A01020': 'Hindalco Cash Equity',
-            'INE437A01024': 'Apollo Hospitals Cash Equity',
-            'INE160A01022': 'PNB Cash Equity',
-            'INE114A01011': 'SAIL Cash Equity',
-            'INE040H01021': 'SUZLON Cash Equity',
-            'INE928J01020': 'PAYTM Cash Equity',
-            'INE415G01027': 'RVNL Cash Equity',
-            'INE053F01010': 'IRFC Cash Equity',
-            'INE202E01016': 'IREDA Cash Equity',
-            'INE257A01026': 'BHEL Cash Equity',
-            'INE129A01025': 'GAIL Cash Equity',
-            'INE849A01020': 'TRENT Cash Equity'
+        const names = {
+            'MCX_FO|538685': 'Natural Gas Future',
+            'NSE_FO|62329': 'Nifty 50 Future',
+            'NSE_FO|62326': 'Nifty Bank Future'
         };
-
         const id = key.includes('|') ? key.split('|')[1] : key;
         const normalizedId = id.replace(/_raw_ticks$/, '');
-        
-        return MASTER_FALLBACK_NAMES[normalizedId] || normalizedId;
+        return names[key] || fallbackNames[normalizedId] || normalizedId;
     }
     
     getInstrumentsFromFiles() {
@@ -623,12 +591,12 @@ class ChartServer {
             broadcast_time: Date.now()
         };
         
-        const storeKey = `${type}_bars`;
+        const storeKey = type + '_bars';
         this.recentCandles[storeKey].push(candleData);
         
         const candlesByGroup = {};
         for (const c of this.recentCandles[storeKey]) {
-            const key = `${c.instrument || c.instrument_key}_${c.threshold}`;
+            const key = (c.instrument || c.instrument_key) + '_' + c.threshold;
             if (!candlesByGroup[key]) candlesByGroup[key] = [];
             candlesByGroup[key].push(c);
         }
@@ -640,7 +608,7 @@ class ChartServer {
         
         this.recentCandles[storeKey] = updatedCandles.sort((a, b) => a.timestamp - b.timestamp);
         
-        this.io.to(`${instrumentKey}_${type}_${threshold}`).emit(`${instrumentKey}_${type}_${threshold}_candle`, candleData);
+        this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_candle', candleData);
         this.io.emit('candle_update', candleData);
     }
     
@@ -655,18 +623,19 @@ class ChartServer {
             broadcast_time: Date.now()
         };
         
-        this.io.to(`${instrumentKey}_${type}_${threshold}`).emit(`${instrumentKey}_${type}_${threshold}_live_candle`, candleData);
+        this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_live_candle', candleData);
         this.io.emit('live_candle_update', candleData);
     }
 
     broadcastTradeSignal(signalData) {
-        // Ensure name is dynamically verified on incoming alerts
-        signalData.name = this.getInstrumentName(signalData.instrument);
-        
+        const todayIST = getTodayISTDateString();
+        const sigDate = new Date(signalData.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        if (sigDate !== todayIST) return; // Strict live gate: prevent historical files from polluting current screen
+
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
             sig.bar_type === signalData.bar_type &&
-            sig.threshold === signalData.threshold &&
+            String(sig.threshold) === String(signalData.threshold) &&
             sig.barNumber === signalData.barNumber &&
             sig.type === signalData.type &&
             sig.version === signalData.version
@@ -674,6 +643,7 @@ class ChartServer {
         
         if (isDuplicate) return;
 
+        signalData.name = this.getInstrumentName(signalData.instrument);
         signalData.status = signalData.status || 'pending';
         this.tradeSignals.push(signalData);
         
@@ -683,11 +653,10 @@ class ChartServer {
         
         this.saveSignalsToDisk();
         this.io.emit('trade_signal', signalData);
-        console.log(`🚀 Broadcasted: ${signalData.version} | ${signalData.instrument} | Thresh: ${signalData.threshold} | Bar #${signalData.barNumber}`);
+        console.log("🚀 Broadcasted: " + signalData.version + " | " + signalData.instrument + " | Thresh: " + signalData.threshold + " | Bar #" + signalData.barNumber);
     }
 
     broadcastTradeStatusUpdate(updateData) {
-        // Stringify thresholds to prevent Type mismatch (String vs Number) comparison drops
         const matchIndex = this.tradeSignals.findIndex(sig => 
             sig.instrument === updateData.instrument &&
             sig.bar_type === updateData.bar_type &&
@@ -705,16 +674,25 @@ class ChartServer {
             }
             
             this.saveSignalsToDisk();
-            this.io.emit('trade_status_update', this.tradeSignals[matchIndex]);
+            
+            // Enrich before broadcast to ensure UI remains dynamic
+            const enrichedUpdate = {
+                ...this.tradeSignals[matchIndex],
+                name: this.getInstrumentName(this.tradeSignals[matchIndex].instrument)
+            };
+            this.io.emit('trade_status_update', enrichedUpdate);
         } else {
-            // Fallback: If not indexed in cache, broadcast directly so client UI updates instantly
-            this.io.emit('trade_status_update', updateData);
+            const enrichedUpdate = {
+                ...updateData,
+                name: this.getInstrumentName(updateData.instrument)
+            };
+            this.io.emit('trade_status_update', enrichedUpdate);
         }
     }
     
     start() {
         this.server.listen(this.port, () => {
-            console.log(`📊 Chart server on port ${this.port}`);
+            console.log("📊 Chart server on port " + this.port);
         });
     }
 }
