@@ -197,7 +197,7 @@ class PriceBarBuilder extends EventEmitter {
 
                         parsedBars.push({
                             type: 'price_bar',
-                            instrument_key: key,
+                            instrument_key: bar.instrument_key, // Corrected from 'key' to 'bar.instrument_key'
                             name: bar.name,
                             barNumber: parseInt(values[barNumberIdx]) || i,
                             open: parseFloat(values[openIdx]),
