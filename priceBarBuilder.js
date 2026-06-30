@@ -6,27 +6,26 @@ const { STRATEGIES } = require('./priceActionStrategy');
 
 const MCX_LOT_MULTIPLIER_MAP = {
     '538685': 1250, // Natural Gas
+    '538686': 250,  // Natural Gas Mini
     '520702': 100,  // Crude Oil
+    '520703': 10,   // Crude Oil Mini
     '464150': 30,   // Silver Standard
-    '464151': 5,    // Silver Mini
-    '477177': 1,    // Silver Micro
-    '552708': 2500, // Copper
-    '552711': 5000, // Zinc
-    '552709': 5000, // Lead
-    '552706': 5000, // Aluminium
-    '466583': 100,  // Gold Standard
+    '471726': 5,    // Silver Mini
+    '488788': 1,    // Silver Micro
+    '568831': 2500, // Copper
+    '568836': 5,    // Zinc
+    '568833': 5,    // Lead
+    '568830': 5,    // Aluminium
+    '466583': 1,    // Gold Standard
     '510764': 10,   // Gold Mini
-    '510464': 1,    // Gold Petal
-    '565898': 50,   // Bulldex
+    '552721': 1     // Gold Petal
 };
 
 function getLotMultiplier(instrumentKey) {
     if (!instrumentKey) return 1;
-    if (instrumentKey.includes('MCX_FO')) {
-        const id = instrumentKey.split('|')[1];
-        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
-            return MCX_LOT_MULTIPLIER_MAP[id];
-        }
+    const id = instrumentKey.split('|')[1];
+    if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
+        return MCX_LOT_MULTIPLIER_MAP[id];
     }
     return 1;
 }
@@ -134,7 +133,7 @@ class PriceBarBuilder extends EventEmitter {
 
                         parsedBars.push({
                             type: 'price_bar',
-                            instrument_key: bar.instrument_key,
+                            instrument_key: key,
                             name: bar.name,
                             barNumber: parseInt(values[barNumberIdx]) || i,
                             open: parseFloat(values[openIdx]),
@@ -154,7 +153,7 @@ class PriceBarBuilder extends EventEmitter {
 
                     bar.bars = parsedBars.slice(-500);
                     this.stats.barsByInstrument.set(mapKey, parsedBars.length);
-                    console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name} (Threshold: ${bar.targetTicks})`);
+                    console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name}`);
                 } catch (err) {
                     console.error(`Failed to load history for ${bar.name}:`, err.message);
                 }
@@ -200,7 +199,7 @@ class PriceBarBuilder extends EventEmitter {
                     if (Array.isArray(state.lastExchangeVolumeToday)) {
                         this.lastExchangeVolumeToday = new Map(state.lastExchangeVolumeToday);
                     }
-                    console.log(`✅ [PRICE BAR] Restored active candle progress and cumulative baselines.`);
+                    console.log(`✅ [PRICE BAR] Restored active candle progress baselines.`);
                 } else {
                     fs.unlinkSync(stateFile);
                 }
@@ -215,26 +214,6 @@ class PriceBarBuilder extends EventEmitter {
         if (!ltp) return;
         const price = parseFloat(ltp);
         
-        let tickVolume = 0;
-        const currentVolToday = parseInt(volume_today, 10);
-        const lotMultiplier = getLotMultiplier(instrument_key);
-
-        if (!isNaN(currentVolToday) && currentVolToday > 0) {
-            const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
-            if (prevVolToday !== undefined && prevVolToday !== null) {
-                if (currentVolToday >= prevVolToday) {
-                    tickVolume = currentVolToday - prevVolToday;
-                } else {
-                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
-                }
-            } else {
-                tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
-            }
-            this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
-        } else {
-            tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
-        }
-
         let exchangeTimeMs = Number(exchange_timestamp);
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
             exchangeTimeMs = Date.now();
@@ -243,7 +222,6 @@ class PriceBarBuilder extends EventEmitter {
         if (isNaN(receiveTimeMs) || receiveTimeMs <= 0) {
             receiveTimeMs = Date.now();
         }
-       
         const currentTime = exchangeTimeMs || receiveTimeMs;
         const exchangeTimeISO = exchangeTimeMs ? new Date(exchangeTimeMs).toISOString() : null;
         const receiveTimeISO = new Date(receiveTimeMs).toISOString();
@@ -256,10 +234,10 @@ class PriceBarBuilder extends EventEmitter {
         });
 
         this.stats.totalTicks++;
-        this.stats.totalVolume += tickVolume;
 
         const targets = this.instrumentTargetsMap.get(instrument_key) || [];
 
+        // Loop through targets to process parallel price bar streams
         for (const targetTicks of targets) {
             const mapKey = `${instrument_key}_${targetTicks}`;
             let bar = this.activeBars.get(mapKey);
@@ -284,6 +262,26 @@ class PriceBarBuilder extends EventEmitter {
             bar.lastUpdateTime = currentTime;
             bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
 
+            // Calculate tick volume
+            let tickVolume = 0;
+            const currentVolToday = parseInt(volume_today, 10);
+            const lotMultiplier = getLotMultiplier(instrument_key);
+
+            if (!isNaN(currentVolToday) && currentVolToday > 0) {
+                const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
+                if (prevVolToday !== undefined && prevVolToday !== null) {
+                    if (currentVolToday >= prevVolToday) {
+                        tickVolume = (currentVolToday - prevVolToday) / lotMultiplier;
+                    } else {
+                        tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
+                    }
+                } else {
+                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
+                }
+            } else {
+                tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
+            }
+
             bar.volume += tickVolume;
             bar.transactions++;
             
@@ -300,7 +298,7 @@ class PriceBarBuilder extends EventEmitter {
                     is_live: true,
                     barNumber: bar.barNumber,
                     open: bar.open,
-                    high: bar.low,
+                    high: bar.high,
                     low: bar.low,
                     close: bar.close,
                     currentTicks: bar.currentTicks,
@@ -333,6 +331,12 @@ class PriceBarBuilder extends EventEmitter {
             if (bar.currentTicks >= bar.targetTicks) {
                 this.closeBar(mapKey, bar);
             }
+        }
+
+        // Store cumulative volume baseline after parallel streams complete
+        const currentVolToday = parseInt(volume_today, 10);
+        if (!isNaN(currentVolToday) && currentVolToday > 0) {
+            this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
         }
     }
     
@@ -420,7 +424,7 @@ class PriceBarBuilder extends EventEmitter {
                     }
                 }
             } catch (err) {
-                console.error(`Error processing price signals:`, err.message);
+                console.error(`Error processing signals:`, err.message);
             }
         }
         

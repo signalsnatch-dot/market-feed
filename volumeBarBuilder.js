@@ -4,33 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-const MCX_LOT_MULTIPLIER_MAP = {
-    '538685': 1250, // Natural Gas
-    '520702': 100,  // Crude Oil
-    '464150': 30,   // Silver Standard
-    '464151': 5,    // Silver Mini
-    '477177': 1,    // Silver Micro
-    '552708': 2500, // Copper
-    '552711': 5000, // Zinc
-    '552709': 5000, // Lead
-    '552706': 5000, // Aluminium
-    '466583': 100,  // Gold Standard
-    '510764': 10,   // Gold Mini
-    '510464': 1,    // Gold Petal
-    '565898': 50,   // Bulldex
-};
-
-function getLotMultiplier(instrumentKey) {
-    if (!instrumentKey) return 1;
-    if (instrumentKey.includes('MCX_FO')) {
-        const id = instrumentKey.split('|')[1];
-        if (MCX_LOT_MULTIPLIER_MAP[id] !== undefined) {
-            return MCX_LOT_MULTIPLIER_MAP[id];
-        }
-    }
-    return 1;
-}
-
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {
         super();
@@ -40,6 +13,7 @@ class VolumeBarBuilder extends EventEmitter {
         this.lastExchangeVolumeToday = new Map();
         this.tickSizeMap = new Map();
         this.instrumentTargetsMap = new Map();
+        this.instrumentLotSizeMap = new Map();
         
         this.dataDir = config.directories?.candlesDataDir || './candles_data/volume_bars';
         this.rawDataDir = config.directories?.rawDataDir || './raw_ticks_data';
@@ -70,6 +44,7 @@ class VolumeBarBuilder extends EventEmitter {
                 
             this.instrumentTargetsMap.set(instrument.key, targets);
             this.tickSizeMap.set(instrument.key, instrument.tickSize !== undefined ? instrument.tickSize : 0.05);
+            this.instrumentLotSizeMap.set(instrument.key, instrument.lotSize !== undefined ? instrument.lotSize : 1);
 
             for (const targetVol of targets) {
                 const mapKey = `${instrument.key}_${targetVol}`;
@@ -95,6 +70,7 @@ class VolumeBarBuilder extends EventEmitter {
                 
                 this.stats.barsByInstrument.set(mapKey, 0);
             }
+            
             console.log(`📊 [VOLUME BAR] ${instrument.name}: Parallel tracking initialized for thresholds [${targets.join(', ')}]`);
         }
     }
@@ -211,18 +187,22 @@ class VolumeBarBuilder extends EventEmitter {
 
     processTick(tickData) {
         const { instrument_key, ltp, last_traded_quantity, volume_today, exchange_timestamp, timestamp } = tickData;
+        
         if (!ltp) return;
+        
         const price = parseFloat(ltp);
         
         let tickVolume = 0;
         const currentVolToday = parseInt(volume_today, 10);
-        const lotMultiplier = getLotMultiplier(instrument_key);
+        const lotMultiplier = this.instrumentLotSizeMap.get(instrument_key) || 1;
 
         if (!isNaN(currentVolToday) && currentVolToday > 0) {
             const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
+            
             if (prevVolToday !== undefined && prevVolToday !== null) {
                 if (currentVolToday >= prevVolToday) {
-                    tickVolume = currentVolToday - prevVolToday;
+                    // Divide volume_today deltas by lot size configuration parameter
+                    tickVolume = (currentVolToday - prevVolToday) / lotMultiplier;
                 } else {
                     tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
                 }
@@ -240,6 +220,7 @@ class VolumeBarBuilder extends EventEmitter {
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
             exchangeTimeMs = Date.now();
         }
+        
         let receiveTimeMs = parseInt(timestamp, 10);
         if (isNaN(receiveTimeMs) || receiveTimeMs <= 0) {
             receiveTimeMs = Date.now();
@@ -344,6 +325,7 @@ class VolumeBarBuilder extends EventEmitter {
                         timestamp: currentTime,
                         progress: (finalActiveBar.currentVolume / finalActiveBar.targetVolume) * 100
                     };
+                    
                     this.emit('live_candle_update', liveCandle);
                 }
 
