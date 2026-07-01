@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-// Dynamic timezone and trading-session aware date helpers
+// Dynamic timezone and trading-session aware date helpers (Bypasses Intl to prevent platform crashes)
 function getTradingDayIST(ts) {
     if (!ts) return '';
     let ms = typeof ts === 'number' ? ts : Number(ts);
@@ -17,36 +17,50 @@ function getTradingDayIST(ts) {
     if (isNaN(ms) || ms <= 0) return '';
     if (ms < 10000000000) ms *= 1000; // Force seconds to millisecond scaling
 
-    const date = new Date(ms);
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
+    // Convert UTC milliseconds to Indian Standard Time (IST) mathematically (+5.5 hours)
+    const msIST = ms + (5.5 * 60 * 60 * 1000);
+    const dateIST = new Date(msIST);
     
-    const formattedStr = formatter.format(date); 
-    const match = formattedStr.match(/^(\d{4}-\d{2}-\d{2}).*?(\d{2}):(\d{2})$/);
-    if (!match) return formattedStr.split(',')[0].trim();
-
-    const calendarDateStr = match[1];
-    const hour = parseInt(match[2], 10);
-    const minute = parseInt(match[3], 10);
-
-    const timeMinutes = hour * 60 + minute;
-    const sessionStartMinutes = 9 * 60; // Trading session boundary starts at 09:00 AM IST
+    // Extract standard UTC date/hour components (shifted to represent IST local time)
+    const year = dateIST.getUTCFullYear();
+    const month = String(dateIST.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateIST.getUTCDate()).padStart(2, '0');
+    const hour = dateIST.getUTCHours();
+    
+    const calendarDateStr = `${year}-${month}-${day}`;
+    const sessionStartHour = 9; // Trading session boundary starts at 09:00 AM IST
 
     // If trade occurred before 9:00 AM IST, roll back to yesterday's trading day
-    if (timeMinutes < sessionStartMinutes) {
+    if (hour < sessionStartHour) {
         const d = new Date(calendarDateStr + 'T12:00:00');
         d.setDate(d.getDate() - 1);
         return d.toISOString().split('T')[0];
     }
 
     return calendarDateStr;
+}
+
+function getSignalISTDateString(ts) {
+    if (!ts) return '';
+    let ms = typeof ts === 'number' ? ts : Number(ts);
+    if (isNaN(ms)) {
+        const parsed = Date.parse(ts);
+        if (!isNaN(parsed)) ms = parsed;
+    }
+    if (isNaN(ms) || ms <= 0) return '';
+    if (ms < 10000000000) ms *= 1000;
+
+    // Convert to IST calendar day mathematically (+5.5 hours)
+    const dateIST = new Date(ms + (5.5 * 60 * 60 * 1000));
+    const year = dateIST.getUTCFullYear();
+    const month = String(dateIST.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateIST.getUTCDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+}
+
+function getTodayISTDateString() {
+    return getSignalISTDateString(Date.now());
 }
 
 function getTodayISTTradingDay() {
@@ -291,82 +305,99 @@ class ChartServer {
     }
 
     generateHistoricalSignals() {
-        console.log('⚡ Generating signals on history...');
+        console.log('⚡ Starting background signal generation on history (non-blocking)...');
+        this.pruneOldSignals();
+        
+        const todayTradingDay = getTodayISTTradingDay();
         const seenSignals = new Set();
         
-        this.pruneOldSignals();
-        const todayTradingDay = getTodayISTTradingDay();
-
-        const filteredSignals = this.tradeSignals.filter(sig => {
+        const todaySignals = this.tradeSignals.filter(sig => {
             const sigDate = getTradingDayIST(sig.timestamp);
             return sigDate === todayTradingDay;
         });
-
-        filteredSignals.forEach(sig => {
+        todaySignals.forEach(sig => {
             const key = sig.instrument + '_' + sig.bar_type + '_' + sig.threshold + '_' + sig.barNumber + '_' + sig.type + '_' + sig.version;
             seenSignals.add(key);
         });
 
-        const processStrategyOnHistory = (storeKey, barType) => {
+        const tasks = [];
+        const collectTasks = (storeKey, barType) => {
             const store = this.recentCandles[storeKey];
             for (const [instKey, thresholdsMap] of Object.entries(store)) {
                 for (const [threshStr, list] of Object.entries(thresholdsMap)) {
-                    if (list.length < 32) continue;
-                    const threshold = parseInt(threshStr, 10);
-                    
-                    try {
-                        const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
-                        for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
-                            const signals = strategyFn(list, { tickSize });
-                            signals.forEach(sig => {
-                                const candle = list[sig.index];
-                                if (!candle) return;
-
-                                const candDate = getTradingDayIST(candle.timestamp);
-                                if (candDate !== todayTradingDay) return; // Ignore legacy bars
-
-                                let confidence = 50;
-                                const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
-                                if (confMatch) confidence = parseInt(confMatch[1]);
-
-                                const signalEvent = {
-                                    version: versionName,
-                                    instrument: instKey,
-                                    name: this.getInstrumentName(instKey),
-                                    type: sig.type,
-                                    entry: sig.triggerPrice,
-                                    sl: sig.stopLoss,
-                                    tp: sig.takeProfit,
-                                    confidence: confidence,
-                                    reason: sig.reason.replace('Conf:', (barType === 'volume' ? 'Volume' : 'Price') + ', Conf:'),
-                                    timestamp: candle.timestamp,
-                                    barNumber: candle.barNumber,
-                                    bar_type: barType,
-                                    threshold: threshold,
-                                    status: 'cancelled', 
-                                    overlapping: false
-                                };
-
-                                const uniqueKey = instKey + '_' + barType + '_' + threshold + '_' + candle.barNumber + '_' + sig.type + '_' + versionName;
-                                if (!seenSignals.has(uniqueKey)) {
-                                    seenSignals.add(uniqueKey);
-                                    this.tradeSignals.push(signalEvent);
-                                }
-                            });
-                        }
-                    } catch (err) {
-                        console.error("Error processing history signals:", err.message);
+                    if (list.length >= 32) {
+                        tasks.push({ barType, instKey, threshStr, list });
                     }
                 }
             }
         };
 
-        processStrategyOnHistory('volume_bars', 'volume');
-        processStrategyOnHistory('price_bars', 'price');
-        this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
+        collectTasks('volume_bars', 'volume');
+        collectTasks('price_bars', 'price');
 
-        this.pruneOldSignals();
-        this.saveSignalsToDisk();
+        // Non-blocking Task Runner: processes 1 instrument threshold group per event tick
+        const runNextTask = () => {
+            if (tasks.length === 0) {
+                this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
+                this.pruneOldSignals();
+                this.saveSignalsToDisk();
+                console.log('✅ Background historical signal generation completed!');
+                return;
+            }
+
+            const task = tasks.shift();
+            const { instKey, threshStr, list, barType } = task;
+            const threshold = parseInt(threshStr, 10);
+
+            try {
+                const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
+                for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
+                    const signals = strategyFn(list, { tickSize });
+                    signals.forEach(sig => {
+                        const candle = list[sig.index];
+                        if (!candle) return;
+
+                        const candDate = getTradingDayIST(candle.timestamp);
+                        if (candDate !== todayTradingDay) return; // Clean date-boundary filter
+
+                        let confidence = 50;
+                        const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
+                        if (confMatch) confidence = parseInt(confMatch[1]);
+
+                        const signalEvent = {
+                            version: versionName,
+                            instrument: instKey,
+                            name: this.getInstrumentName(instKey),
+                            type: sig.type,
+                            entry: sig.triggerPrice,
+                            sl: sig.stopLoss,
+                            tp: sig.takeProfit,
+                            confidence: confidence,
+                            reason: sig.reason.replace('Conf:', (barType === 'volume' ? 'Volume' : 'Price') + ', Conf:'),
+                            timestamp: candle.timestamp,
+                            barNumber: candle.barNumber,
+                            bar_type: barType,
+                            threshold: threshold,
+                            status: 'cancelled', 
+                            overlapping: false
+                        };
+
+                        const uniqueKey = instKey + '_' + barType + '_' + threshold + '_' + candle.barNumber + '_' + sig.type + '_' + versionName;
+                        if (!seenSignals.has(uniqueKey)) {
+                            seenSignals.add(uniqueKey);
+                            this.tradeSignals.push(signalEvent);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error(`Error processing history signals for ${instKey}:`, err.message);
+            }
+
+            // Yield control back to Express/Socket.IO immediately
+            setImmediate(runNextTask);
+        };
+
+        runNextTask();
     }
 
     pruneOldSignals() {
