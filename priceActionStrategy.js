@@ -23,10 +23,10 @@ const DEFAULT_PARAMS = {
 
     // === Fallback Structural Ratio Configurations ===
     emaTouchRatioV2: 0.15,              // Volatility-padded EMA touch threshold
-    triggerOffsetRatioV2: 0.05,         // Volatility-padded stop order triggers
+    triggerOffsetRatioV2: 0.03,         // Volatility-padded stop order triggers
     stopOffsetRatioV2: 0.30,            // Volatility-padded stops protecting against noise sweeps
     doubleTopBottomToleranceRatioV2: 0.15, // Padded double top/bottom verification
-    structureOffsetRatio: 0.12,         // Minimum ABR breach buffer to confirm a structural breakout (10% default)
+    structureOffsetRatio: 0.10,         // Minimum ABR breach buffer to confirm a structural breakout (10% default)
     
     // === Original Tick-Based Configurations (V1-V10) ===
     tickSize: 0.05,                     // Fallback minimum tick size (0.05 paisa/points)
@@ -870,17 +870,51 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
         let signalFound = false;
 
+        // Dynamic Double Top / Bottom pivot reset logic for structural configurations
+        let adjustedSwingHighIdx = null;
+        let adjustedSwingLowIdx = null;
+
+        if (p.useStructuralRules) {
+            const rawHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
+            if (rawHighIdx !== null) {
+                adjustedSwingHighIdx = rawHighIdx;
+                const dtTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+                // Scan forward from original peak to locate more immediate equal double top pivots
+                for (let k = rawHighIdx + 1; k < i - 1; k++) {
+                    if (candles[k].high <= candles[rawHighIdx].high && 
+                        (candles[rawHighIdx].high - candles[k].high) <= dtTolerance) {
+                        adjustedSwingHighIdx = k;
+                    }
+                }
+            }
+
+            const rawLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
+            if (rawLowIdx !== null) {
+                adjustedSwingLowIdx = rawLowIdx;
+                const dbTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+                // Scan forward from original trough to locate more immediate equal double bottom pivots
+                for (let k = rawLowIdx + 1; k < i - 1; k++) {
+                    if (candles[k].low >= candles[rawLowIdx].low && 
+                        (candles[k].low - candles[rawLowIdx].low) <= dbTolerance) {
+                        adjustedSwingLowIdx = k;
+                    }
+                }
+            }
+        } else {
+            adjustedSwingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
+            adjustedSwingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
+        }
+
         // 1. SECOND ENTRY LONG (H2)
         if (trend.bullish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
-            const swingHighIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'high');
-            if (swingHighIdx !== null) {
+            if (adjustedSwingHighIdx !== null) {
                 const setup = p.useStructuralRules
                     ? (p.requireStrictSecondLeg 
-                        ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, i, p.tickSize, avgRange, p)
-                        : evaluateStructuralH2Setup(candles, swingHighIdx, i, p.tickSize, avgRange, p))
+                        ? evaluateStructuralStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, avgRange, p)
+                        : evaluateStructuralH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, avgRange, p))
                     : (p.requireStrictSecondLeg 
-                        ? evaluateStrictH2Setup(candles, swingHighIdx, i, p.tickSize)
-                        : evaluateH2Setup(candles, swingHighIdx, i, p.tickSize));
+                        ? evaluateStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize)
+                        : evaluateH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize));
 
                 if (setup.isH2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
@@ -903,8 +937,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
                             
                             let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
                             let structuralTarget = null;
-                            if (p.useStructuralTarget && swingHighIdx !== null) {
-                                structuralTarget = candles[swingHighIdx].high + triggerOffset;
+                            if (p.useStructuralTarget && adjustedSwingHighIdx !== null) {
+                                structuralTarget = candles[adjustedSwingHighIdx].high + triggerOffset;
                                 takeProfit = structuralTarget;
                             }
 
@@ -939,15 +973,14 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
         // 2. SECOND ENTRY SHORT (L2)
         if (trend.bearish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
-            const swingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
-            if (swingLowIdx !== null) {
+            if (adjustedSwingLowIdx !== null) {
                 const setup = p.useStructuralRules
                     ? (p.requireStrictSecondLeg
-                        ? evaluateStructuralStrictL2Setup(candles, swingLowIdx, i, p.tickSize, avgRange, p)
-                        : evaluateStructuralL2Setup(candles, swingLowIdx, i, p.tickSize, avgRange, p))
+                        ? evaluateStructuralStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, avgRange, p)
+                        : evaluateStructuralL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, avgRange, p))
                     : (p.requireStrictSecondLeg
-                        ? evaluateStrictL2Setup(candles, swingLowIdx, i, p.tickSize)
-                        : evaluateL2Setup(candles, swingLowIdx, i, p.tickSize));
+                        ? evaluateStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize)
+                        : evaluateL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize));
 
                 if (setup.isL2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
@@ -970,8 +1003,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                             let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
                             let structuralTarget = null;
-                            if (p.useStructuralTarget && swingLowIdx !== null) {
-                                structuralTarget = candles[swingLowIdx].low - triggerOffset;
+                            if (p.useStructuralTarget && adjustedSwingLowIdx !== null) {
+                                structuralTarget = candles[adjustedSwingLowIdx].low - triggerOffset;
                                 takeProfit = structuralTarget;
                             }
 
@@ -1099,7 +1132,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                 ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p)
                                 : evaluateStructuralH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p))
                             : (p.requireStrictSecondLeg
-                                ? evaluateStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
+                                ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
                                 : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize));
                         
                         if (setupH2.isH2) {
