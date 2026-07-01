@@ -1,14 +1,11 @@
 /**
  * Price Action Strategy Versions Module (Dual-Framework Engine)
- * Houses 43 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
+ * Houses 50 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
  * - V1 to V10: Original absolute tick-based logic (preserves baseline results, zero regression).
- * - V11 to V20: New dynamic volatility-adjusted ratio-based logic (loaded from config.json).
- * - V21 to V23: Filtered variations of V3 (Absolute Tick-Based)
- * - V24 to V26: Filtered variations of V8 (Strict Absolute Tick-Based)
- * - V27 to V29: Filtered variations of V13 (Calibrated Ratio-Based)
- * - V30 to V32: Filtered variations of V18 (Strict Calibrated Ratio-Based)
- * - V33 to V42: Structural Calibrated editions incorporating three-dimensional leg completion filters.
- * - V43: Dynamic Structural variation with confidence metrics.
+ * - V11 to V20: Dynamic volatility-adjusted ratio-based logic (loaded from config.json).
+ * - V21 to V30: Structural Calibrated editions incorporating three-dimensional leg completion filters.
+ * - V31 to V40: Upgraded absolute tick-based versions (clones of V1-V10 utilizing optimized Al Brooks trends).
+ * - V41 to V50: Upgraded structural calibrated versions (clones of V21-V30 utilizing optimized Al Brooks trends).
  */
 
 const DEFAULT_PARAMS = {
@@ -18,25 +15,25 @@ const DEFAULT_PARAMS = {
     minTrendBars: 12,                   // Minimum bars required to establish trend structure
     rewardRatio: 1.5,                   // Target reward-to-risk ratio (Typically 1:1 to 1:1.5)
     
-    // === Fallback Ratio-Based Configurations (V11-V32) ===
+    // === Fallback Ratio-Based Configurations ===
     emaTouchRatio: 0.20,                // Tolerates EMA test within 20% of average bar range
     triggerOffsetRatio: 0.05,           // Offset order entry by 5% of average bar range beyond signal bar high/low
     stopOffsetRatio: 0.05,              // Stop placed 5% of average bar range beyond opposite extreme
     doubleTopBottomToleranceRatio: 0.25,// Double top/bottom tolerance within 25% of average bar range
 
-    // === Fallback Structural Ratio Configurations (V33-V43) ===
+    // === Fallback Structural Ratio Configurations ===
     emaTouchRatioV2: 0.15,              // Volatility-padded EMA touch threshold
-    triggerOffsetRatioV2: 0.03,         // Volatility-padded stop order triggers
+    triggerOffsetRatioV2: 0.05,         // Volatility-padded stop order triggers
     stopOffsetRatioV2: 0.30,            // Volatility-padded stops protecting against noise sweeps
     doubleTopBottomToleranceRatioV2: 0.15, // Padded double top/bottom verification
-    structureOffsetRatio: 0.10,         // Minimum ABR breach buffer to confirm a structural breakout (10% default)
+    structureOffsetRatio: 0.12,         // Minimum ABR breach buffer to confirm a structural breakout (10% default)
     
     // === Original Tick-Based Configurations (V1-V10) ===
     tickSize: 0.05,                     // Fallback minimum tick size (0.05 paisa/points)
     emaTouchTicks: 4,                   // Maximum ticks from EMA to consider it a valid test
     triggerOffsetTicks: 1,              // Enter 1 tick beyond signal bar high/low
     stopOffsetTicks: 1,                 // Stop placed 1 tick beyond signal bar opposite extreme
-    doubleTopBottomToleranceTicks: 4,   // How close (in ticks) a trap must be to a prior swing high/low to count as double top/bottom
+    doubleTopBottomToleranceTicks: 4,   // How close (in ticks) a prior swing high/low must be
     
     // === Signal Bar Quality Rules ===
     minSignalBarCloseRatio: 0.60,       // Close must be in the top/bottom 40% of the bar's range
@@ -68,7 +65,7 @@ const DEFAULT_PARAMS = {
     // === Confidence Filter ===
     minConfidenceThreshold: 45,         // Only execute setups that score >= 45/100 on the Confluence Matrix
     enableConfidenceScoring: true,      // Toggles scoring calculations
-     
+    
     // === Risk Management ===
     maxRiskPerTrade: 0.01,              // Risk 1% of equity per trade
     maxConsecutiveLosses: 3,            // Cool-down after consecutive losses
@@ -80,35 +77,23 @@ const DEFAULT_PARAMS = {
 function getTickSize(instrumentKey) {
     if (!instrumentKey) return 0.05;
     if (instrumentKey.includes('MCX_FO')) {
-        // Natural Gas
         if (instrumentKey.includes('504265') || instrumentKey.includes('487465')) return 0.10;
-        // Base Metals (Zinc, Lead, Copper, Aluminium)
         if (instrumentKey.includes('552708') || instrumentKey.includes('552711') || instrumentKey.includes('552709') || instrumentKey.includes('552706') || instrumentKey.includes('Bulldex')) return 0.05;
-        // Crude Oil, Silver, Gold
         return 1.0;
     }
-    return 0.05; // NSE Standard
+    return 0.05;
 }
 
-/**
- * Dynamic Instrument Config Lookup Helper
- * Parses instrument keys, matching them with configurations inside the JSON file.
- * Automatically resolves common delimiter swaps (e.g. '|' vs '_').
- */
 function getInstrumentConfig(instrumentKey) {
     if (!instrumentKey) return null;
-    
-    const normalizedKey = instrumentKey.replace(/_/g, '|'); // Standardize format for match verification
-    
+    const normalizedKey = instrumentKey.replace(/_/g, '|');
     try {
         const fs = require('fs');
         const path = require('path');
-        
         let configPath = path.resolve(__dirname, 'config.json');
         if (!fs.existsSync(configPath)) {
             configPath = path.resolve(__dirname, '../config.json');
         }
-        
         if (fs.existsSync(configPath)) {
             const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
             if (rawConfig && Array.isArray(rawConfig.instruments)) {
@@ -120,9 +105,7 @@ function getInstrumentConfig(instrumentKey) {
                 });
             }
         }
-    } catch (e) {
-        // Fall back gracefully if disk read is unavailable or fails
-    }
+    } catch (e) {}
     return null;
 }
 
@@ -154,11 +137,12 @@ function getAverageBarRange(candles, currentIdx, lookback = 10) {
     return count > 0 ? sum / count : 0;
 }
 
+// Upgraded Swing Scanner: Scans strictly right-to-left to lock onto the most recent pivot
 function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
     let bestIdx = null;
     let bestVal = direction === 'high' ? -Infinity : Infinity;
     const start = Math.max(0, currentIdx - lookback);
-    for (let i = start; i < currentIdx; i++) {
+    for (let i = currentIdx - 1; i >= start; i--) {
         const val = direction === 'high' ? candles[i].high : candles[i].low;
         const isBetter = direction === 'high' ? val > bestVal : val < bestVal;
         if (isBetter) {
@@ -169,7 +153,10 @@ function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
     return bestIdx;
 }
 
-// === Trend Evaluation Selection Helper ===
+// ============================================================
+// TREND EVALUATION SELECTORS
+// ============================================================
+
 function assessTrend(candles, ema, i, params) {
     if (params.useBrooksTrend) {
         return assessTrendBrooks(candles, ema, i, params);
@@ -177,7 +164,7 @@ function assessTrend(candles, ema, i, params) {
     return assessTrendLegacy(candles, ema, i, params);
 }
 
-// === Legacy Trend Logic (Strictly preserved for V1-V30) ===
+// Legacy Trend Logic (Preserved for V1-V30)
 function assessTrendLegacy(candles, ema, i, params) {
     const { emaPeriod, minTrendBars } = params;
     if (i < emaPeriod + minTrendBars || ema[i] == null || ema[i - 5] == null) {
@@ -200,7 +187,7 @@ function assessTrendLegacy(candles, ema, i, params) {
     return { bullish, bearish };
 }
 
-// === New Al Brooks Trend Logic (Upgraded for V31-V50) ===
+// Upgraded Al Brooks Trend Logic (Default for V31-V50)
 function assessTrendBrooks(candles, ema, i, params) {
     const { emaPeriod, minTrendBars } = params;
     
@@ -237,7 +224,10 @@ function assessTrendBrooks(candles, ema, i, params) {
     return { bullish, bearish };
 }
 
-// === Whipsaw Filter Selector ===
+// ============================================================
+// WHIPSAW FILTER SELECTORS
+// ============================================================
+
 function isWhipsawing(candles, ema, i, p) {
     if (!p.enableWhipsawFilter) return false;
     if (p.useBrooksTrend) {
@@ -366,7 +356,6 @@ function calculateConfidenceScore(candles, ema, i, type, p, avgRange) {
     const hasFVG = checkFVGConfluence(candles, i, type === 'BUY' ? 'BUY' : 'SELL', p.fvgLookback);
     if (hasFVG) score += 15;
 
-    // Volatility-Adjusted EMA Proximity Scoring
     const extreme = type === 'BUY' ? sBar.low : sBar.high;
     const distanceToEMA = Math.abs(extreme - ema[i]);
     const emaTouchDistance = avgRange > 0 ? avgRange * p.emaTouchRatio : (p.emaTouchTicks * p.tickSize);
@@ -417,6 +406,7 @@ function validateSignalBar(sBar, type, p) {
 
     return true;
 }
+
 // ============================================================
 // STRUCTURAL LEG COMPLETION WITH TIME & Acceptance Filters
 // ============================================================
@@ -434,7 +424,7 @@ function isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetR
         return true;
     }
     
-    // 3. Time-at-Level Rule (3 consecutive breaches)
+    // 3. Time-at-Level Rule
     if (candles[j].high > prevHigh) {
         consecutiveBreachesRef.count++;
         if (consecutiveBreachesRef.count >= 3) {
@@ -613,7 +603,7 @@ function evaluateStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
     return setup;
 }
 
-// === NOISE-CANCELLED STRUCTURAL LEG EVALUATIONS (V33-V43) ===
+// === NOISE-CANCELLED STRUCTURAL LEG EVALUATIONS ===
 
 function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p) {
     if (swingHighIdx === null || swingHighIdx >= currentIdx - 2) {
@@ -711,6 +701,7 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
     };
 }
 
+// Sophisticated Brooks strict check: accepts if deeper OR if forming a tight double-bottom
 function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p) {
     const setup = evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p);
     if (!setup.isH2) return setup;
@@ -728,13 +719,16 @@ function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tick
         if (candles[k].low < secondLegLow) secondLegLow = candles[k].low;
     }
 
-    if (secondLegLow >= firstLegLow) {
+    const dbTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+    const isDoubleBottom = Math.abs(secondLegLow - firstLegLow) <= dbTolerance;
+
+    if (secondLegLow >= firstLegLow && !isDoubleBottom) {
         setup.isH2 = false;
     }
-
     return setup;
 }
 
+// Sophisticated Brooks strict check: accepts if shallower OR if forming a tight double-top
 function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p) {
     const setup = evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p);
     if (!setup.isL2) return setup;
@@ -752,10 +746,12 @@ function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickS
         if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high;
     }
 
-    if (secondLegHigh <= firstLegHigh) {
+    const dtTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+    const isDoubleTop = Math.abs(secondLegHigh - firstLegHigh) <= dtTolerance;
+
+    if (secondLegHigh <= firstLegHigh && !isDoubleTop) {
         setup.isL2 = false;
     }
-
     return setup;
 }
 
@@ -766,18 +762,13 @@ function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickS
 function twoLeggedPullbackCore(candles, params = {}) {
     const sampleCandle = candles[0];
     const instrumentKey = sampleCandle?.instrument || sampleCandle?.instrument_key || params.instrument_key || params.instrument;
-    
-    // Dynamically retrieve the calibration config for this specific instrument from config.json
     const instConfig = getInstrumentConfig(instrumentKey);
-    
     const resolvedTickSize = params.tickSize !== undefined 
         ? params.tickSize 
         : (instConfig?.tickSize || getTickSize(instrumentKey));
 
-    // Decoupled Structural Logic configuration parsing
     const useStructural = params.useStructuralRules || false;
     
-    // Dynamic Parameter Precedence logic with complete separation of versions
     let emaTouchRatioVal;
     let triggerOffsetRatioVal;
     let stopOffsetRatioVal;
@@ -785,7 +776,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
     let structureOffsetRatioVal;
 
     if (useStructural) {
-        // High probability V33-V43 editions
         emaTouchRatioVal = instConfig?.emaTouchRatioV2 !== undefined 
             ? instConfig.emaTouchRatioV2 
             : (params.emaTouchRatioV2 !== undefined ? params.emaTouchRatioV2 : DEFAULT_PARAMS.emaTouchRatioV2);
@@ -806,7 +796,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
             ? instConfig.structureOffsetRatio 
             : (params.structureOffsetRatio !== undefined ? params.structureOffsetRatio : DEFAULT_PARAMS.structureOffsetRatio);
     } else {
-        // Standard baseline V11-V32 editions
         emaTouchRatioVal = instConfig?.emaTouchRatio !== undefined 
             ? instConfig.emaTouchRatio 
             : (params.emaTouchRatio !== undefined ? params.emaTouchRatio : DEFAULT_PARAMS.emaTouchRatio);
@@ -855,20 +844,17 @@ function twoLeggedPullbackCore(candles, params = {}) {
         const range = sBar.high - sBar.low;
         if (range <= 0) continue;
 
-        // Fetch dynamic baseline volatility (average bar range of the last 10 candles)
         const avgRange = getAverageBarRange(candles, i, 10);
         
         let emaTouchDistance, triggerOffset, stopOffset, doubleTopBottomTolerance, triggerBreakDist;
 
         if (p.useRatios) {
-            // Dynamic, volatility-adjusted limits derived from config.json data
             emaTouchDistance = avgRange > 0 ? avgRange * p.emaTouchRatio : (p.emaTouchTicks * p.tickSize);
             triggerOffset = avgRange > 0 ? avgRange * p.triggerOffsetRatio : (p.triggerOffsetTicks * p.tickSize);
             stopOffset = avgRange > 0 ? avgRange * p.stopOffsetRatio : (p.stopOffsetTicks * p.tickSize);
             doubleTopBottomTolerance = avgRange > 0 ? avgRange * p.doubleTopBottomToleranceRatio : (p.doubleTopBottomToleranceTicks * p.tickSize);
             triggerBreakDist = avgRange > 0 ? avgRange * p.triggerOffsetRatio : p.tickSize;
         } else {
-            // Original absolute tick-based limits
             emaTouchDistance = p.emaTouchTicks * p.tickSize;
             triggerOffset = p.triggerOffsetTicks * p.tickSize;
             stopOffset = p.stopOffsetTicks * p.tickSize;
@@ -1191,10 +1177,9 @@ function twoLeggedPullbackCore(candles, params = {}) {
 }
 
 // ============================================================
-// STRATEGY VERSIONS MAP (PARALLEL CONFIGS)
+// STRATEGIES MAP (PARALLEL CONFIGS)
 // ============================================================
 
-// === STRATEGIES DICTIONARY (V1 to V50) ===
 const STRATEGIES = {
     // === V1 to V10: Original Absolute Ticks ===
     "V1: Double Traps": (candles, params = {}) => {
@@ -1260,7 +1245,7 @@ const STRATEGIES = {
         return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
     },
 
-    // === V21-V30: Structural Calibrated Editions (Shifted down from V33-V42) ===
+    // === V21-V30: Structural Calibrated Editions ===
     "V21: Double Traps (Structural-Calibrated)": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true });
     },
@@ -1335,91 +1320,25 @@ const STRATEGIES = {
         return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, enableConfidenceScoring: true, minConfidenceThreshold: 45, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V44: Aggressive (Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, minSignalBarCloseRatio: 0.50, useStructuralTarget: false, useBrooksTrend: true, useBrooksTrend: true });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, minSignalBarCloseRatio: 0.50, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V45: Wade Structural (Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V46: Double Traps (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V47: EMA Pullback (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V48: High Confidence (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, enableConfidenceScoring: true, minConfidenceThreshold: 45, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V49: Aggressive (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            enableFVGConfluence: false,
-            enableLiquiditySweeps: false,
-            useStructuralTarget: false,
-            requireStrictSecondLeg: true,
-            minSignalBarCloseRatio: 0.50,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true, minSignalBarCloseRatio: 0.50, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
     "V50: Wade Structural (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
-        return twoLeggedPullbackCore(candles, {
-            ...params,
-            enableTraps: true,
-            enableConfidenceScoring: true,
-            enableFVGConfluence: true,
-            enableLiquiditySweeps: true,
-            minConfidenceThreshold: 45,
-            useStructuralTarget: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useRatios: true,
-            useStructuralRules: true
-        });
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     }
 };
 
@@ -1430,7 +1349,6 @@ Object.keys(STRATEGIES).forEach(key => {
                          key.includes("Structural-Calibrated");
 
     const isStructural = key.includes("Structural-Calibrated");
-    
     const isBrooksTrend = key.includes("Upgraded");
 
     const originalFunc = STRATEGIES[key];
