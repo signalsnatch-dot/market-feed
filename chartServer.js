@@ -54,7 +54,8 @@ class ChartServer {
             pingInterval: 25000
         });
         
-        this.recentCandles = { price_bars: [], volume_bars: [] };
+        // Structured nesting for instant O(1) lookups
+        this.recentCandles = { price_bars: {}, volume_bars: {} };
         this.tradeSignals = [];
         this.maxRecentCandlesPerInstrument = 1200; 
         
@@ -68,21 +69,17 @@ class ChartServer {
     validateDataDirectory() {
         const resolvedPath = path.resolve(this.candlesDataDir);
         const parentDir = path.resolve('.');
-        
         if (!resolvedPath.startsWith(parentDir)) {
             throw new Error("Security violation: candlesDataDir resolves outside project root");
         }
-        
         if (!fs.existsSync(resolvedPath)) {
             fs.mkdirSync(resolvedPath, { recursive: true });
         }
-        
         try {
             fs.accessSync(resolvedPath, fs.constants.W_OK);
         } catch (err) {
             throw new Error("Data directory not writable: " + resolvedPath);
         }
-        
         this.candlesDataDir = resolvedPath;
     }
     
@@ -93,15 +90,12 @@ class ChartServer {
             path.join(this.candlesDataDir, 'price_bars'),
             path.join(__dirname, 'public')
         ];
-        
         const isAllowed = allowedDirs.some(allowedDir => 
             resolvedPath.startsWith(path.resolve(allowedDir))
         );
-        
         if (!isAllowed) {
             throw new Error("Security violation: Unauthorized path: " + filepath);
         }
-        
         return resolvedPath;
     }
     
@@ -145,19 +139,17 @@ class ChartServer {
             const storeKey = type + '_bars';
             const { instrument, threshold } = req.query;
             
-            let data = this.recentCandles[storeKey];
-            
-            // On-demand filtering to avoid 100MB payload on page load
-            if (instrument && threshold) {
-                const threshNum = parseInt(threshold, 10);
-                data = data.filter(c => 
-                    (c.instrument === instrument || c.instrument_key === instrument) && 
-                    c.threshold == threshNum
-                );
+            if (!instrument || !threshold) {
+                return res.json([]);
+            }
+
+            const threshNum = parseInt(threshold, 10);
+            const instrumentMap = this.recentCandles[storeKey][instrument];
+            if (instrumentMap && instrumentMap[threshNum]) {
+                return res.json(instrumentMap[threshNum].slice(-50)); // Slices last 50 candles instantly
             }
             
-            // Limit historical data response to the last 50 candles for instant page load
-            res.json(data.slice(-50));
+            res.json([]);
         });
         
         this.app.get('/api/instruments', (req, res) => {
@@ -169,16 +161,11 @@ class ChartServer {
         });
         
         this.app.get('/api/signals', (req, res) => {
-            const todayIST = getTodayISTDateString();
-            const todaySignals = this.tradeSignals
-                .filter(sig => {
-                    const sigDate = getSignalISTDateString(sig.timestamp);
-                    return sigDate === todayIST;
-                })
-                .map(sig => ({
-                    ...sig,
-                    name: this.getInstrumentName(sig.instrument)
-                }));
+            this.pruneOldSignals();
+            const todaySignals = this.tradeSignals.map(sig => ({
+                ...sig,
+                name: this.getInstrumentName(sig.instrument)
+            }));
             res.json(todaySignals);
         });
         
@@ -200,19 +187,13 @@ class ChartServer {
         
         this.io.on('connection', (socket) => {
             console.log("Client connected: " + socket.id);
+            this.pruneOldSignals();
             
-            const todayIST = getTodayISTDateString();
-            const todaySignals = this.tradeSignals
-                .filter(sig => {
-                    const sigDate = getSignalISTDateString(sig.timestamp);
-                    return sigDate === todayIST;
-                })
-                .map(sig => ({
-                    ...sig,
-                    name: this.getInstrumentName(sig.instrument)
-                }));
+            const todaySignals = this.tradeSignals.map(sig => ({
+                ...sig,
+                name: this.getInstrumentName(sig.instrument)
+            }));
             
-            // FIX: Removed 100MB historical candles from socket connection emit
             socket.emit('historical_candles', {
                 instruments: this.getInstrumentsFromFiles(),
                 trade_signals: todaySignals,
@@ -240,140 +221,124 @@ class ChartServer {
     
     loadHistoricalCandles() {
         console.log('📂 Loading historical parallel threshold candles...');
-        this.recentCandles = { price_bars: [], volume_bars: [] };
+        this.recentCandles = { price_bars: {}, volume_bars: {} };
         
-        const volumeDir = path.join(this.candlesDataDir, 'volume_bars');
-        if (fs.existsSync(volumeDir)) {
-            const files = fs.readdirSync(volumeDir);
-            files.forEach(file => {
-                if (file.endsWith('_volume_bars.csv')) {
-                    const filepath = path.join(volumeDir, file);
-                    try {
-                        this.validateFilePath(filepath, 'volume_bars');
-                        const info = this.extractInstrumentKeyAndThreshold(file);
-                        const candles = this.parseVolumeBarCSV(filepath, info.instrumentKey);
-                        candles.forEach(c => c.threshold = info.threshold || c.targetVolume);
-                        const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
-                        this.recentCandles.volume_bars.push(...limitedCandles);
-                    } catch (err) {
-                        console.error("Error loading " + file + ":", err.message);
+        const loadTypeDir = (dirPath, storeKey) => {
+            if (fs.existsSync(dirPath)) {
+                const files = fs.readdirSync(dirPath);
+                files.forEach(file => {
+                    if (file.endsWith(`_${storeKey}.csv`)) {
+                        const filepath = path.join(dirPath, file);
+                        try {
+                            this.validateFilePath(filepath, storeKey);
+                            const info = this.extractInstrumentKeyAndThreshold(file);
+                            const instrument = info.instrumentKey;
+                            const threshold = info.threshold;
+                            
+                            const candles = storeKey === 'volume_bars' 
+                                ? this.parseVolumeBarCSV(filepath, instrument)
+                                : this.parsePriceBarCSV(filepath, instrument);
+                                
+                            candles.forEach(c => c.threshold = threshold || (storeKey === 'volume_bars' ? c.targetVolume : c.targetTicks));
+                            
+                            const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
+                            
+                            if (!this.recentCandles[storeKey][instrument]) {
+                                this.recentCandles[storeKey][instrument] = {};
+                            }
+                            this.recentCandles[storeKey][instrument][threshold] = limitedCandles.sort((a,b) => a.timestamp - b.timestamp);
+                        } catch (err) {
+                            console.error(`Error loading ${file}:`, err.message);
+                        }
                     }
-                }
-            });
-        }
-        
-        const priceDir = path.join(this.candlesDataDir, 'price_bars');
-        if (fs.existsSync(priceDir)) {
-            const files = fs.readdirSync(priceDir);
-            files.forEach(file => {
-                if (file.endsWith('_price_bars.csv')) {
-                    const filepath = path.join(priceDir, file);
-                    try {
-                        this.validateFilePath(filepath, 'price_bars');
-                        const info = this.extractInstrumentKeyAndThreshold(file);
-                        const candles = this.parsePriceBarCSV(filepath, info.instrumentKey);
-                        candles.forEach(c => c.threshold = info.threshold || c.targetTicks);
-                        const limitedCandles = candles.slice(-this.maxRecentCandlesPerInstrument);
-                        this.recentCandles.price_bars.push(...limitedCandles);
-                    } catch (err) {
-                        console.error("Error loading " + file + ":", err.message);
-                    }
-                }
-            });
-        }
-        
-        this.recentCandles.volume_bars.sort((a, b) => a.timestamp - b.timestamp);
-        this.recentCandles.price_bars.sort((a, b) => a.timestamp - b.timestamp);
+                });
+            }
+        };
+
+        loadTypeDir(path.join(this.candlesDataDir, 'volume_bars'), 'volume_bars');
+        loadTypeDir(path.join(this.candlesDataDir, 'price_bars'), 'price_bars');
     }
 
     generateHistoricalSignals() {
         console.log('⚡ Generating signals on history...');
         const seenSignals = new Set();
         
+        this.pruneOldSignals();
         const todayIST = getTodayISTDateString();
-        const filteredSignals = this.tradeSignals.filter(sig => {
-            const sigDate = getSignalISTDateString(sig.timestamp);
-            return sigDate === todayIST;
-        });
 
-        filteredSignals.forEach(sig => {
+        this.tradeSignals.forEach(sig => {
             const key = sig.instrument + '_' + sig.bar_type + '_' + sig.threshold + '_' + sig.barNumber + '_' + sig.type + '_' + sig.version;
             seenSignals.add(key);
         });
 
-        const processStrategyOnHistory = (candles, barType) => {
-            const grouped = {};
-            candles.forEach(c => {
-                const inst = c.instrument || c.instrument_key;
-                const thresh = c.threshold || (barType === 'volume' ? c.targetVolume : c.targetTicks);
-                const key = inst + '_' + thresh;
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(c);
-            });
+        const processStrategyOnHistory = (storeKey, barType) => {
+            const store = this.recentCandles[storeKey];
+            for (const [instKey, thresholdsMap] of Object.entries(store)) {
+                for (const [threshStr, list] of Object.entries(thresholdsMap)) {
+                    if (list.length < 32) continue;
+                    const threshold = parseInt(threshStr, 10);
+                    
+                    try {
+                        const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
+                        for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
+                            const signals = strategyFn(list, { tickSize });
+                            signals.forEach(sig => {
+                                const candle = list[sig.index];
+                                if (!candle) return;
 
-            for (const [groupKey, list] of Object.entries(grouped)) {
-                if (list.length < 32) continue;
-                const parts = groupKey.split('_');
-                const instKey = parts[0] + '_' + parts[1];
-                const threshStr = parts[2];
-                const threshold = parseInt(threshStr, 10);
-                
-                try {
-                    const tickSize = instKey.includes('MCX_FO') ? 0.05 : 0.05;
-                    for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
-                        const signals = strategyFn(list, { tickSize });
-                        signals.forEach(sig => {
-                            const candle = list[sig.index];
-                            if (!candle) return;
+                                const candDate = getSignalISTDateString(candle.timestamp);
+                                if (candDate !== todayIST) return; // Clean date-boundary filter
 
-                            const candDate = getSignalISTDateString(candle.timestamp);
-                            if (candDate !== todayIST) return; // Ignore legacy bars
+                                let confidence = 50;
+                                const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
+                                if (confMatch) confidence = parseInt(confMatch[1]);
 
-                            let confidence = 50;
-                            const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
-                            if (confMatch) confidence = parseInt(confMatch[1]);
+                                const signalEvent = {
+                                    version: versionName,
+                                    instrument: instKey,
+                                    name: this.getInstrumentName(instKey),
+                                    type: sig.type,
+                                    entry: sig.triggerPrice,
+                                    sl: sig.stopLoss,
+                                    tp: sig.takeProfit,
+                                    confidence: confidence,
+                                    reason: sig.reason.replace('Conf:', (barType === 'volume' ? 'Volume' : 'Price') + ', Conf:'),
+                                    timestamp: candle.timestamp,
+                                    barNumber: candle.barNumber,
+                                    bar_type: barType,
+                                    threshold: threshold,
+                                    status: 'cancelled', 
+                                    overlapping: false
+                                };
 
-                            const signalEvent = {
-                                version: versionName,
-                                instrument: instKey,
-                                name: this.getInstrumentName(instKey),
-                                type: sig.type,
-                                entry: sig.triggerPrice,
-                                sl: sig.stopLoss,
-                                tp: sig.takeProfit,
-                                confidence: confidence,
-                                reason: sig.reason.replace('Conf:', (barType === 'volume' ? 'Volume' : 'Price') + ', Conf:'),
-                                timestamp: candle.timestamp,
-                                barNumber: candle.barNumber,
-                                bar_type: barType,
-                                threshold: threshold,
-                                status: 'cancelled', 
-                                overlapping: false
-                            };
-
-                            const uniqueKey = instKey + '_' + barType + '_' + threshold + '_' + candle.barNumber + '_' + sig.type + '_' + versionName;
-                            if (!seenSignals.has(uniqueKey)) {
-                                seenSignals.add(uniqueKey);
-                                this.tradeSignals.push(signalEvent);
-                            }
-                        });
+                                const uniqueKey = instKey + '_' + barType + '_' + threshold + '_' + candle.barNumber + '_' + sig.type + '_' + versionName;
+                                if (!seenSignals.has(uniqueKey)) {
+                                    seenSignals.add(uniqueKey);
+                                    this.tradeSignals.push(signalEvent);
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.error("Error processing history signals:", err.message);
                     }
-                } catch (err) {
-                    console.error("Error processing history signals:", err.message);
                 }
             }
         };
 
-        processStrategyOnHistory(this.recentCandles.volume_bars, 'volume');
-        processStrategyOnHistory(this.recentCandles.price_bars, 'price');
+        processStrategyOnHistory('volume_bars', 'volume');
+        processStrategyOnHistory('price_bars', 'price');
         this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
 
+        this.pruneOldSignals();
+        this.saveSignalsToDisk();
+    }
+
+    pruneOldSignals() {
+        const todayIST = getTodayISTDateString();
         this.tradeSignals = this.tradeSignals.filter(sig => {
             const sigDate = getSignalISTDateString(sig.timestamp);
             return sigDate === todayIST;
         });
-
-        this.saveSignalsToDisk();
     }
 
     loadSavedSignals() {
@@ -521,13 +486,12 @@ class ChartServer {
         return candles;
     }
     
-    // FIX: Removed 5.5 hour offset addition to prevent double timezone addition
     convertToIST(timestamp) {
         let msTimestamp = timestamp;
         if (timestamp < 10000000000) {
             msTimestamp = timestamp * 1000;
         }
-        return msTimestamp; // Standard UTC timestamp
+        return msTimestamp; // Keep clean standard UTC timestamps
     }
     
     parseCSVLine(line) {
@@ -569,33 +533,45 @@ class ChartServer {
         };
         const id = key.includes('|') ? key.split('|')[1] : key;
         const normalizedId = id.replace(/_raw_ticks$/, '');
-        return names[key] || fallbackNames[normalizedId] || normalizedId;
+        return names[key] || normalizedId;
     }
     
     getInstrumentsFromFiles() {
         const instrumentsMap = new Map();
-        [...this.recentCandles.volume_bars, ...this.recentCandles.price_bars].forEach(candle => {
-            const key = candle.instrument || candle.instrument_key;
-            if (!key) return;
-            
-            if (!instrumentsMap.has(key)) {
-                instrumentsMap.set(key, {
-                    key: key,
-                    name: this.getInstrumentName(key),
-                    exchange: key.split('|')[0],
-                    symbol: key.split('|')[1],
-                    volumeThresholds: new Set(),
-                    priceThresholds: new Set()
-                });
+        const todayIST = getTodayISTDateString();
+        
+        const scanStore = (storeKey, type) => {
+            const store = this.recentCandles[storeKey];
+            for (const [instrumentKey, thresholdsMap] of Object.entries(store)) {
+                for (const [threshold, candles] of Object.entries(thresholdsMap)) {
+                    // FIX: Filter thresholds lists so that only those with active data today are displayed
+                    const hasTodayData = candles.some(c => getSignalISTDateString(c.timestamp) === todayIST);
+                    
+                    if (hasTodayData) {
+                        if (!instrumentsMap.has(instrumentKey)) {
+                            instrumentsMap.set(instrumentKey, {
+                                key: instrumentKey,
+                                name: this.getInstrumentName(instrumentKey),
+                                exchange: instrumentKey.split('|')[0],
+                                symbol: instrumentKey.split('|')[1],
+                                volumeThresholds: new Set(),
+                                priceThresholds: new Set()
+                            });
+                        }
+                        
+                        const inst = instrumentsMap.get(instrumentKey);
+                        if (type === 'volume') {
+                            inst.volumeThresholds.add(parseInt(threshold, 10));
+                        } else {
+                            inst.priceThresholds.add(parseInt(threshold, 10));
+                        }
+                    }
+                }
             }
-            
-            const inst = instrumentsMap.get(key);
-            if (candle.type === 'volume' && candle.threshold) {
-                inst.volumeThresholds.add(candle.threshold);
-            } else if (candle.type === 'price' && candle.threshold) {
-                inst.priceThresholds.add(candle.threshold);
-            }
-        });
+        };
+
+        scanStore('volume_bars', 'volume');
+        scanStore('price_bars', 'price');
         
         return Array.from(instrumentsMap.values()).map(inst => ({
             ...inst,
@@ -616,21 +592,21 @@ class ChartServer {
         };
         
         const storeKey = type + '_bars';
-        this.recentCandles[storeKey].push(candleData);
+        if (!this.recentCandles[storeKey][instrumentKey]) {
+            this.recentCandles[storeKey][instrumentKey] = {};
+        }
+        if (!this.recentCandles[storeKey][instrumentKey][threshold]) {
+            this.recentCandles[storeKey][instrumentKey][threshold] = [];
+        }
+
+        const targetArray = this.recentCandles[storeKey][instrumentKey][threshold];
+        targetArray.push(candleData);
         
-        const candlesByGroup = {};
-        for (const c of this.recentCandles[storeKey]) {
-            const key = (c.instrument || c.instrument_key) + '_' + c.threshold;
-            if (!candlesByGroup[key]) candlesByGroup[key] = [];
-            candlesByGroup[key].push(c);
+        if (targetArray.length > this.maxRecentCandlesPerInstrument) {
+            targetArray.shift();
         }
         
-        const updatedCandles = [];
-        for (const key of Object.keys(candlesByGroup)) {
-            updatedCandles.push(...candlesByGroup[key].slice(-this.maxRecentCandlesPerInstrument));
-        }
-        
-        this.recentCandles[storeKey] = updatedCandles.sort((a, b) => a.timestamp - b.timestamp);
+        this.recentCandles[storeKey][instrumentKey][threshold] = targetArray.sort((a,b) => a.timestamp - b.timestamp);
         
         this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_candle', candleData);
         this.io.emit('candle_update', candleData);

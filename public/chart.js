@@ -107,11 +107,46 @@ class MarketChart {
         }
     }
 
+    showLoading() {
+        const chartElement = document.getElementById('main-chart');
+        if (!chartElement) return;
+        
+        let loader = document.getElementById('chart-loader-overlay');
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'chart-loader-overlay';
+            loader.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30,34,45,0.75); display: flex; align-items: center; justify-content: center; z-index: 50; color: #00bcd4; font-family: monospace; font-size: 14px; font-weight: bold; pointer-events: none;';
+            loader.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                    <div style="width: 32px; height: 32px; border: 3px solid #00bcd4; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s infinite linear;"></div>
+                    <span>LOADING DATA...</span>
+                </div>
+            `;
+            
+            if (!document.getElementById('loader-animation')) {
+                const style = document.createElement('style');
+                style.id = 'loader-animation';
+                style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+                document.head.appendChild(style);
+            }
+            
+            chartElement.style.position = 'relative';
+            chartElement.appendChild(loader);
+        }
+        loader.style.display = 'flex';
+    }
+
+    hideLoading() {
+        const loader = document.getElementById('chart-loader-overlay');
+        if (loader) loader.style.display = 'none';
+    }
+
     async loadCandlesForCurrentInstrument() {
         if (!this.currentInstrument || !this.currentThreshold) return;
 
+        this.showLoading(); // Display dynamic spinner overlay immediately
+
         try {
-            // FIX: Load only the 50 most recent candles dynamically from the server
             const res = await fetch(`/api/recent/${this.currentType}?instrument=${encodeURIComponent(this.currentInstrument)}&threshold=${this.currentThreshold}`);
             if (res.ok) {
                 const data = await res.json();
@@ -123,6 +158,8 @@ class MarketChart {
             console.error("Failed to load historical candles dynamically:", err);
             this.candles = [];
             this.updateCharts();
+        } finally {
+            this.hideLoading(); // Hide spinner when load completes
         }
     }
 
