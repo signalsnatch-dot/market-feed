@@ -6,11 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-function getTodayISTDateString() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Strictly YYYY-MM-DD in India
-}
-
-function getSignalISTDateString(ts) {
+// Dynamic timezone and trading-session aware date helpers
+function getTradingDayIST(ts) {
     if (!ts) return '';
     let ms = typeof ts === 'number' ? ts : Number(ts);
     if (isNaN(ms)) {
@@ -19,7 +16,41 @@ function getSignalISTDateString(ts) {
     }
     if (isNaN(ms) || ms <= 0) return '';
     if (ms < 10000000000) ms *= 1000; // Force seconds to millisecond scaling
-    return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+    const date = new Date(ms);
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    
+    const formattedStr = formatter.format(date); 
+    const match = formattedStr.match(/^(\d{4}-\d{2}-\d{2}).*?(\d{2}):(\d{2})$/);
+    if (!match) return formattedStr.split(',')[0].trim();
+
+    const calendarDateStr = match[1];
+    const hour = parseInt(match[2], 10);
+    const minute = parseInt(match[3], 10);
+
+    const timeMinutes = hour * 60 + minute;
+    const sessionStartMinutes = 9 * 60; // Trading session boundary starts at 09:00 AM IST
+
+    // If trade occurred before 9:00 AM IST, roll back to yesterday's trading day
+    if (timeMinutes < sessionStartMinutes) {
+        const d = new Date(calendarDateStr + 'T12:00:00');
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().split('T')[0];
+    }
+
+    return calendarDateStr;
+}
+
+function getTodayISTTradingDay() {
+    return getTradingDayIST(Date.now());
 }
 
 class ChartServer {
@@ -264,9 +295,14 @@ class ChartServer {
         const seenSignals = new Set();
         
         this.pruneOldSignals();
-        const todayIST = getTodayISTDateString();
+        const todayTradingDay = getTodayISTTradingDay();
 
-        this.tradeSignals.forEach(sig => {
+        const filteredSignals = this.tradeSignals.filter(sig => {
+            const sigDate = getTradingDayIST(sig.timestamp);
+            return sigDate === todayTradingDay;
+        });
+
+        filteredSignals.forEach(sig => {
             const key = sig.instrument + '_' + sig.bar_type + '_' + sig.threshold + '_' + sig.barNumber + '_' + sig.type + '_' + sig.version;
             seenSignals.add(key);
         });
@@ -286,8 +322,8 @@ class ChartServer {
                                 const candle = list[sig.index];
                                 if (!candle) return;
 
-                                const candDate = getSignalISTDateString(candle.timestamp);
-                                if (candDate !== todayIST) return; // Clean date-boundary filter
+                                const candDate = getTradingDayIST(candle.timestamp);
+                                if (candDate !== todayTradingDay) return; // Ignore legacy bars
 
                                 let confidence = 50;
                                 const confMatch = sig.reason.match(/Conf:\s*(\d+)/i);
@@ -334,25 +370,25 @@ class ChartServer {
     }
 
     pruneOldSignals() {
-        const todayIST = getTodayISTDateString();
+        const todayTradingDay = getTodayISTTradingDay();
         this.tradeSignals = this.tradeSignals.filter(sig => {
-            const sigDate = getSignalISTDateString(sig.timestamp);
-            return sigDate === todayIST;
+            const sigDate = getTradingDayIST(sig.timestamp);
+            return sigDate === todayTradingDay;
         });
     }
 
     loadSavedSignals() {
-        const jsonFile = 'signals_today_' + getTodayISTDateString() + '.json';
+        const jsonFile = 'signals_today_' + getTodayISTTradingDay() + '.json';
         const signalsFile = path.join(this.candlesDataDir, jsonFile);
         if (fs.existsSync(signalsFile)) {
             try {
                 const fileData = fs.readFileSync(signalsFile, 'utf8');
                 const loaded = JSON.parse(fileData);
                 
-                const todayIST = getTodayISTDateString();
+                const todayTradingDay = getTodayISTTradingDay();
                 this.tradeSignals = loaded.filter(sig => {
-                    const sigDate = getSignalISTDateString(sig.timestamp);
-                    return sigDate === todayIST;
+                    const sigDate = getTradingDayIST(sig.timestamp);
+                    return sigDate === todayTradingDay;
                 });
             } catch (err) {
                 this.tradeSignals = [];
@@ -362,14 +398,14 @@ class ChartServer {
 
     saveSignalsToDisk() {
         try {
-            const todayIST = getTodayISTDateString();
-            const jsonFile = 'signals_today_' + todayIST + '.json';
+            const todayTradingDay = getTodayISTTradingDay();
+            const jsonFile = 'signals_today_' + todayTradingDay + '.json';
             const signalsFile = path.join(this.candlesDataDir, jsonFile);
             
             const signalMap = new Map();
             const filteredSignals = this.tradeSignals.filter(sig => {
-                const sigDate = getSignalISTDateString(sig.timestamp);
-                return sigDate === todayIST;
+                const sigDate = getTradingDayIST(sig.timestamp);
+                return sigDate === todayTradingDay;
             });
             
             for (const signal of filteredSignals) {
@@ -491,7 +527,7 @@ class ChartServer {
         if (timestamp < 10000000000) {
             msTimestamp = timestamp * 1000;
         }
-        return msTimestamp; // Keep clean standard UTC timestamps
+        return msTimestamp; // Clean UTC Epoch milliseconds
     }
     
     parseCSVLine(line) {
@@ -538,14 +574,14 @@ class ChartServer {
     
     getInstrumentsFromFiles() {
         const instrumentsMap = new Map();
-        const todayIST = getTodayISTDateString();
+        const todayTradingDay = getTodayISTTradingDay();
         
         const scanStore = (storeKey, type) => {
             const store = this.recentCandles[storeKey];
             for (const [instrumentKey, thresholdsMap] of Object.entries(store)) {
                 for (const [threshold, candles] of Object.entries(thresholdsMap)) {
                     // FIX: Filter thresholds lists so that only those with active data today are displayed
-                    const hasTodayData = candles.some(c => getSignalISTDateString(c.timestamp) === todayIST);
+                    const hasTodayData = candles.some(c => getTradingDayIST(c.timestamp) === todayTradingDay);
                     
                     if (hasTodayData) {
                         if (!instrumentsMap.has(instrumentKey)) {
@@ -628,9 +664,9 @@ class ChartServer {
     }
 
     broadcastTradeSignal(signalData) {
-        const todayIST = getTodayISTDateString();
-        const sigDate = getSignalISTDateString(signalData.timestamp);
-        if (sigDate !== todayIST) return; 
+        const todayTradingDay = getTodayISTTradingDay();
+        const sigDate = getTradingDayIST(signalData.timestamp);
+        if (sigDate !== todayTradingDay) return; 
 
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
