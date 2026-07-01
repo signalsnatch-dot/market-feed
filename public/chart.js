@@ -1,4 +1,3 @@
-
 // public/chart.js
 class MarketChart {
     constructor() {
@@ -43,15 +42,15 @@ class MarketChart {
         });
     }
     
-    switchInstrument(key) {
-        console.log(`Switching to instrument: ${key}`);
+    async switchInstrument(key) {
+        console.log("Switching to instrument: " + key);
         this.currentInstrument = key;
         this.setActiveInstrument(key);
         this.initialDataLoaded = false;
         this.timeMap.clear(); 
         
         this.updateThresholdSelector();
-        this.loadCandlesForCurrentInstrument();
+        await this.loadCandlesForCurrentInstrument();
         this.subscribeToCandles();
         this.updateBottomChartLabel();
     }
@@ -69,8 +68,8 @@ class MarketChart {
             labelElement = document.createElement('div');
             labelElement.id = 'bottom-chart-label';
             labelElement.style.cssText = 'position: absolute; top: -20px; left: 10px; font-size: 11px; color: #787b86; z-index: 10;';
-            bottomChartContainer.parentElement.style.position = 'relative';
-            bottomChartContainer.parentElement.appendChild(labelElement);
+            bottomChartContainer.parentNode.style.position = 'relative';
+            bottomChartContainer.parentNode.appendChild(labelElement);
         }
         labelElement.textContent = label;
     }
@@ -108,16 +107,20 @@ class MarketChart {
         }
     }
 
-    loadCandlesForCurrentInstrument() {
-        const cacheKey = `${this.currentType}_candles`;
-        if (this[cacheKey]) {
-            this.candles = this[cacheKey]
-                .filter(c => (c.instrument === this.currentInstrument || c.instrument_key === this.currentInstrument) && c.threshold == this.currentThreshold)
-                .map(c => this.convertToChartCandle(c))
-                .filter(c => null !== c);
-            this.candles.sort((a,b) => a.time - b.time);
-            this.updateCharts();
-        } else {
+    async loadCandlesForCurrentInstrument() {
+        if (!this.currentInstrument || !this.currentThreshold) return;
+
+        try {
+            // FIX: Load only the 50 most recent candles dynamically from the server
+            const res = await fetch(`/api/recent/${this.currentType}?instrument=${encodeURIComponent(this.currentInstrument)}&threshold=${this.currentThreshold}`);
+            if (res.ok) {
+                const data = await res.json();
+                this.candles = data.map(c => this.convertToChartCandle(c)).filter(c => null !== c);
+                this.candles.sort((a, b) => a.time - b.time);
+                this.updateCharts();
+            }
+        } catch (err) {
+            console.error("Failed to load historical candles dynamically:", err);
             this.candles = [];
             this.updateCharts();
         }
@@ -169,16 +172,6 @@ class MarketChart {
     
     async loadHistoricalData() {
         try {
-            const volumeRes = await fetch('/api/recent/volume');
-            if (volumeRes.ok) {
-                this.volume_candles = await volumeRes.json();
-            }
-            
-            const priceRes = await fetch('/api/recent/price');
-            if (priceRes.ok) {
-                this.price_candles = await priceRes.json();
-            }
-            
             const instRes = await fetch('/api/instruments');
             if (instRes.ok) {
                 this.instrumentsList = await instRes.json();
@@ -188,7 +181,7 @@ class MarketChart {
                     this.currentInstrument = this.instrumentsList[0].key;
                     this.setActiveInstrument(this.currentInstrument);
                     this.updateThresholdSelector();
-                    this.loadCandlesForCurrentInstrument();
+                    await this.loadCandlesForCurrentInstrument();
                     this.updateBottomChartLabel();
                 }
             }
@@ -198,38 +191,16 @@ class MarketChart {
     }
     
     getInstrumentName(key) {
-        if (!key) return 'N/A';
-
-        // 1. Dynamic check against the backend instrument state array
         if (this.instrumentsList && this.instrumentsList.length > 0) {
             const inst = this.instrumentsList.find(i => i.key === key);
             if (inst && inst.name) return inst.name;
         }
-
-        // 2. Local Fallback Database
-        const fallbackNames = {
-            '538685': 'Natural Gas Future',
-            '538686': 'Natural Gas Mini Future',
-            '520702': 'Crude Oil Future',
-            '520703': 'Crude Oil Mini Future',
-            '464150': 'Silver Future',
-            '471726': 'Silver Mini Future',
-            '488788': 'Silver Micro Future',
-            '61093': 'Nifty 50 Future',
-            '61088': 'Nifty Bank Future',
-            '61091': 'Fin Nifty Future',
-            '61092': 'Midcap Nifty Future',
-            'INE002A01018': 'Reliance Cash Equity',
-            'INE040A01034': 'HDFC Bank Cash Equity',
-            'INE090A01021': 'ICICI Bank Cash Equity',
-            'INE062A01020': 'SBI Cash Equity',
-            'INE467B01029': 'TCS Cash Equity',
-            'INE009A01021': 'Infosys Cash Equity'
+        const names = {
+            'MCX_FO|538685': 'Natural Gas Future',
+            'NSE_FO|62329': 'Nifty 50 Future',
+            'NSE_FO|62326': 'Nifty Bank Future'
         };
-
-        const id = key.includes('|') ? key.split('|')[1] : key;
-        const normalizedId = id.replace(/_raw_ticks$/, '');
-        return fallbackNames[normalizedId] || normalizedId;
+        return names[key] || (key && key.includes('|') ? key.split('|')[1] : key);
     }
     
     renderInstrumentSelector() {
@@ -261,26 +232,15 @@ class MarketChart {
         });
         
         this.socket.on('historical_candles', (data) => {
-            if (data.volume_bars) {
-                this.volume_candles = data.volume_bars.map(c => ({
-                    ...c,
-                    instrument: c.instrument || c.instrument_key
-                }));
-            }
-            if (data.price_bars) {
-                this.price_candles = data.price_bars.map(c => ({
-                    ...c,
-                    instrument: c.instrument || c.instrument_key
-                }));
-            }
-            
             if (data.instruments) {
                 this.instrumentsList = data.instruments;
                 this.renderInstrumentSelector();
                 this.updateThresholdSelector();
             }
 
-            if (this.currentInstrument) this.loadCandlesForCurrentInstrument();
+            if (this.currentInstrument) {
+                this.loadCandlesForCurrentInstrument();
+            }
 
             if (data.strategies) {
                 this.tracker.setupStrategyVersions(data.strategies);
@@ -464,7 +424,7 @@ class MarketChart {
         }
 
         const countElem = document.getElementById('candleCount');
-        if (countElem) countElem.textContent = `Candles: ${chartData.length}`;
+        if (countElem) countElem.textContent = "Candles: " + chartData.length;
     }
 
     addBottomPaneLabel() {
@@ -530,7 +490,7 @@ class MarketChart {
             this.indicators.setFullHistory(chartData);
             this.updateStatsPane(normalizedCandle);
         } catch (e) {
-            console.error("Charts live update exception avoided:", e.message);
+            console.error("Charts live update exception avoided: " + e.message);
         }
     }
 
@@ -567,7 +527,7 @@ class MarketChart {
                 candle.time = last.time + 1;
             }
             this.candles.push(candle);
-            this.candles.sort((a,b) => a.time - b.time);
+            this.candles.sort((a, b) => a.time - b.time);
         }
         if (this.candles.length > 500) this.candles = this.candles.slice(-500);
         this.updateCharts();
@@ -590,7 +550,7 @@ class MarketChart {
         
         this.socket.emit('subscribe', this.lastSubscription);
 
-        const subscriptionKey = `${this.currentInstrument}_${this.currentType}_${this.currentThreshold}`;
+        const subscriptionKey = this.currentInstrument + '_' + this.currentType + '_' + this.currentThreshold;
         
         this.socket.on(`${subscriptionKey}_live_candle`, (liveCandle) => {
             const normalized = {
@@ -622,20 +582,20 @@ class MarketChart {
     
     setupEventListeners() {
         document.querySelectorAll('.type-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.currentType = btn.dataset.type;
                 this.updateThresholdSelector();
-                this.loadCandlesForCurrentInstrument();
+                await this.loadCandlesForCurrentInstrument();
                 this.subscribeToCandles();
                 this.updateBottomChartLabel();
             });
         });
 
-        document.getElementById('threshold-selector')?.addEventListener('change', (e) => {
+        document.getElementById('threshold-selector')?.addEventListener('change', async (e) => {
             this.currentThreshold = parseInt(e.target.value, 10);
-            this.loadCandlesForCurrentInstrument();
+            await this.loadCandlesForCurrentInstrument();
             this.subscribeToCandles();
         });
 

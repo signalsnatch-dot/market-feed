@@ -1,3 +1,4 @@
+// chartServer.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -5,11 +6,9 @@ const path = require('path');
 const fs = require('fs');
 const { STRATEGIES } = require('./priceActionStrategy');
 
-// Standalone timezone and scale-safe helpers placed at the top of chartServer.js or as class methods
 function getTodayISTDateString() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Strictly YYYY-MM-DD in India
 }
-
 
 function getSignalISTDateString(ts) {
     if (!ts) return '';
@@ -19,10 +18,9 @@ function getSignalISTDateString(ts) {
         if (!isNaN(parsed)) ms = parsed;
     }
     if (isNaN(ms) || ms <= 0) return '';
-    if (ms < 10000000000) ms *= 1000; // Convert seconds to milliseconds
+    if (ms < 10000000000) ms *= 1000; // Force seconds to millisecond scaling
     return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
-
 
 class ChartServer {
     constructor(port = 3001, candlesDataDir = './candles_data', options = {}) {
@@ -140,12 +138,26 @@ class ChartServer {
         
         this.app.get('/api/recent/:type', (req, res) => {
             const type = req.params.type;
-            if (type === 'price' || type === 'volume') {
-                const storeKey = type + '_bars';
-                res.json(this.recentCandles[storeKey]);
-            } else {
-                res.status(400).json({ error: 'Invalid type' });
+            if (type !== 'price' && type !== 'volume') {
+                return res.status(400).json({ error: 'Invalid type' });
             }
+
+            const storeKey = type + '_bars';
+            const { instrument, threshold } = req.query;
+            
+            let data = this.recentCandles[storeKey];
+            
+            // On-demand filtering to avoid 100MB payload on page load
+            if (instrument && threshold) {
+                const threshNum = parseInt(threshold, 10);
+                data = data.filter(c => 
+                    (c.instrument === instrument || c.instrument_key === instrument) && 
+                    c.threshold == threshNum
+                );
+            }
+            
+            // Limit historical data response to the last 50 candles for instant page load
+            res.json(data.slice(-50));
         });
         
         this.app.get('/api/instruments', (req, res) => {
@@ -200,9 +212,8 @@ class ChartServer {
                     name: this.getInstrumentName(sig.instrument)
                 }));
             
+            // FIX: Removed 100MB historical candles from socket connection emit
             socket.emit('historical_candles', {
-                volume_bars: this.recentCandles.volume_bars,
-                price_bars: this.recentCandles.price_bars,
                 instruments: this.getInstrumentsFromFiles(),
                 trade_signals: todaySignals,
                 strategies: Object.keys(STRATEGIES)
@@ -281,7 +292,7 @@ class ChartServer {
         
         const todayIST = getTodayISTDateString();
         const filteredSignals = this.tradeSignals.filter(sig => {
-            const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const sigDate = getSignalISTDateString(sig.timestamp);
             return sigDate === todayIST;
         });
 
@@ -315,7 +326,6 @@ class ChartServer {
                             const candle = list[sig.index];
                             if (!candle) return;
 
-                            // Filter: only generate historical signals belonging strictly to today's IST session
                             const candDate = getSignalISTDateString(candle.timestamp);
                             if (candDate !== todayIST) return; // Ignore legacy bars
 
@@ -358,9 +368,8 @@ class ChartServer {
         processStrategyOnHistory(this.recentCandles.price_bars, 'price');
         this.tradeSignals.sort((a, b) => a.timestamp - b.timestamp);
 
-        // Filter trade signals so list remains clean of legacy caches
         this.tradeSignals = this.tradeSignals.filter(sig => {
-            const sigDate = new Date(sig.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const sigDate = getSignalISTDateString(sig.timestamp);
             return sigDate === todayIST;
         });
 
@@ -512,13 +521,13 @@ class ChartServer {
         return candles;
     }
     
+    // FIX: Removed 5.5 hour offset addition to prevent double timezone addition
     convertToIST(timestamp) {
-        const IST_OFFSET = 5.5 * 60 * 60 * 1000;
         let msTimestamp = timestamp;
         if (timestamp < 10000000000) {
             msTimestamp = timestamp * 1000;
         }
-        return msTimestamp + IST_OFFSET;
+        return msTimestamp; // Standard UTC timestamp
     }
     
     parseCSVLine(line) {
@@ -644,8 +653,8 @@ class ChartServer {
 
     broadcastTradeSignal(signalData) {
         const todayIST = getTodayISTDateString();
-        const sigDate = new Date(signalData.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-        if (sigDate !== todayIST) return; // Strict live gate: prevent historical files from polluting current screen
+        const sigDate = getSignalISTDateString(signalData.timestamp);
+        if (sigDate !== todayIST) return; 
 
         const isDuplicate = this.tradeSignals.some(sig => 
             sig.instrument === signalData.instrument &&
@@ -690,7 +699,6 @@ class ChartServer {
             
             this.saveSignalsToDisk();
             
-            // Enrich before broadcast to ensure UI remains dynamic
             const enrichedUpdate = {
                 ...this.tradeSignals[matchIndex],
                 name: this.getInstrumentName(this.tradeSignals[matchIndex].instrument)
