@@ -1,3 +1,4 @@
+
 // public/signalPanel.js
 class LiveTradeTracker {
     constructor(chartServer) {
@@ -256,38 +257,11 @@ class LiveTradeTracker {
         if (!listContainer) return;
         listContainer.innerHTML = '';
 
-        // Safely extract the active trading session day (cutoff 9:00 AM IST) on client-side
-        const getTodayISTTradingDay = () => {
-            const now = Date.now();
-            const formatter = new Intl.DateTimeFormat('en-CA', {
-                timeZone: 'Asia/Kolkata',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-            });
-            const formattedStr = formatter.format(now); 
-            const match = formattedStr.match(/^(\d{4}-\d{2}-\d{2}).*?(\d{2}):(\d{2})$/);
-            if (!match) return formattedStr.split(',')[0].trim();
-
-            const calendarDateStr = match[1];
-            const hour = parseInt(match[2], 10);
-            const minute = parseInt(match[3], 10);
-
-            const timeMinutes = hour * 60 + minute;
-            const sessionStartMinutes = 9 * 60; // 9:00 AM IST
-
-            if (timeMinutes < sessionStartMinutes) {
-                const d = new Date(calendarDateStr + 'T12:00:00');
-                d.setDate(d.getDate() - 1);
-                return d.toISOString().split('T')[0];
-            }
-            return calendarDateStr;
+        const getTodayISTDateString = () => {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         };
 
-        const getSignalISTTradingDay = (ts) => {
+        const getSignalISTDateString = (ts) => {
             if (!ts) return '';
             let ms = typeof ts === 'number' ? ts : Number(ts);
             if (isNaN(ms)) {
@@ -326,11 +300,11 @@ class LiveTradeTracker {
             return calendarDateStr;
         };
 
-        const todayIST = getTodayISTTradingDay();
+        const todayIST = getTodayISTDateString();
 
         const filtered = this.allSignals.filter(sig => {
-            // FIX: Strict client-side date gate: hide any trades not belonging to today's active IST session
-            const sigDate = getSignalISTTradingDay(sig.timestamp);
+            // FIX: Strict timezone and session-boundary aware client-side date filter [1, 2]
+            const sigDate = getSignalISTDateString(sig.timestamp);
             if (sigDate !== todayIST) return false;
 
             const matchesVersion = (sig.version || "V1: Double Traps") === this.filterVersion;

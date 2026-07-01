@@ -1,3 +1,4 @@
+
 /**
  * Price Action Strategy Versions Module (Dual-Framework Engine)
  * Houses 50 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
@@ -467,31 +468,67 @@ function isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRat
 // STRUCTURAL PRICE ACTION LEG COUNTING ENGINE
 // ============================================================
 
-function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
+function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize, p) {
     if (swingHighIdx === null || swingHighIdx >= currentIdx - 2) {
         return { isH2: false };
     }
 
+    let firstLegStarted = false;
     let h1TriggerIdx = -1;
     let h1SignalIdx = -1;
     let secondLegStarted = false;
     let h2TriggerIdx = -1;
     let h2SignalIdx = -1;
 
+    const useStrict = p && p.useStrictLegInitiation;
+
     for (let j = swingHighIdx + 1; j <= currentIdx; j++) {
         const prevHigh = candles[j - 1].high;
         const currentHigh = candles[j].high;
+        const prevLow = candles[j - 1].low;
+        const currentLow = candles[j].low;
+        const isBullish = candles[j].close > candles[j].open;
+        const isBearish = candles[j].close < candles[j].open;
 
+        // Step 1: First Leg Down initiation
+        if (useStrict && !firstLegStarted) {
+            // FIX: Enforce first leg down can only start on a bearish body + low break [1]
+            if (isBearish && currentLow < prevLow) {
+                firstLegStarted = true;
+            }
+            continue;
+        }
+
+        // Step 2: H1 completion (Accumulation / Bounce start)
         if (h1TriggerIdx === -1) {
-            if (currentHigh > prevHigh) {
-                h1TriggerIdx = j;
-                h1SignalIdx = j - 1;
+            if (useStrict) {
+                // FIX: Enforce H1 bounce can only start on a bullish body + high break [1]
+                if (isBullish && currentHigh > prevHigh) {
+                    h1TriggerIdx = j;
+                    h1SignalIdx = j - 1;
+                }
+            } else {
+                if (currentHigh > prevHigh) {
+                    h1TriggerIdx = j;
+                    h1SignalIdx = j - 1;
+                }
             }
-        } else if (!secondLegStarted) {
-            if (candles[j].low < candles[j - 1].low || candles[j].high < candles[j - 1].high) {
-                secondLegStarted = true;
+        } 
+        // Step 3: Second Leg Down initiation
+        else if (!secondLegStarted) {
+            if (useStrict) {
+                // FIX: Enforce second leg down can only start on a bearish body + low break [1]
+                if (isBearish && currentLow < prevLow) {
+                    secondLegStarted = true;
+                }
+            } else {
+                if (candles[j].low < prevLow || candles[j].high < prevHigh) {
+                    secondLegStarted = true;
+                }
             }
-        } else if (h2TriggerIdx === -1) {
+        } 
+        // Step 4: Track if a previous H2 trigger has already occurred
+        else if (h2TriggerIdx === -1) {
             if (currentHigh > prevHigh) {
                 h2TriggerIdx = j;
                 h2SignalIdx = j - 1;
@@ -499,7 +536,8 @@ function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
         }
     }
 
-    const isValidH2Signal = (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
+    const leg1Valid = useStrict ? firstLegStarted : true;
+    const isValidH2Signal = leg1Valid && (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
 
     return {
         isH2: isValidH2Signal,
@@ -510,39 +548,76 @@ function evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
     };
 }
 
-function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
+function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize, p) {
     if (swingLowIdx === null || swingLowIdx >= currentIdx - 2) {
         return { isL2: false };
     }
 
+    let firstLegStarted = false;
     let l1TriggerIdx = -1;
     let l1SignalIdx = -1;
     let secondLegStarted = false;
     let l2TriggerIdx = -1;
     let l2SignalIdx = -1;
 
+    const useStrict = p && p.useStrictLegInitiation;
+
     for (let j = swingLowIdx + 1; j <= currentIdx; j++) {
         const prevLow = candles[j - 1].low;
+        const prevHigh = candles[j - 1].high;
         const currentLow = candles[j].low;
+        const currentHigh = candles[j].high;
+        const isBullish = candles[j].close > candles[j].open;
+        const isBearish = candles[j].close < candles[j].open;
 
+        // Step 1: First Leg Up initiation
+        if (useStrict && !firstLegStarted) {
+            // FIX: Enforce first leg up can only start on a bullish body + high break [1]
+            if (isBullish && currentHigh > prevHigh) {
+                firstLegStarted = true;
+            }
+            continue;
+        }
+
+        // Step 2: L1 completion (Consolidation / Pullback start)
         if (l1TriggerIdx === -1) {
-            if (currentLow < prevLow) {
-                l1TriggerIdx = j;
-                l1SignalIdx = j - 1;
+            if (useStrict) {
+                // FIX: Enforce L1 pullback can only start on a bearish body + low break [1]
+                if (isBearish && currentLow < prevLow) {
+                    l1TriggerIdx = j;
+                    l1SignalIdx = j - 1;
+                }
+            } else {
+                if (candles[j].low < prevLow) {
+                    l1TriggerIdx = j;
+                    l1SignalIdx = j - 1;
+                }
             }
-        } else if (!secondLegStarted) {
-            if (candles[j].high > candles[j - 1].high || candles[j].low > candles[j - 1].low) {
-                secondLegStarted = true;
+        } 
+        // Step 3: Second Leg Up initiation
+        else if (!secondLegStarted) {
+            if (useStrict) {
+                // FIX: Enforce second leg up can only start on a bullish body + high break [1]
+                if (isBullish && currentHigh > prevHigh) {
+                    secondLegStarted = true;
+                }
+            } else {
+                if (candles[j].high > prevHigh || candles[j].low > prevLow) {
+                    secondLegStarted = true;
+                }
             }
-        } else if (l2TriggerIdx === -1) {
-            if (currentLow < prevLow) {
+        } 
+        // Step 4: Track if a previous L2 trigger has already occurred
+        else if (l2TriggerIdx === -1) {
+            if (candles[j].low < prevLow) {
                 l2TriggerIdx = j;
                 l2SignalIdx = j - 1;
             }
         }
     }
 
-    const isValidL2Signal = (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
+    const leg1Valid = useStrict ? firstLegStarted : true;
+    const isValidL2Signal = leg1Valid && (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
 
     return {
         isL2: isValidL2Signal,
@@ -555,8 +630,8 @@ function evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
 
 // === BROOKS/WADE STRICT LEG EVALUATIONS ===
 
-function evaluateStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
-    const setup = evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize);
+function evaluateStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize, p) {
+    const setup = evaluateH2Setup(candles, swingHighIdx, currentIdx, tickSize, p);
     if (!setup.isH2) return setup;
 
     const h1TriggerIdx = setup.h1TriggerIdx;
@@ -579,8 +654,8 @@ function evaluateStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize) {
     return setup;
 }
 
-function evaluateStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize) {
-    const setup = evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize);
+function evaluateStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize, p) {
+    const setup = evaluateL2Setup(candles, swingLowIdx, currentIdx, tickSize, p);
     if (!setup.isL2) return setup;
 
     const l1TriggerIdx = setup.l1TriggerIdx;
@@ -610,6 +685,7 @@ function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, 
         return { isH2: false };
     }
 
+    let firstLegStarted = false;
     let h1TriggerIdx = -1;
     let h1SignalIdx = -1;
     let secondLegStarted = false;
@@ -619,23 +695,56 @@ function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, 
     let h1Breaches = { count: 0 };
     let h2Breaches = { count: 0 };
 
-    // FIX: Safely read structureOffsetRatio from the "p" object parameter to prevent undefined references
     const structureOffsetRatio = (p && p.structureOffsetRatio !== undefined) ? p.structureOffsetRatio : 0.10;
+    const useStrict = p && p.useStrictLegInitiation;
 
     for (let j = swingHighIdx + 1; j <= currentIdx; j++) {
         const prevHigh = candles[j - 1].high;
         const prevLow = candles[j - 1].low;
+        const currentHigh = candles[j].high;
+        const currentLow = candles[j].low;
+        const isBullish = candles[j].close > candles[j].open;
+        const isBearish = candles[j].close < candles[j].open;
 
+        // Step 1: First Leg Down initiation
+        if (useStrict && !firstLegStarted) {
+            const structuralLowOffset = prevLow - (avgRange * structureOffsetRatio);
+            if (isBearish && currentLow < structuralLowOffset) {
+                firstLegStarted = true;
+            }
+            continue;
+        }
+
+        // Step 2: H1 completion
         if (h1TriggerIdx === -1) {
-            if (isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, h1Breaches)) {
-                h1TriggerIdx = j;
-                h1SignalIdx = j - 1;
+            if (useStrict) {
+                const structuralHighOffset = prevHigh + (avgRange * structureOffsetRatio);
+                if (isBullish && currentHigh > structuralHighOffset) {
+                    h1TriggerIdx = j;
+                    h1SignalIdx = j - 1;
+                }
+            } else {
+                if (isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, h1Breaches)) {
+                    h1TriggerIdx = j;
+                    h1SignalIdx = j - 1;
+                }
             }
-        } else if (!secondLegStarted) {
-            if (candles[j].low < prevLow || candles[j].high < prevHigh) {
-                secondLegStarted = true;
+        } 
+        // Step 3: Second Leg Down initiation
+        else if (!secondLegStarted) {
+            if (useStrict) {
+                const structuralLowOffset = prevLow - (avgRange * structureOffsetRatio);
+                if (isBearish && currentLow < structuralLowOffset) {
+                    secondLegStarted = true;
+                }
+            } else {
+                if (candles[j].low < prevLow || candles[j].high < prevHigh) {
+                    secondLegStarted = true;
+                }
             }
-        } else if (h2TriggerIdx === -1) {
+        } 
+        // Step 4: Previous trigger check
+        else if (h2TriggerIdx === -1) {
             if (isStructuralHighBreach(candles, j, prevHigh, avgRange, structureOffsetRatio, h2Breaches)) {
                 h2TriggerIdx = j;
                 h2SignalIdx = j - 1;
@@ -643,7 +752,8 @@ function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, 
         }
     }
 
-    const isValidH2Signal = (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
+    const leg1Valid = useStrict ? firstLegStarted : true;
+    const isValidH2Signal = leg1Valid && (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
 
     return {
         isH2: isValidH2Signal,
@@ -659,6 +769,7 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
         return { isL2: false };
     }
 
+    let firstLegStarted = false;
     let l1TriggerIdx = -1;
     let l1SignalIdx = -1;
     let secondLegStarted = false;
@@ -668,23 +779,56 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
     let l1Breaches = { count: 0 };
     let l2Breaches = { count: 0 };
 
-    // FIX: Safely read structureOffsetRatio from the "p" object parameter to prevent undefined references
     const structureOffsetRatio = (p && p.structureOffsetRatio !== undefined) ? p.structureOffsetRatio : 0.10;
+    const useStrict = p && p.useStrictLegInitiation;
 
     for (let j = swingLowIdx + 1; j <= currentIdx; j++) {
         const prevLow = candles[j - 1].low;
         const prevHigh = candles[j - 1].high;
+        const currentLow = candles[j].low;
+        const currentHigh = candles[j].high;
+        const isBullish = candles[j].close > candles[j].open;
+        const isBearish = candles[j].close < candles[j].open;
 
+        // Step 1: First Leg Up initiation
+        if (useStrict && !firstLegStarted) {
+            const structuralHighOffset = prevHigh + (avgRange * structureOffsetRatio);
+            if (isBullish && currentHigh > structuralHighOffset) {
+                firstLegStarted = true;
+            }
+            continue;
+        }
+
+        // Step 2: L1 completion
         if (l1TriggerIdx === -1) {
-            if (isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, l1Breaches)) {
-                l1TriggerIdx = j;
-                l1SignalIdx = j - 1;
+            if (useStrict) {
+                const structuralLowOffset = prevLow - (avgRange * structureOffsetRatio);
+                if (isBearish && currentLow < structuralLowOffset) {
+                    l1TriggerIdx = j;
+                    l1SignalIdx = j - 1;
+                }
+            } else {
+                if (isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, l1Breaches)) {
+                    l1TriggerIdx = j;
+                    l1SignalIdx = j - 1;
+                }
             }
-        } else if (!secondLegStarted) {
-            if (candles[j].high > prevHigh || candles[j].low > prevLow) {
-                secondLegStarted = true;
+        } 
+        // Step 3: Second Leg Up initiation
+        else if (!secondLegStarted) {
+            if (useStrict) {
+                const structuralHighOffset = prevHigh + (avgRange * structureOffsetRatio);
+                if (isBullish && currentHigh > structuralHighOffset) {
+                    secondLegStarted = true;
+                }
+            } else {
+                if (candles[j].high > prevHigh || candles[j].low > prevLow) {
+                    secondLegStarted = true;
+                }
             }
-        } else if (l2TriggerIdx === -1) {
+        } 
+        // Step 4: Previous trigger check
+        else if (l2TriggerIdx === -1) {
             if (isStructuralLowBreach(candles, j, prevLow, avgRange, structureOffsetRatio, l2Breaches)) {
                 l2TriggerIdx = j;
                 l2SignalIdx = j - 1;
@@ -692,7 +836,8 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
         }
     }
 
-    const isValidL2Signal = (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
+    const leg1Valid = useStrict ? firstLegStarted : true;
+    const isValidL2Signal = leg1Valid && (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
 
     return {
         isL2: isValidL2Signal,
@@ -705,6 +850,7 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
 
 // Sophisticated Brooks strict check: accepts if deeper OR if forming a tight double-bottom
 function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p) {
+    // FIX: Passed the "p" object parameter (6th) to prevent undefined reference errors inside nested structural loops
     const setup = evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, avgRange, p);
     if (!setup.isH2) return setup;
 
@@ -732,6 +878,7 @@ function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tick
 
 // Sophisticated Brooks strict check: accepts if shallower OR if forming a tight double-top
 function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p) {
+    // FIX: Passed the "p" object parameter (6th) to prevent undefined reference errors inside nested structural loops
     const setup = evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, avgRange, p);
     if (!setup.isL2) return setup;
 
@@ -913,8 +1060,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         ? evaluateStructuralStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, avgRange, p)
                         : evaluateStructuralH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, avgRange, p))
                     : (p.requireStrictSecondLeg 
-                        ? evaluateStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize)
-                        : evaluateH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize));
+                        ? evaluateStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, p)
+                        : evaluateH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, p));
 
                 if (setup.isH2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
@@ -979,8 +1126,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         ? evaluateStructuralStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, avgRange, p)
                         : evaluateStructuralL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, avgRange, p))
                     : (p.requireStrictSecondLeg
-                        ? evaluateStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize)
-                        : evaluateL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize));
+                        ? evaluateStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, p)
+                        : evaluateL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, p));
 
                 if (setup.isL2) {
                     const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
@@ -1047,11 +1194,12 @@ function twoLeggedPullbackCore(candles, params = {}) {
                     if (swingLowIdx !== null) {
                         const setupL2 = p.useStructuralRules
                             ? (p.requireStrictSecondLeg
+                                // FIX: Added missing parameter argument "p" (6th) to structural calls inside trap loops to prevent crashes
                                 ? evaluateStructuralStrictL2Setup(candles, swingLowIdx, L, p.tickSize, avgRange, p)
                                 : evaluateStructuralL2Setup(candles, swingLowIdx, L, p.tickSize, avgRange, p))
                             : (p.requireStrictSecondLeg
-                                ? evaluateStrictL2Setup(candles, swingLowIdx, L, p.tickSize)
-                                : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize));
+                                ? evaluateStrictL2Setup(candles, swingLowIdx, L, p.tickSize, p)
+                                : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize, p));
                         
                         if (setupL2.isL2) {
                             const triggeredShort = candles[L + 1].low < candles[L].low - triggerBreakDist;
@@ -1129,11 +1277,12 @@ function twoLeggedPullbackCore(candles, params = {}) {
                     if (swingHighIdx !== null) {
                         const setupH2 = p.useStructuralRules
                             ? (p.requireStrictSecondLeg
+                                // FIX: Added missing parameter argument "p" (6th) to structural calls inside trap loops to prevent crashes
                                 ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p)
                                 : evaluateStructuralH2Setup(candles, swingHighIdx, L, p.tickSize, avgRange, p))
                             : (p.requireStrictSecondLeg
-                                ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize)
-                                : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize));
+                                ? evaluateStructuralStrictH2Setup(candles, swingHighIdx, L, p.tickSize, p)
+                                : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize, p));
                         
                         if (setupH2.isH2) {
                             const triggeredLong = candles[L + 1].high > candles[L].high + triggerBreakDist;
@@ -1383,6 +1532,8 @@ Object.keys(STRATEGIES).forEach(key => {
 
     const isStructural = key.includes("Structural-Calibrated");
     const isBrooksTrend = key.includes("Upgraded");
+    const versionNum = parseInt(key.match(/^V(\d+):/)?.[1] || 0, 10);
+    const isStrictLegInit = versionNum >= 10;
 
     const originalFunc = STRATEGIES[key];
     STRATEGIES[key] = (candles, params = {}) => {
@@ -1390,6 +1541,7 @@ Object.keys(STRATEGIES).forEach(key => {
             useRatios: isCalibrated, 
             useStructuralRules: isStructural,
             useBrooksTrend: isBrooksTrend,
+            useStrictLegInitiation: isStrictLegInit,
             ...(isBrooksTrend ? { minTrendBars: 18, swingLookback: 12 } : {}),
             ...params 
         };
