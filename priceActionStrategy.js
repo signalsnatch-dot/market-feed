@@ -619,7 +619,8 @@ function evaluateStructuralH2Setup(candles, swingHighIdx, currentIdx, tickSize, 
     let h1Breaches = { count: 0 };
     let h2Breaches = { count: 0 };
 
-    const structureOffsetRatio = p.structureOffsetRatio !== undefined ? p.structureOffsetRatio : 0.10;
+    // FIX: Safely read structureOffsetRatio from the "p" object parameter to prevent undefined references
+    const structureOffsetRatio = (p && p.structureOffsetRatio !== undefined) ? p.structureOffsetRatio : 0.10;
 
     for (let j = swingHighIdx + 1; j <= currentIdx; j++) {
         const prevHigh = candles[j - 1].high;
@@ -667,7 +668,8 @@ function evaluateStructuralL2Setup(candles, swingLowIdx, currentIdx, tickSize, a
     let l1Breaches = { count: 0 };
     let l2Breaches = { count: 0 };
 
-    const structureOffsetRatio = p.structureOffsetRatio !== undefined ? p.structureOffsetRatio : 0.10;
+    // FIX: Safely read structureOffsetRatio from the "p" object parameter to prevent undefined references
+    const structureOffsetRatio = (p && p.structureOffsetRatio !== undefined) ? p.structureOffsetRatio : 0.10;
 
     for (let j = swingLowIdx + 1; j <= currentIdx; j++) {
         const prevLow = candles[j - 1].low;
@@ -719,7 +721,7 @@ function evaluateStructuralStrictH2Setup(candles, swingHighIdx, currentIdx, tick
         if (candles[k].low < secondLegLow) secondLegLow = candles[k].low;
     }
 
-    const dbTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+    const dbTolerance = avgRange * ((p && p.doubleTopBottomToleranceRatioV2) || 0.15);
     const isDoubleBottom = Math.abs(secondLegLow - firstLegLow) <= dbTolerance;
 
     if (secondLegLow >= firstLegLow && !isDoubleBottom) {
@@ -746,7 +748,7 @@ function evaluateStructuralStrictL2Setup(candles, swingLowIdx, currentIdx, tickS
         if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high;
     }
 
-    const dtTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
+    const dtTolerance = avgRange * ((p && p.doubleTopBottomToleranceRatioV2) || 0.15);
     const isDoubleTop = Math.abs(secondLegHigh - firstLegHigh) <= dtTolerance;
 
     if (secondLegHigh <= firstLegHigh && !isDoubleTop) {
@@ -879,7 +881,6 @@ function twoLeggedPullbackCore(candles, params = {}) {
             if (rawHighIdx !== null) {
                 adjustedSwingHighIdx = rawHighIdx;
                 const dtTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
-                // Scan forward from original peak to locate more immediate equal double top pivots
                 for (let k = rawHighIdx + 1; k < i - 1; k++) {
                     if (candles[k].high <= candles[rawHighIdx].high && 
                         (candles[rawHighIdx].high - candles[k].high) <= dtTolerance) {
@@ -887,12 +888,11 @@ function twoLeggedPullbackCore(candles, params = {}) {
                     }
                 }
             }
-
+            
             const rawLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
             if (rawLowIdx !== null) {
                 adjustedSwingLowIdx = rawLowIdx;
                 const dbTolerance = avgRange * (p.doubleTopBottomToleranceRatioV2 || 0.15);
-                // Scan forward from original trough to locate more immediate equal double bottom pivots
                 for (let k = rawLowIdx + 1; k < i - 1; k++) {
                     if (candles[k].low >= candles[rawLowIdx].low && 
                         (candles[k].low - candles[rawLowIdx].low) <= dbTolerance) {
