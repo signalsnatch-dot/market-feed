@@ -102,12 +102,17 @@ class ChartServer {
         // Structured nesting for instant O(1) lookups
         this.recentCandles = { price_bars: {}, volume_bars: {} };
         this.tradeSignals = [];
+        this.instrumentsData = [];
+        this.maxRecentCandlesPerInstrument = 1200; 
+        this.maxSignalHistory = 1200;
+        this.maxClientSignals = 200;
         this.maxRecentCandlesPerInstrument = 1200; 
         
         this.setupRoutes();
         this.setupSocketEvents();
         this.loadSavedSignals();
         this.loadHistoricalCandles();
+        this.rebuildInstrumentIndex();
         this.generateHistoricalSignals(); 
     }
     
@@ -183,6 +188,7 @@ class ChartServer {
 
             const storeKey = type + '_bars';
             const { instrument, threshold } = req.query;
+            const limit = Math.min(200, Math.max(10, parseInt(req.query.limit, 10) || 100));
             
             if (!instrument || !threshold) {
                 return res.json([]);
@@ -191,14 +197,14 @@ class ChartServer {
             const threshNum = parseInt(threshold, 10);
             const instrumentMap = this.recentCandles[storeKey][instrument];
             if (instrumentMap && instrumentMap[threshNum]) {
-                return res.json(instrumentMap[threshNum].slice(-50)); // Slices last 50 candles instantly
+                return res.json(instrumentMap[threshNum].slice(-limit));
             }
             
             res.json([]);
         });
         
         this.app.get('/api/instruments', (req, res) => {
-            res.json(this.getInstrumentsFromFiles());
+            res.json(this.instrumentsData);
         });
 
         this.app.get('/api/strategies', (req, res) => {
@@ -207,10 +213,12 @@ class ChartServer {
         
         this.app.get('/api/signals', (req, res) => {
             this.pruneOldSignals();
-            const todaySignals = this.tradeSignals.map(sig => ({
-                ...sig,
-                name: this.getInstrumentName(sig.instrument)
-            }));
+            const limit = Math.min(500, Math.max(50, parseInt(req.query.limit, 10) || 200));
+            const activeOnly = req.query.activeOnly === 'true';
+            const version = req.query.version;
+            const instrument = req.query.instrument;
+            const threshold = req.query.threshold ? parseInt(req.query.threshold, 10) : undefined;
+            const todaySignals = this.getRecentSignalsForClient({ limit, activeOnly, version, instrument, threshold });
             res.json(todaySignals);
         });
         
@@ -240,8 +248,8 @@ class ChartServer {
             }));
             
             socket.emit('historical_candles', {
-                instruments: this.getInstrumentsFromFiles(),
-                trade_signals: todaySignals,
+                instruments: this.instrumentsData,
+                trade_signals: this.getRecentSignalsForClient({ limit: this.maxClientSignals }),
                 strategies: Object.keys(STRATEGIES)
             });
             
@@ -406,6 +414,40 @@ class ChartServer {
             const sigDate = getTradingDayIST(sig.timestamp);
             return sigDate === todayTradingDay;
         });
+        if (this.tradeSignals.length > this.maxSignalHistory) {
+            this.tradeSignals = this.tradeSignals.slice(-this.maxSignalHistory);
+        }
+    }
+
+    getRecentSignalsForClient({ limit = 200, activeOnly = false, version, instrument, threshold } = {}) {
+        const todayTradingDay = getTodayISTTradingDay();
+        let filtered = this.tradeSignals.filter(sig => {
+            const sigDate = getTradingDayIST(sig.timestamp);
+            if (sigDate !== todayTradingDay) return false;
+            if (activeOnly && sig.status !== 'active') return false;
+            return true;
+        });
+
+        if (version) {
+            filtered = filtered.filter(sig => sig.version === version);
+        }
+        if (instrument) {
+            filtered = filtered.filter(sig => sig.instrument === instrument);
+        }
+        if (threshold !== undefined) {
+            filtered = filtered.filter(sig => parseInt(sig.threshold, 10) === threshold);
+        }
+
+        filtered.sort((a, b) => b.timestamp - a.timestamp);
+        if (filtered.length > limit) filtered = filtered.slice(0, limit);
+        return filtered.map(sig => ({
+            ...sig,
+            name: this.getInstrumentName(sig.instrument)
+        }));
+    }
+
+    rebuildInstrumentIndex() {
+        this.instrumentsData = this.getInstrumentsFromFiles();
     }
 
     loadSavedSignals() {

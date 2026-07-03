@@ -5,7 +5,11 @@ yarn-error.log*
 package-lock.json
 yarn.lock
 output-logs-*
-backtest-logs-*
+backtest-logs*
+candlegenerate*
+output*
+plan\ for\ next\ steps
+test-result-comparison*
 
 # Data directories (all market data)
 market_data/
@@ -15,11 +19,14 @@ volume_bars_data/
 ticker_candles_data/
 backtest_results/
 version-backtest-results/
+version-backtest-report/
 extract-subset/
 extracted/
 candle-versions/
 backtest-logs/
 compare-output/
+backtest-results/
+live-performance-report/
 
 # Legacy data directories (if any)
 data/

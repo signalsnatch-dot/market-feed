@@ -1,12 +1,13 @@
 
 /**
  * Price Action Strategy Versions Module (Dual-Framework Engine)
- * Houses 50 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
+ * Houses 53 independent versions of the Thomas Wade / Al Brooks 2-Legged Pullback strategy:
  * - V1 to V10: Original absolute tick-based logic (preserves baseline results, zero regression).
  * - V11 to V20: Dynamic volatility-adjusted ratio-based logic (loaded from config.json).
  * - V21 to V30: Structural Calibrated editions incorporating three-dimensional leg completion filters.
  * - V31 to V40: Upgraded absolute tick-based versions (clones of V1-V10 utilizing optimized Al Brooks trends).
  * - V41 to V50: Upgraded structural calibrated versions (clones of V21-V30 utilizing optimized Al Brooks trends).
+ * - V51 to V53: Al Brooks Structural Pure (95%+ alignment) - strict structural rules, directional EMA test, high win-rate focus.
  */
 
 const DEFAULT_PARAMS = {
@@ -1064,7 +1065,14 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         : evaluateH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, p));
 
                 if (setup.isH2) {
-                    const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
+                    let touchEMA;
+                    if (p.useDirectionalEMATest) {
+                        // Brooks-aligned: H2 signal bar tests EMA from above (pullback down to EMA)
+                        touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.close > ema[i];
+                    } else {
+                        // Legacy: symmetric band check
+                        touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
+                    }
                     const passesSignalBarCheck = validateSignalBar(sBar, 'BUY', p);
 
                     if (touchEMA && passesSignalBarCheck) {
@@ -1130,7 +1138,14 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         : evaluateL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, p));
 
                 if (setup.isL2) {
-                    const touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
+                    let touchEMA;
+                    if (p.useDirectionalEMATest) {
+                        // Brooks-aligned: L2 signal bar tests EMA from below (pullback up to EMA)
+                        touchEMA = sBar.high >= ema[i] - emaTouchDistance && sBar.close < ema[i];
+                    } else {
+                        // Legacy: symmetric band check
+                        touchEMA = sBar.low <= ema[i] + emaTouchDistance && sBar.high >= ema[i] - emaTouchDistance;
+                    }
                     const passesSignalBarCheck = validateSignalBar(sBar, 'SELL', p);
 
                     if (touchEMA && passesSignalBarCheck) {
@@ -1521,6 +1536,67 @@ const STRATEGIES = {
     },
     "V50: Wade Structural (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+
+    // === V51-V53: Al Brooks Structural Pure (95%+ Alignment) ===
+    "V51: Brooks Structural Pure": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { 
+            ...params, 
+            useStructuralRules: true,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true,
+            useBrooksTrend: true,
+            minTrendBars: 18,
+            swingLookback: 12,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            useDirectionalEMATest: true,
+            useStructuralTarget: false,
+            structureOffsetRatio: 0.08,
+            doubleTopBottomToleranceRatioV2: 0.12,
+            minBarsBetweenSignals: 3
+        });
+    },
+    
+    "V52: Brooks Volume-Optimized": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { 
+            ...params, 
+            useStructuralRules: true,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true,
+            useBrooksTrend: true,
+            minTrendBars: 12,
+            swingLookback: 8,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            useDirectionalEMATest: true,
+            useStructuralTarget: false,
+            structureOffsetRatio: 0.10,
+            doubleTopBottomToleranceRatioV2: 0.15,
+            emaTouchRatioV2: 0.18,
+            minBarsBetweenSignals: 4
+        });
+    },
+    
+    "V53: Brooks Selective (Win-Rate Focus)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { 
+            ...params, 
+            useStructuralRules: true,
+            requireStrictSecondLeg: true,
+            requireDoubleTopBottomTrap: true,
+            useBrooksTrend: true,
+            minTrendBars: 20,
+            swingLookback: 14,
+            enableTraps: false,
+            enableConfidenceScoring: false,
+            useDirectionalEMATest: true,
+            useStructuralTarget: false,
+            structureOffsetRatio: 0.08,
+            doubleTopBottomToleranceRatioV2: 0.10,
+            emaTouchRatioV2: 0.12,
+            minBarsBetweenSignals: 5,
+            minSignalBarCloseRatio: 0.70
+        });
     }
 };
 

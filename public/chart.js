@@ -15,6 +15,9 @@ class MarketChart {
         this.isInitialized = false;
         this.initialDataLoaded = false;
         this.lastSubscription = null;
+
+        this.chartHistoryLimit = 100;
+        this.maxCandlesInMemory = 250;
         
         this.timeMap = new Map();
         this.indicators = new ChartIndicators(this);
@@ -32,14 +35,8 @@ class MarketChart {
     }
 
     setActiveInstrument(key) {
-        const buttons = document.querySelectorAll('.instrument-btn');
-        buttons.forEach(btn => {
-            if (btn.dataset.key === key) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
+        const select = document.getElementById('instrument-selector-select');
+        if (select) select.value = key;
     }
     
     async switchInstrument(key) {
@@ -147,7 +144,7 @@ class MarketChart {
         this.showLoading(); // Display dynamic spinner overlay immediately
 
         try {
-            const res = await fetch(`/api/recent/${this.currentType}?instrument=${encodeURIComponent(this.currentInstrument)}&threshold=${this.currentThreshold}`);
+            const res = await fetch(`/api/recent/${this.currentType}?instrument=${encodeURIComponent(this.currentInstrument)}&threshold=${this.currentThreshold}&limit=${this.chartHistoryLimit}`);
             if (res.ok) {
                 const data = await res.json();
                 this.candles = data.map(c => this.convertToChartCandle(c)).filter(c => null !== c);
@@ -247,14 +244,25 @@ class MarketChart {
             container.innerHTML = '<span style="color: #787b86;">Loading instruments...</span>';
             return;
         }
-        let html = '';
+        container.innerHTML = '';
+        const label = document.createElement('label');
+        label.textContent = 'Instrument';
+        label.style.cssText = 'display: block; margin-bottom: 6px; color: #d1d4dc; font-size: 12px;';
+
+        const select = document.createElement('select');
+        select.id = 'instrument-selector-select';
+        select.style.cssText = 'width: 100%; max-width: 420px; padding: 8px 10px; border-radius: 10px; border: 1px solid #4a4e5a; background: #1e222d; color: #d1d4dc; font-size: 13px;';
         this.instrumentsList.forEach(inst => {
-            html += `<button class="instrument-btn" data-key="${inst.key}">${inst.name || inst.symbol}</button>`;
+            const opt = document.createElement('option');
+            opt.value = inst.key;
+            opt.textContent = inst.name || inst.symbol || inst.key;
+            select.appendChild(opt);
         });
-        container.innerHTML = html;
-        document.querySelectorAll('.instrument-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.switchInstrument(btn.dataset.key));
+        select.addEventListener('change', async () => {
+            await this.switchInstrument(select.value);
         });
+        container.appendChild(label);
+        container.appendChild(select);
     }
     
     setupWebSocket() {
@@ -515,16 +523,14 @@ class MarketChart {
                 value: volumeVal,
                 color: '#00bcd4'
             });
-
-            const chartData = this.candles.map(c => ({
+            const chartData = this.candles.slice(-this.chartHistoryLimit).map(c => ({
                 time: c.time,
                 open: c.open,
                 high: c.high,
                 low: c.low,
                 close: c.close
             }));
-
-            this.indicators.setFullHistory(chartData);
+            this.indicators.updateLatestPoint(chartData);
             this.updateStatsPane(normalizedCandle);
         } catch (e) {
             console.error("Charts live update exception avoided: " + e.message);
@@ -566,7 +572,7 @@ class MarketChart {
             this.candles.push(candle);
             this.candles.sort((a, b) => a.time - b.time);
         }
-        if (this.candles.length > 500) this.candles = this.candles.slice(-500);
+        if (this.candles.length > this.maxCandlesInMemory) this.candles = this.candles.slice(-this.maxCandlesInMemory);
         this.updateCharts();
         this.updateStatsFromCandle(candle);
     }
