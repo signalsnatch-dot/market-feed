@@ -106,7 +106,9 @@ class ChartServer {
         this.maxRecentCandlesPerInstrument = 1200; 
         this.maxSignalHistory = 1200;
         this.maxClientSignals = 200;
-        this.maxRecentCandlesPerInstrument = 1200; 
+        this.saveInProgress = false;
+        this.lastSignalSave = 0;
+        this.signalSaveInterval = 30000; // Save signals to disk every 30 seconds
         
         this.setupRoutes();
         this.setupSocketEvents();
@@ -114,6 +116,7 @@ class ChartServer {
         this.loadHistoricalCandles();
         this.rebuildInstrumentIndex();
         this.generateHistoricalSignals(); 
+        this.startPeriodicSignalSave(); 
     }
     
     validateDataDirectory() {
@@ -469,6 +472,20 @@ class ChartServer {
         }
     }
 
+    startPeriodicSignalSave() {
+        setInterval(() => {
+            if (this.saveInProgress) return;
+            this.saveInProgress = true;
+            try {
+                this.saveSignalsToDisk();
+            } catch (err) {
+                console.error('❌ Periodic save failed:', err.message);
+            } finally {
+                this.saveInProgress = false;
+            }
+        }, this.signalSaveInterval);
+    }
+
     saveSignalsToDisk() {
         try {
             const todayTradingDay = getTodayISTTradingDay();
@@ -481,8 +498,9 @@ class ChartServer {
                 return sigDate === todayTradingDay;
             });
             
+            // Use comprehensive dedup key: timestamp + instrument + bar_type + threshold + barNumber + type + version
             for (const signal of filteredSignals) {
-                const key = signal.timestamp + '_' + signal.instrument + '_' + signal.threshold + '_' + signal.version;
+                const key = signal.timestamp + '_' + signal.instrument + '_' + signal.bar_type + '_' + signal.threshold + '_' + signal.barNumber + '_' + signal.type + '_' + signal.version;
                 signalMap.set(key, signal);
             }
             
@@ -717,8 +735,8 @@ class ChartServer {
         
         this.recentCandles[storeKey][instrumentKey][threshold] = targetArray.sort((a,b) => a.timestamp - b.timestamp);
         
+        // Emit to subscribed room only (prevents broadcasting every instrument to all clients)
         this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_candle', candleData);
-        this.io.emit('candle_update', candleData);
     }
     
     broadcastLiveCandle(instrumentKey, liveCandle, type) {
@@ -733,7 +751,6 @@ class ChartServer {
         };
         
         this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_live_candle', candleData);
-        this.io.emit('live_candle_update', candleData);
     }
 
     broadcastTradeSignal(signalData) {
@@ -760,7 +777,6 @@ class ChartServer {
             this.tradeSignals.shift();
         }
         
-        this.saveSignalsToDisk();
         this.io.emit('trade_signal', signalData);
         console.log("🚀 Broadcasted: " + signalData.version + " | " + signalData.instrument + " | Thresh: " + signalData.threshold + " | Bar #" + signalData.barNumber);
     }
@@ -781,8 +797,6 @@ class ChartServer {
                 this.tradeSignals[matchIndex].exitReason = updateData.exitReason;
                 this.tradeSignals[matchIndex].exitPrice = updateData.exitPrice;
             }
-            
-            this.saveSignalsToDisk();
             
             const enrichedUpdate = {
                 ...this.tradeSignals[matchIndex],
