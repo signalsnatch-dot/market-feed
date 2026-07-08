@@ -28,6 +28,8 @@ backtest-logs/
 compare-output/
 backtest-results/
 live-performance-report/
+live-backtest-results/
+candles/
 
 # Legacy data directories (if any)
 data/

@@ -12,7 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { STRATEGIES, runPriceActionBacktest } = require('./priceActionStrategy');
+const { STRATEGIES, runPriceActionBacktest } = require('./priceActionStrategyV2');
 
 const EXTRACTED_DIR = './extracted';
 const CONFIG_FILE = './build-version-config.json';
@@ -76,22 +76,35 @@ function formatDateFromTimestamp(extTs) {
 function resolveThresholds(buildInst, liveInst, dateKey) {
     let thresholds = [];
 
-    // Date-specific config thresholds
+    // 1. Date-specific thresholds (NEW format: date → [10 values])
     if (buildInst.thresholds && typeof buildInst.thresholds === 'object' && !Array.isArray(buildInst.thresholds)) {
-        if (dateKey && buildInst.thresholds[dateKey] !== undefined) thresholds.push(buildInst.thresholds[dateKey]);
+        if (dateKey && buildInst.thresholds[dateKey] !== undefined) {
+            const dateVal = buildInst.thresholds[dateKey];
+            if (Array.isArray(dateVal)) {
+                // NEW format: date → array of 10 threshold values
+                // Date-specific arrays are self-contained — no merging needed
+                return dateVal.sort((a, b) => a - b);
+            } else if (typeof dateVal === 'number') {
+                // LEGACY format: single number → index into static_thresholds
+                const idx = dateVal - 1; // legacy was 1-indexed
+                if (Array.isArray(buildInst.static_thresholds) && buildInst.static_thresholds[idx] !== undefined) {
+                    thresholds.push(buildInst.static_thresholds[idx]);
+                }
+            }
+        }
     } else if (Array.isArray(buildInst.thresholds)) {
         thresholds = [...buildInst.thresholds];
     }
 
-    // Static thresholds from build config
-    if (Array.isArray(buildInst.static_thresholds)) {
+    // 2. Static thresholds from build config (only if no date-specific array was found)
+    if (Array.isArray(buildInst.static_thresholds) && thresholds.length === 0) {
         for (const v of buildInst.static_thresholds) {
             if (!thresholds.includes(v)) thresholds.push(v);
         }
     }
 
-    // From config.json volumePerBar
-    if (liveInst && Array.isArray(liveInst.volumePerBar)) {
+    // 3. From config.json volumePerBar (only if still empty)
+    if (liveInst && Array.isArray(liveInst.volumePerBar) && thresholds.length === 0) {
         for (const v of liveInst.volumePerBar) {
             if (!thresholds.includes(v)) thresholds.push(v);
         }

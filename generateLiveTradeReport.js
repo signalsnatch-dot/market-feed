@@ -8,21 +8,33 @@ const OUTPUT_DIR = './live-performance-report';
 const startTime = '09:00'; // Session Start (HH:MM in 24h IST format)
 const endTime = '15:35';   // Session End (HH:MM in 24h IST format). Set to null to use current time.
 
-// Matches any V1 to V50 strategy
-const versionRegex = /^V([1-9]|[1-4]\d|50):/;
+// Matches any V1 to V106 strategy
+const versionRegex = /^V(\d+):/;
 
-// Exactly the 10 active High Confidence versions producing confidence metric outputs
+// All active High Confidence versions (original + fixed) producing confidence metric outputs
 const confidenceVersions = [
-    'V3: High Confidence', 
-    'V8: High Confidence (Strict)', 
-    'V13: High Confidence (Calibrated)', 
+    // Original High Confidence versions
+    'V3: High Confidence',
+    'V8: High Confidence (Strict)',
+    'V13: High Confidence (Calibrated)',
     'V18: High Confidence (Strict-Calibrated)',
     'V23: High Confidence (Structural-Calibrated)',
     'V28: High Confidence (Strict Structural-Calibrated)',
     'V33: High Confidence (Upgraded)',
     'V38: High Confidence (Strict Upgraded)',
     'V43: High Confidence (Structural-Calibrated Upgraded)',
-    'V48: High Confidence (Strict Structural-Calibrated Upgraded)'
+    'V48: High Confidence (Strict Structural-Calibrated Upgraded)',
+    // Fixed High Confidence versions (V2 engine)
+    'V53: Fixed High Confidence',
+    'V58: Fixed High Confidence (Strict)',
+    'V63: Fixed High Confidence (Calibrated)',
+    'V68: Fixed High Confidence (Strict-Calibrated)',
+    'V73: Fixed High Confidence (Structural-Calibrated)',
+    'V78: Fixed High Confidence (Strict Structural-Calibrated)',
+    'V83: Fixed High Confidence (Upgraded)',
+    'V88: Fixed High Confidence (Strict Upgraded)',
+    'V93: Fixed High Confidence (Structural-Calibrated Upgraded)',
+    'V98: Fixed High Confidence (Strict Structural-Calibrated Upgraded)',
 ];
 
 const INSTRUMENT_NAMES = {
@@ -454,7 +466,7 @@ async function main() {
                 barType
             });
         });
-
+ 
         if (flatTrades.length === 0) {
             console.log("No valid live signals matching the selected status and session parameters were found.");
             process.exit(0);
@@ -482,7 +494,7 @@ async function main() {
         let md = `# Portfolio Live Signals Performance Report\n\n`;
         md += `*Report Generated on (Local): ${new Date().toLocaleString()}*\n`;
         md += `*Session Filtering Window (IST):* ${startTime} to ${resolvedEndTime}\n`;
-        md += `*Rule Validation Model Range:* V1 to V50\n`;
+        md += `*Rule Validation Model Range:* V1 to V106\n`;
         md += `*Analyzed Period Range:* ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}\n\n`;
 
         // ============================================================
@@ -504,7 +516,7 @@ async function main() {
         // ============================================================
         // SECTION 2: DETAILED VERSION PERFORMANCE (SPLIT BY BAR TYPE)
         // ============================================================
-        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V50)\n\n`;
+        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V106)\n\n`;
 
         uniqueVersions.forEach(v => {
             const vTrades = flatTrades.filter(t => t.strategy === v);
@@ -710,9 +722,142 @@ async function main() {
         fs.writeFileSync(targetFile, md, 'utf8');
         console.log("Success! Complete live signals performance analysis compiled inside: '" + targetFile + "'");
 
+        // --- Also generate compact LLM-friendly summary ---
+        const compactSummary = generateCompactSummary(flatTrades);
+        const compactFile = path.join(OUTPUT_DIR, `live_compact_summary_${timestamp}.md`);
+        fs.writeFileSync(compactFile, compactSummary, 'utf8');
+        console.log("Success! Compact LLM summary written to '" + compactFile + "'");
+
     } catch (error) {
         console.error("Execution stopped due to error:", error.message);
     }
+}
+
+// ============================================================
+// COMPACT SUMMARY GENERATOR (LLM-friendly)
+// ============================================================
+function generateCompactSummary(allTrades) {
+    const MIN_TRADES = 3;
+
+    let md = `# Live Strategy Performance Compact Summary\n\n`;
+    md += `*Generated: ${new Date().toLocaleString()}*\n`;
+    md += `*Purpose: LLM-readable summary for strategy refinement from live signals*\n\n`;
+
+    // Separate by bar type
+    for (const barType of ['volume', 'price']) {
+        const btTrades = allTrades.filter(t => t.barType === barType);
+        if (btTrades.length === 0) continue;
+
+        md += `## ${barType === 'volume' ? 'Volume-Bar' : 'Price-Bar'} Systems\n\n`;
+
+        // ── Per instrument, find best 3 version+threshold combinations by win rate ──
+        const instrumentGroups = new Map();
+        for (const t of btTrades) {
+            if (!instrumentGroups.has(t.instrument)) instrumentGroups.set(t.instrument, []);
+            instrumentGroups.get(t.instrument).push(t);
+        }
+
+        const perInstrumentTop3 = [];
+
+        for (const [instrument, trades] of instrumentGroups) {
+            // Group by version+threshold combination within this instrument
+            const comboMap = new Map();
+            for (const t of trades) {
+                const comboKey = `${t.strategy}|${t.threshold}`;
+                if (!comboMap.has(comboKey)) comboMap.set(comboKey, []);
+                comboMap.get(comboKey).push(t.trade);
+            }
+
+            const comboMetrics = [];
+            for (const [comboKey, comboTrades] of comboMap) {
+                if (comboTrades.length < MIN_TRADES) continue;
+                const [version, threshold] = comboKey.split('|');
+                const m = computeMetrics(comboTrades);
+                comboMetrics.push({ version, threshold, ...m, trades: comboTrades.length });
+            }
+
+            comboMetrics.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
+            const top3 = comboMetrics.slice(0, 3);
+            if (top3.length > 0) perInstrumentTop3.push({ instrument, top3 });
+        }
+
+        // ── Section A: Per-Instrument Top 3 Version+Threshold Combinations ──
+        md += `### Best Version+Threshold Per Instrument (${barType})\n\n`;
+        md += `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`;
+        md += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
+
+        for (const entry of perInstrumentTop3) {
+            entry.top3.forEach((v, idx) => {
+                md += `| ${entry.instrument} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`;
+            });
+        }
+        md += `\n`;
+
+        // ── Cross-reference: which version appears most in top3 ──
+        const versionScoreMap = new Map();
+        for (const entry of perInstrumentTop3) {
+            for (const v of entry.top3) {
+                const existing = versionScoreMap.get(v.version) || { appearances: 0, totalWinRate: 0, totalReturn: 0, totalTrades: 0, groups: [] };
+                existing.appearances++;
+                existing.totalWinRate += v.winRate;
+                existing.totalReturn += v.totalReturn;
+                existing.totalTrades += v.trades;
+                existing.groups.push(`${entry.instrument} (T${v.threshold})`);
+                versionScoreMap.set(v.version, existing);
+            }
+        }
+
+        const versionRankings = [];
+        for (const [ver, data] of versionScoreMap) {
+            versionRankings.push({
+                version: ver,
+                appearances: data.appearances,
+                avgWinRate: data.totalWinRate / data.appearances,
+                avgReturn: data.totalReturn / data.appearances,
+                totalTrades: data.totalTrades,
+                groups: data.groups,
+            });
+        }
+        versionRankings.sort((a, b) => b.appearances - a.appearances || b.avgWinRate - a.avgWinRate);
+
+        // ── Section B: Overall Best Versions ──
+        md += `### Overall Best-Performing Versions (${barType})\n\n`;
+        md += `*Ranked by number of instrument-threshold groups in Top 3.*\n\n`;
+        md += `| Rank | Version | Groups in Top 3 | Avg Win Rate | Avg Return | Total Trades | Best Instruments |\n`;
+        md += `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`;
+
+        versionRankings.slice(0, 15).forEach((v, idx) => {
+            const bestGroups = v.groups.slice(0, 3).map(g => g.split(' | ')[0]).join(', ');
+            md += `| #${idx + 1} | ${v.version} | ${v.appearances} | ${v.avgWinRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalTrades} | ${bestGroups}... |\n`;
+        });
+        md += `\n`;
+
+        // ── Section C: Original vs Fixed comparison ──
+        md += `### Original vs Fixed Version Comparison (${barType})\n\n`;
+        md += `| Pair | Original | Fixed | Win Rate Δ | Return Δ |\n`;
+        md += `| :--- | :--- | :--- | :---: | :---: |\n`;
+
+        const originalMap = new Map();
+        const fixedMap = new Map();
+        for (const [ver, data] of versionScoreMap) {
+            const vNum = parseInt(ver.match(/^V(\d+):/)?.[1] || '0', 10);
+            if (vNum >= 1 && vNum <= 50) originalMap.set(vNum, { ver, ...data });
+            if (vNum >= 51 && vNum <= 100) fixedMap.set(vNum - 50, { ver, ...data });
+        }
+
+        for (let i = 1; i <= 50; i++) {
+            const orig = originalMap.get(i);
+            const fixed = fixedMap.get(i);
+            if (orig && fixed) {
+                const wrDelta = fixed.avgWinRate - orig.avgWinRate;
+                const retDelta = fixed.avgReturn - orig.avgReturn;
+                md += `| V${i} | ${orig.ver} | ${fixed.ver} | ${wrDelta > 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta > 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
+            }
+        }
+        md += `\n`;
+    }
+
+    return md;
 }
 
 main();

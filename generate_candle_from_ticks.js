@@ -232,6 +232,28 @@ async function processFileStream(file, thresholds, inst, name, mode, summaryPath
     }
 }
 
+function peekInstrument(file) {
+    const fp = path.join(INPUT_DIR, file);
+    const peekFd = fs.openSync(fp, 'r');
+    const buf = Buffer.alloc(65536);
+    const bytesRead = fs.readSync(peekFd, buf, 0, 65536, 0);
+    fs.closeSync(peekFd);
+    const peekStr = buf.toString('utf8', 0, bytesRead);
+    const newlineIdx = peekStr.indexOf('\n');
+    if (newlineIdx === -1) return null;
+    const hdrsLine = peekStr.charCodeAt(0) === 0xFEFF ? peekStr.slice(1, newlineIdx) : peekStr.slice(0, newlineIdx);
+    const rest = peekStr.slice(newlineIdx + 1);
+    const secondNewline = rest.indexOf('\n');
+    const firstDataLine = (secondNewline !== -1 ? rest.slice(0, secondNewline) : rest).trim();
+    if (!hdrsLine || !firstDataLine) return null;
+    const hdrs = hdrsLine.split(',').map(h => h.trim());
+    const dataParts = firstDataLine.split(',');
+    const idxInst = hdrs.indexOf('instrument_key');
+    const idxExt = hdrs.indexOf('exchange_timestamp');
+    if (idxInst === -1 || dataParts.length <= idxInst) return null;
+    return { inst: dataParts[idxInst], ext: idxExt !== -1 && dataParts.length > idxExt ? parseInt(dataParts[idxExt], 10) : null, hdrsLine };
+}
+
 async function main() {
     if (!fs.existsSync(CONFIG_FILE)) { console.error('❌ Config not found'); process.exit(1); }
     const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
@@ -251,50 +273,20 @@ async function main() {
     console.log(`📂 Found ${files.length} file(s)`);
     console.log(`📊 Candle mode: ${CANDLE_MODE}`);
 
-    const summaryPath = path.join(OUTPUT_DIR, 'summary.csv');
-    fs.writeFileSync(summaryPath, 'source_file,instrument_key,mode,threshold,total_candles,total_volume,avg_volume_per_candle,total_transactions,avg_duration_seconds\n');
-
-    let processed = 0;
-
+    // Peek all files to determine instrument + thresholds ahead of time
+    const fileTasks = [];
     for (const file of files) {
-        console.log(`\n📄 ${file}...`);
-
-        // Quick peek: read first 2 lines to determine instrument + thresholds (read only first 64KB, not the entire file)
-        const fp = path.join(INPUT_DIR, file);
-        const peekFd = fs.openSync(fp, 'r');
-        const buf = Buffer.alloc(65536);
-        const bytesRead = fs.readSync(peekFd, buf, 0, 65536, 0);
-        fs.closeSync(peekFd);
-        const peekStr = buf.toString('utf8', 0, bytesRead);
-        const newlineIdx = peekStr.indexOf('\n');
-        if (newlineIdx === -1) continue;
-        const hdrsLine = peekStr.charCodeAt(0) === 0xFEFF ? peekStr.slice(1, newlineIdx) : peekStr.slice(0, newlineIdx);
-        const rest = peekStr.slice(newlineIdx + 1);
-        const secondNewline = rest.indexOf('\n');
-        const firstDataLine = (secondNewline !== -1 ? rest.slice(0, secondNewline) : rest).trim();
-        if (!hdrsLine || !firstDataLine) continue;
-
-        const hdrs = hdrsLine.split(',').map(h => h.trim());
-        const dataParts = firstDataLine.split(',');
-        const idxInst = hdrs.indexOf('instrument_key');
-        const idxExt = hdrs.indexOf('exchange_timestamp');
-        if (idxInst === -1 || dataParts.length <= idxInst) continue;
-        const inst = dataParts[idxInst];
-        const cfg = instCfg.get(inst);
-        if (!cfg) { console.log(`   ⚠️ No config for ${inst}`); continue; }
-
+        const peek = peekInstrument(file);
+        if (!peek) continue;
+        const cfg = instCfg.get(peek.inst);
+        if (!cfg) { console.log(`   ⚠️ No config for ${peek.inst}`); continue; }
         let dateKey = null;
-        if (idxExt !== -1 && dataParts.length > idxExt) {
-            let ts = parseInt(dataParts[idxExt], 10);
-            if (!isNaN(ts)) {
-                if (ts < 10000000000) ts *= 1000;
-                const d = new Date(ts);
-                dateKey = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
-            }
+        if (peek.ext !== null && !isNaN(peek.ext)) {
+            let ts = peek.ext;
+            if (ts < 10000000000) ts *= 1000;
+            const d = new Date(ts);
+            dateKey = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)}`;
         }
-
-        console.log(`   ${inst} | ${dateKey || '??'}`);
-
         let thresholds = [];
         if (cfg.thresholds && typeof cfg.thresholds === 'object' && !Array.isArray(cfg.thresholds)) {
             if (dateKey && cfg.thresholds[dateKey] !== undefined) thresholds.push(cfg.thresholds[dateKey]);
@@ -306,15 +298,62 @@ async function main() {
                 if (!thresholds.includes(v)) thresholds.push(v);
             }
         }
-        if (!thresholds.length) { console.warn('   ⚠️ No thresholds.'); continue; }
+        if (!thresholds.length) { console.warn(`   ⚠️ No thresholds for ${peek.inst}`); continue; }
+        fileTasks.push({ file, inst: peek.inst, name: cfg.name, thresholds, dateKey });
+    }
 
-        await processFileStream(file, thresholds, inst, cfg.name, CANDLE_MODE, summaryPath);
+    if (!fileTasks.length) { console.log('❌ No files to process.'); return; }
+    console.log(`📋 Queued ${fileTasks.length} instruments\n`);
+
+    // Collect summary data in memory to avoid concurrent appendFileSync to summary.csv
+    const summaryRows = [];
+    const summaryPath = path.join(OUTPUT_DIR, 'summary.csv');
+    fs.writeFileSync(summaryPath, 'source_file,instrument_key,mode,threshold,total_candles,total_volume,avg_volume_per_candle,total_transactions,avg_duration_seconds\n');
+
+    const CONCURRENCY = 8;
+    let processed = 0;
+    const total = fileTasks.length;
+
+    async function processOneTask(task) {
+        console.log(`📄 ${task.file}  (${task.inst} | ${task.dateKey || '??'})  [thresholds: ${task.thresholds.join(', ')}]`);
+        const counter = { count: 0 };
+        // Create a per-file summary path that processFileStream can write to
+        const localSummary = task.file + '.tmp';
+        fs.writeFileSync(localSummary, '');
+        await processFileStream(task.file, task.thresholds, task.inst, task.name, CANDLE_MODE, localSummary);
+        // Read back local summary and collect rows
+        const content = fs.readFileSync(localSummary, 'utf8').trim();
+        fs.unlinkSync(localSummary);
+        if (content) {
+            for (const row of content.split('\n')) {
+                if (row.trim()) summaryRows.push(row);
+            }
+        }
         processed++;
-        console.log(`   [${processed}/${files.length}]`);
+        console.log(`   ✅ ${task.file} [${processed}/${total}]`);
+    }
+
+    // Parallel worker pool - processes up to CONCURRENCY files at a time
+    const workers = [];
+    let taskIdx = 0;
+    async function worker() {
+        while (taskIdx < fileTasks.length) {
+            const task = fileTasks[taskIdx++];
+            await processOneTask(task);
+        }
+    }
+    for (let i = 0; i < CONCURRENCY; i++) {
+        workers.push(worker());
+    }
+    await Promise.all(workers);
+
+    // Write all summary rows at once (serialized)
+    if (summaryRows.length) {
+        fs.appendFileSync(summaryPath, summaryRows.join('\n') + '\n');
     }
 
     if (!processed) { console.log('\n❌ No candles generated.'); return; }
-    console.log(`\n✅ Done! ${processed} files processed.`);
+    console.log(`\n✅ Done! ${processed} files processed in parallel (concurrency=${CONCURRENCY}).`);
 }
 
 main();

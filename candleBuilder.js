@@ -1,7 +1,7 @@
 const EventEmitter = require('events');
 const PriceBarBuilder = require('./priceBarBuilder');
 const VolumeBarBuilder = require('./volumeBarBuilder');
-const { STRATEGIES } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategyV2');
 
 class DualCandleBuilder extends EventEmitter {
     constructor(config) {

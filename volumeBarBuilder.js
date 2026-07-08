@@ -2,7 +2,7 @@
 const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
-const { STRATEGIES } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategyV2');
 
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {

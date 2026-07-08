@@ -4,7 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
-const { STRATEGIES } = require('./priceActionStrategy');
+const { STRATEGIES } = require('./priceActionStrategyV2');
 
 // Dynamic timezone and trading-session aware date helpers (Bypasses Intl to prevent platform crashes)
 function getTradingDayIST(ts) {

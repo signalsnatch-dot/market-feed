@@ -1,9 +1,9 @@
 // backtester.js - Standalone strategy backtesting system
 const fs = require('fs');
 const path = require('path');
-const { STRATEGIES, runPriceActionBacktest, DEFAULT_PARAMS } = require('./priceActionStrategy');
+const { STRATEGIES, runPriceActionBacktest, DEFAULT_PARAMS } = require('./priceActionStrategyV2');
 
-const versionRegex = /^V([1-9]|[1-4]\d|50):/;
+const versionRegex = /^V(\d+):/;
 
 class StrategyBacktester {
     constructor(config) {

@@ -4,22 +4,34 @@ const path = require('path');
 const RESULTS_DIR = process.argv.includes('--live') ? './live-backtest-results' : './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
 
-// Matches any V1 to V50 strategy strictly
-const versionRegex = /^V([1-9]|[1-4]\d|50):/;
+// Matches any V1 to V106 strategy strictly
+const versionRegex = /^V(\d+):/;
 const isLive = process.argv.includes('--live');
 
-// Exactly the 10 active High Confidence versions producing confidence metric outputs
+// All active High Confidence versions (original + fixed) producing confidence metric outputs
 const confidenceVersions = [
-    'V3: High Confidence', 
-    'V8: High Confidence (Strict)', 
-    'V13: High Confidence (Calibrated)', 
+    // Original High Confidence versions
+    'V3: High Confidence',
+    'V8: High Confidence (Strict)',
+    'V13: High Confidence (Calibrated)',
     'V18: High Confidence (Strict-Calibrated)',
     'V23: High Confidence (Structural-Calibrated)',
     'V28: High Confidence (Strict Structural-Calibrated)',
     'V33: High Confidence (Upgraded)',
     'V38: High Confidence (Strict Upgraded)',
     'V43: High Confidence (Structural-Calibrated Upgraded)',
-    'V48: High Confidence (Strict Structural-Calibrated Upgraded)'
+    'V48: High Confidence (Strict Structural-Calibrated Upgraded)',
+    // Fixed High Confidence versions (V2 engine)
+    'V53: Fixed High Confidence',
+    'V58: Fixed High Confidence (Strict)',
+    'V63: Fixed High Confidence (Calibrated)',
+    'V68: Fixed High Confidence (Strict-Calibrated)',
+    'V73: Fixed High Confidence (Structural-Calibrated)',
+    'V78: Fixed High Confidence (Strict Structural-Calibrated)',
+    'V83: Fixed High Confidence (Upgraded)',
+    'V88: Fixed High Confidence (Strict Upgraded)',
+    'V93: Fixed High Confidence (Structural-Calibrated Upgraded)',
+    'V98: Fixed High Confidence (Strict Structural-Calibrated Upgraded)',
 ];
 
 const INSTRUMENT_NAMES = {
@@ -393,7 +405,7 @@ md += `\n`;
 // ============================================================
 // SECTION 2: DETAILED VERSION PERFORMANCE WITH DAILY BREAKDOWNS
 // ============================================================
-md += `## Section 2: Detailed Performance by Strategy Version (V1 to V50)\n\n`;
+md += `## Section 2: Detailed Performance by Strategy Version (V1 to V106)\n\n`;
 
 uniqueVersions.forEach(v => {
     const vTrades = flatTrades.filter(t => t.strategy === v);
@@ -634,6 +646,241 @@ try {
     
     fs.writeFileSync(targetFile, md, 'utf8');
     console.log(`Success! Complete${isLive ? ' live backtest' : ''} portfolio-wide multi-day analysis written to '${targetFile}'`);
+
+    // --- Also generate compact LLM-friendly summary ---
+    const compactSummary = generateCompactSummary(flatTrades);
+    const compactFile = path.join(OUTPUT_DIR, `${isLive ? 'live' : 'backtest'}_compact_summary_${timestamp}.md`);
+    fs.writeFileSync(compactFile, compactSummary, 'utf8');
+    console.log(`Success! Compact LLM summary written to '${compactFile}'`);
 } catch (e) {
     console.error(`Failed to write markdown output:`, e);
+}
+
+// ============================================================
+// COMPACT SUMMARY GENERATOR (LLM-friendly)
+// ============================================================
+function generateCompactSummary(allTrades) {
+    const MIN_TRADES = 3; // Minimum trades required for a version to be considered
+
+    let md = `# Strategy Performance Compact Summary\n\n`;
+    md += `*Generated: ${new Date().toLocaleString()}*\n`;
+    md += `*Purpose: LLM-readable summary for strategy refinement*\n\n`;
+
+    // ── Step 1: Per instrument, find best 3 version+threshold combinations by win rate ──
+    const instrumentGroups = new Map();
+    for (const t of allTrades) {
+        if (!instrumentGroups.has(t.instrument)) instrumentGroups.set(t.instrument, []);
+        instrumentGroups.get(t.instrument).push(t);
+    }
+
+    const perInstrumentTop3 = []; // { instrument, top3: [{version, threshold, ...metrics}] }
+
+    for (const [instrument, trades] of instrumentGroups) {
+        // Group by version+threshold combination within this instrument
+        const comboMap = new Map(); // "version|threshold" → trades
+        for (const t of trades) {
+            const comboKey = `${t.strategy}|${t.threshold}`;
+            if (!comboMap.has(comboKey)) comboMap.set(comboKey, []);
+            comboMap.get(comboKey).push(t.trade);
+        }
+
+        const comboMetrics = [];
+        for (const [comboKey, comboTrades] of comboMap) {
+            if (comboTrades.length < MIN_TRADES) continue;
+            const [version, threshold] = comboKey.split('|');
+            const m = computeMetrics(comboTrades);
+            comboMetrics.push({ version, threshold, ...m, trades: comboTrades.length });
+        }
+
+        // Sort by win rate descending, then total return descending
+        comboMetrics.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
+        const top3 = comboMetrics.slice(0, 3);
+
+        if (top3.length > 0) {
+            perInstrumentTop3.push({ instrument, top3 });
+        }
+    }
+
+    // ── Section A: Per-Instrument Top 3 Version+Threshold Combinations ──
+    md += `## Section A: Best Version+Threshold Per Instrument (Top 3 by Win Rate)\n\n`;
+    md += `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`;
+    md += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
+
+    for (const entry of perInstrumentTop3) {
+        entry.top3.forEach((v, idx) => {
+            md += `| ${entry.instrument} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`;
+        });
+    }
+    md += `\n`;
+
+    // ── Step 2: Cross-reference — which version appears most in top3? ──
+    const versionScoreMap = new Map();
+    for (const entry of perInstrumentTop3) {
+        for (const v of entry.top3) {
+            const existing = versionScoreMap.get(v.version) || { appearances: 0, totalWinRate: 0, totalReturn: 0, totalTrades: 0, groups: [] };
+            existing.appearances++;
+            existing.totalWinRate += v.winRate;
+            existing.totalReturn += v.totalReturn;
+            existing.totalTrades += v.trades;
+            existing.groups.push(`${entry.instrument} (T${v.threshold})`);
+            versionScoreMap.set(v.version, existing);
+        }
+    }
+
+    const versionRankings = [];
+    for (const [ver, data] of versionScoreMap) {
+        versionRankings.push({
+            version: ver,
+            appearances: data.appearances,
+            avgWinRate: data.totalWinRate / data.appearances,
+            avgReturn: data.totalReturn / data.appearances,
+            totalTrades: data.totalTrades,
+            groups: data.groups,
+        });
+    }
+    versionRankings.sort((a, b) => b.appearances - a.appearances || b.avgWinRate - a.avgWinRate);
+
+    // ── Section B: Overall Best Versions ──
+    md += `## Section B: Overall Best-Performing Versions (Cross-Instrument)\n\n`;
+    md += `*Ranked by number of instrument-threshold groups where this version appears in the Top 3.*\n\n`;
+    md += `| Rank | Version | Groups in Top 3 | Avg Win Rate | Avg Return | Total Trades | Best Instruments |\n`;
+    md += `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`;
+
+    versionRankings.slice(0, 20).forEach((v, idx) => {
+        const bestGroups = v.groups.slice(0, 3).map(g => g.split(' | ')[0]).join(', ');
+        md += `| #${idx + 1} | ${v.version} | ${v.appearances} | ${v.avgWinRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalTrades} | ${bestGroups}... |\n`;
+    });
+    md += `\n`;
+
+    // ── Section C: Cumulative Cross-Instrument Original vs Batch Comparison ──
+    // For each original V1–V50 and its batch clones (V51+, V101+, V151+, V201+, V251+),
+    // compute the BEST threshold per instrument, then aggregate cumulative metrics.
+    md += `## Section C: Cumulative Cross-Instrument Comparison (Best Threshold Per Instrument)\n\n`;
+    md += `*For each original version and its batch clones, we select the best threshold per instrument\n`;
+    md += `(by win rate), then compute cumulative metrics across all instruments.*\n\n`;
+
+    // Step 1: For each version, find best threshold per instrument
+    // Map: version → Map(instrument → bestCombo)
+    const versionBestMap = new Map();
+    for (const t of allTrades) {
+        const vNum = parseInt(t.strategy.match(/^V(\d+):/)?.[1] || '0', 10);
+        if (vNum === 0) continue;
+
+        const verKey = t.strategy; // full version name
+        if (!versionBestMap.has(verKey)) versionBestMap.set(verKey, new Map());
+        const instMap = versionBestMap.get(verKey);
+
+        const comboKey = `${t.threshold}`;
+        if (!instMap.has(t.instrument)) instMap.set(t.instrument, {});
+        if (!instMap.get(t.instrument)[comboKey]) instMap.get(t.instrument)[comboKey] = [];
+        instMap.get(t.instrument)[comboKey].push(t.trade);
+    }
+
+    // Step 2: For each version+instrument, pick the best threshold (by win rate, min 3 trades)
+    // Map: version → { totalTrades, totalWins, totalPnlAmount, totalPnlPct, count }
+    const versionCumulative = new Map();
+
+    for (const [verKey, instMap] of versionBestMap) {
+        const vNum = parseInt(verKey.match(/^V(\d+):/)?.[1] || '0', 10);
+        let cumTrades = 0, cumWins = 0, cumPnlAmount = 0, cumPnlPct = 0;
+        let instrumentsUsed = 0;
+
+        for (const [instrument, thresholdMap] of instMap) {
+            let bestCombo = null;
+            let bestWinRate = -1;
+
+            for (const [threshold, trades] of Object.entries(thresholdMap)) {
+                if (trades.length < MIN_TRADES) continue;
+                const wins = trades.filter(t => t.pnlAmount > 0).length;
+                const wr = (wins / trades.length) * 100;
+                if (wr > bestWinRate || (wr === bestWinRate && bestCombo && trades.length > bestCombo.trades.length)) {
+                    bestWinRate = wr;
+                    bestCombo = { threshold, trades, wins, wr };
+                }
+            }
+
+            if (bestCombo) {
+                cumTrades += bestCombo.trades.length;
+                cumWins += bestCombo.wins;
+                cumPnlAmount += bestCombo.trades.reduce((s, t) => s + (t.pnlAmount || 0), 0);
+                // Accumulate per-trade PnL% for averaging
+                for (const tr of bestCombo.trades) {
+                    cumPnlPct += (tr.pnl || 0);
+                }
+                instrumentsUsed++;
+            }
+        }
+
+        if (instrumentsUsed > 0 && cumTrades > 0) {
+            versionCumulative.set(verKey, {
+                vNum,
+                verKey,
+                instrumentsUsed,
+                totalTrades: cumTrades,
+                winRate: (cumWins / cumTrades) * 100,
+                avgReturn: cumPnlPct / cumTrades, // per-trade average
+                totalPnlPct: cumPnlPct,
+                totalPnlAmount: cumPnlAmount,
+            });
+        }
+    }
+
+    // Step 3: Pair originals (V1–V50) with their batch clones and compare
+    // Batch mapping: Vn original → Vn offset per batch
+    // V51–V100: baseline clones (offset 50)
+    // V101–V150: entry_stop (offset 100)
+    // V151–V200: trend (offset 150)
+    // V201–V250: leg_quality (offset 200)
+    // V251–V300: exit_mgmt (offset 250)
+    const BATCH_OFFSETS = [
+        { offset: 50, label: "Baseline" },
+        { offset: 100, label: "Entry/Stop" },
+        { offset: 150, label: "Trend" },
+        { offset: 200, label: "Leg Quality" },
+        { offset: 250, label: "Exit Mgmt" },
+    ];
+
+    md += `| Orig V | Batch | Original | Original WR | Original Ret | Batch Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`;
+    md += `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+
+    for (let origV = 1; origV <= 50; origV++) {
+        const origEntry = [...versionCumulative.values()].find(
+            v => v.vNum === origV && v.verKey.includes(`V${origV}:`) && !v.verKey.includes('(Original)')
+        );
+        if (!origEntry) continue;
+
+        for (const batch of BATCH_OFFSETS) {
+            const cloneV = origV + batch.offset;
+            const cloneEntry = [...versionCumulative.values()].find(
+                v => v.vNum === cloneV
+            );
+            if (!cloneEntry) continue;
+
+            const wrDelta = cloneEntry.winRate - origEntry.winRate;
+            const retDelta = cloneEntry.avgReturn - origEntry.avgReturn;
+
+            // Only show if both have meaningful data
+            if (origEntry.totalTrades >= MIN_TRADES && cloneEntry.totalTrades >= MIN_TRADES) {
+                md += `| V${origV} | ${batch.label} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${cloneEntry.verKey} | ${cloneEntry.winRate.toFixed(1)}% | ${cloneEntry.avgReturn >= 0 ? '+' : ''}${cloneEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
+            }
+        }
+    }
+    md += `\n`;
+
+    // Also add Brooks comparison: V301↔V304, V302↔V305, V303↔V306
+    md += `### Brooks Strategies\n\n`;
+    md += `| Orig V | Original | Original WR | Original Ret | Fixed | Fixed WR | Fixed Ret | WR Δ | Ret Δ |\n`;
+    md += `| :---: | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+
+    for (const [origV, fixedV] of [[301, 304], [302, 305], [303, 306]]) {
+        const origEntry = [...versionCumulative.values()].find(v => v.vNum === origV);
+        const fixedEntry = [...versionCumulative.values()].find(v => v.vNum === fixedV);
+        if (origEntry && fixedEntry && origEntry.totalTrades >= MIN_TRADES && fixedEntry.totalTrades >= MIN_TRADES) {
+            const wrDelta = fixedEntry.winRate - origEntry.winRate;
+            const retDelta = fixedEntry.avgReturn - origEntry.avgReturn;
+            md += `| V${origV} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${fixedEntry.verKey} | ${fixedEntry.winRate.toFixed(1)}% | ${fixedEntry.avgReturn >= 0 ? '+' : ''}${fixedEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
+        }
+    }
+
+    return md;
 }
