@@ -197,13 +197,43 @@ class StrategyBacktester {
         console.log(`\n📂 Found ${files.length} versioned candle files under ./candles`);
         if (files.length === 0) return;
         
+        const tasks = [];
         for (const filePath of files) {
             const meta = this.parseVersionCandlePath(filePath);
             if (!meta) continue;
-            console.log(`\n📄 Processing: ${meta.instrumentSafe} | threshold ${meta.threshold} | ${meta.baseName}`);
-            await this.runBacktestOnVersionFile(filePath, { initialCapital, tradeSize, allowOverlappingTrades });
+            tasks.push({ filePath, meta });
         }
-        console.log(`\n✅ All version backtest results saved to ${this.versionResultsDir}`);
+        console.log(`📋 Queued ${tasks.length} files\n`);
+
+        const CONCURRENCY = 8;
+        let processed = 0;
+        const total = tasks.length;
+
+        async function processOneTask(ctx, fp, opts) {
+            const m = ctx.meta;
+            console.log(`📄 ${m.instrumentSafe} | thresh ${m.threshold} | ${m.baseName}`);
+            await ctx.runBacktestOnVersionFile(fp, opts);
+            processed++;
+            if (processed % 10 === 0 || processed === total) {
+                console.log(`   ✅ [${processed}/${total}]`);
+            }
+        }
+
+        const workers = [];
+        let taskIdx = 0;
+        async function worker(backtester, opts) {
+            while (taskIdx < tasks.length) {
+                const t = tasks[taskIdx++];
+                await processOneTask({ ...t, runBacktestOnVersionFile: backtester.runBacktestOnVersionFile.bind(backtester) }, t.filePath, opts);
+            }
+        }
+        // Bind `this` to preserve context for each worker
+        const self = this;
+        for (let i = 0; i < CONCURRENCY; i++) {
+            workers.push(worker(self, { initialCapital, tradeSize, allowOverlappingTrades }));
+        }
+        await Promise.all(workers);
+        console.log(`\n✅ All ${total} version backtest results saved to ${this.versionResultsDir}`);
     }
     
     compareVersions() {

@@ -225,6 +225,188 @@ class ChartServer {
             res.json(todaySignals);
         });
         
+        // ──────────────────────────────────────────────
+        // BACKTEST VIEWER API ENDPOINTS
+        // ──────────────────────────────────────────────
+
+        this.app.get('/api/backtest/dates', (req, res) => {
+            try {
+                const baseDir = path.join(__dirname, 'candles', 'live');
+                if (!fs.existsSync(baseDir)) {
+                    return res.json([]);
+                }
+                const dateSet = new Set();
+                const instruments = fs.readdirSync(baseDir);
+                for (const inst of instruments) {
+                    const instDir = path.join(baseDir, inst);
+                    if (!fs.statSync(instDir).isDirectory()) continue;
+                    const thresholds = fs.readdirSync(instDir);
+                    for (const thresh of thresholds) {
+                        const threshDir = path.join(instDir, thresh);
+                        if (!fs.statSync(threshDir).isDirectory()) continue;
+                        const files = fs.readdirSync(threshDir);
+                        for (const file of files) {
+                            if (file.endsWith('_candles.csv')) {
+                                const dateMatch = file.match(/(\d{4}-\d{2}-\d{2})/);
+                                if (dateMatch) {
+                                    const d = dateMatch[1];
+                                    // Filter: only 2026+ dates
+                                    if (d >= '2026-01-01') {
+                                        dateSet.add(d);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                const sorted = Array.from(dateSet).sort();
+                // Return only last 2 months of available data
+                const twoMonthsAgo = new Date();
+                twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+                const cutoff = twoMonthsAgo.toISOString().split('T')[0];
+                const filtered = sorted.filter(d => d >= cutoff);
+                res.json(filtered.length > 0 ? filtered : sorted.slice(-30));
+            } catch (err) {
+                console.error('Backtest dates error:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        this.app.get('/api/backtest/instruments', (req, res) => {
+            try {
+                const date = req.query.date;
+                if (!date) return res.status(400).json({ error: 'date required' });
+                const baseDir = path.join(__dirname, 'candles', 'live');
+                if (!fs.existsSync(baseDir)) return res.json([]);
+                const result = [];
+                const instruments = fs.readdirSync(baseDir);
+                for (const inst of instruments) {
+                    const instDir = path.join(baseDir, inst);
+                    if (!fs.statSync(instDir).isDirectory()) continue;
+                    const thresholds = fs.readdirSync(instDir);
+                    let found = false;
+                    for (const thresh of thresholds) {
+                        const threshDir = path.join(instDir, thresh);
+                        if (!fs.statSync(threshDir).isDirectory()) continue;
+                        const files = fs.readdirSync(threshDir);
+                        for (const file of files) {
+                            if (file.includes(date) && file.endsWith('_candles.csv')) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) break;
+                    }
+                    if (found) {
+                        // Convert MCX_FO_466583 → MCX_FO|466583 (first group before last underscore is exchange)
+                        const lastUnderscore = inst.lastIndexOf('_');
+                        const exchange = inst.substring(0, lastUnderscore);
+                        const symbol = inst.substring(lastUnderscore + 1);
+                        const keyWithPipe = exchange + '|' + symbol;
+                        const name = this.getInstrumentName(keyWithPipe);
+                        result.push({ key: inst, name, displayKey: keyWithPipe });
+                    }
+                }
+                res.json(result.sort((a, b) => a.key.localeCompare(b.key)));
+            } catch (err) {
+                console.error('Backtest instruments error:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        this.app.get('/api/backtest/thresholds', (req, res) => {
+            try {
+                const { date, instrument } = req.query;
+                if (!date || !instrument) return res.status(400).json({ error: 'date and instrument required' });
+                const instDir = path.join(__dirname, 'candles', 'live', instrument);
+                if (!fs.existsSync(instDir)) return res.json([]);
+                const thresholds = [];
+                const entries = fs.readdirSync(instDir);
+                for (const entry of entries) {
+                    const entryPath = path.join(instDir, entry);
+                    if (!fs.statSync(entryPath).isDirectory()) continue;
+                    const files = fs.readdirSync(entryPath);
+                    if (files.some(f => f.includes(date) && f.endsWith('_candles.csv'))) {
+                        thresholds.push(parseInt(entry, 10));
+                    }
+                }
+                res.json(thresholds.sort((a, b) => a - b));
+            } catch (err) {
+                console.error('Backtest thresholds error:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        this.app.get('/api/backtest/candles', (req, res) => {
+            try {
+                const { date, instrument, threshold } = req.query;
+                if (!date || !instrument || !threshold) {
+                    return res.status(400).json({ error: 'date, instrument, threshold required' });
+                }
+                const csvDir = path.join(__dirname, 'candles', 'live', instrument, String(threshold));
+                if (!fs.existsSync(csvDir)) {
+                    return res.status(404).json({ error: 'No data for this combination' });
+                }
+                const files = fs.readdirSync(csvDir);
+                const csvFile = files.find(f => f.includes(date) && f.endsWith('_candles.csv'));
+                if (!csvFile) {
+                    return res.status(404).json({ error: 'CSV not found' });
+                }
+                const filepath = path.join(csvDir, csvFile);
+                const content = fs.readFileSync(filepath, 'utf8');
+                const lines = content.trim().split('\n');
+                if (lines.length < 2) {
+                    return res.json([]);
+                }
+                const headers = lines[0].split(',');
+                const result = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const vals = line.split(',');
+                    const obj = {};
+                    headers.forEach((h, idx) => {
+                        obj[h.trim()] = vals[idx] ? vals[idx].trim() : '';
+                    });
+                    result.push(obj);
+                }
+                res.json(result);
+            } catch (err) {
+                console.error('Backtest candles error:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        this.app.get('/api/backtest/trades', (req, res) => {
+            try {
+                const { date, instrument, threshold } = req.query;
+                if (!date || !instrument || !threshold) {
+                    return res.status(400).json({ error: 'date, instrument, threshold required' });
+                }
+                const instSymbol = instrument.replace(/\|/g, '_');
+                const tradesDir = path.join(__dirname, 'live-backtest-results');
+                if (!fs.existsSync(tradesDir)) {
+                    return res.status(404).json({ error: 'No trades directory' });
+                }
+                const files = fs.readdirSync(tradesDir);
+                const tradeFile = files.find(f => 
+                    f.startsWith('live_' + threshold + '_' + instSymbol) && 
+                    f.includes(date) && 
+                    f.endsWith('.json')
+                );
+                if (!tradeFile) {
+                    return res.json({ strategies: {}, instrument, threshold });
+                }
+                const filepath = path.join(tradesDir, tradeFile);
+                const content = fs.readFileSync(filepath, 'utf8');
+                const data = JSON.parse(content);
+                res.json(data);
+            } catch (err) {
+                console.error('Backtest trades error:', err.message);
+                res.status(500).json({ error: err.message });
+            }
+        });
+
         this.app.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: Date.now() });
         });
@@ -638,6 +820,17 @@ class ChartServer {
     }
     
     getInstrumentName(key) {
+        // First check build-version-config.json (most comprehensive)
+        try {
+            const buildConfigPath = path.resolve(__dirname, 'build-version-config.json');
+            if (fs.existsSync(buildConfigPath)) {
+                const buildConfig = JSON.parse(fs.readFileSync(buildConfigPath, 'utf8'));
+                const inst = buildConfig.find(i => i.instrument_key === key);
+                if (inst && inst.name) return inst.name;
+            }
+        } catch (e) {}
+
+        // Then check config.json
         try {
             const configPath = path.resolve(__dirname, 'config.json');
             if (fs.existsSync(configPath)) {
@@ -647,9 +840,7 @@ class ChartServer {
                     i.key.includes(key) || 
                     key.includes(i.key)
                 );
-                if (inst && inst.name) {
-                    return inst.name;
-                }
+                if (inst && inst.name) return inst.name;
             }
         } catch (e) {}
 
@@ -658,9 +849,11 @@ class ChartServer {
             'NSE_FO|62329': 'Nifty 50 Future',
             'NSE_FO|62326': 'Nifty Bank Future'
         };
+        if (names[key]) return names[key];
+
         const id = key.includes('|') ? key.split('|')[1] : key;
         const normalizedId = id.replace(/_raw_ticks$/, '');
-        return names[key] || normalizedId;
+        return normalizedId;
     }
     
     getInstrumentsFromFiles() {

@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const RESULTS_DIR = './version-backtest-results';
+const RESULTS_DIR = process.argv.includes('--live') ? './live-backtest-results' : './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
 
 // Matches any V1 to V50 strategy strictly
 const versionRegex = /^V([1-9]|[1-4]\d|50):/;
+const isLive = process.argv.includes('--live');
 
 // Exactly the 10 active High Confidence versions producing confidence metric outputs
 const confidenceVersions = [
@@ -222,7 +223,8 @@ function computeMetrics(tradesList) {
     }
     const wins = tradesList.filter(t => t.pnlAmount > 0).length;
     const winRate = (wins / totalTrades) * 100;
-    const totalReturn = tradesList.reduce((sum, t) => sum + (parseFloat(t.pnlPercentage) || 0), 0);
+    // Use pnl field (version-backtest-results and live-backtest-results both store trade return % in 'pnl')
+    const totalReturn = tradesList.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
     const avgReturn = totalReturn / totalTrades;
 
     const validMafe = tradesList.filter(t => t.mafePercentage !== undefined && t.mafePercentage !== null);
@@ -292,13 +294,16 @@ if (files.length === 0) {
 console.log(`Processing ${files.length} backtest files...`);
 
 files.forEach(file => {
-    // Parse format: continuous_<thresholdValue>_<instrument>_<date>.json
-    const match = file.match(/^continuous_(\d+)_(.+?)_(\d{4}-\d{2}-\d{2})\.json$/);
+    // Parse format: continuous_<thresholdValue>_<instrument>_<date>.json or live_<thresholdValue>_<instrument>_<date>.json
+    const match = file.match(/^(?:continuous|live)_(\d+)_(.+?)\.json$/);
     if (!match) return;
 
     const threshold = match[1];
     const rawInstrument = match[2];
-    const date = match[3];
+    // Try to extract date from filename or rawInstrument
+    let date = 'unknown';
+    const dateMatch = file.match(/_(\d{4}-\d{2}-\d{2})\.json$/);
+    if (dateMatch) date = dateMatch[1];
     const instrumentName = getInstrumentDisplayName(rawInstrument);
 
     const filePath = path.join(RESULTS_DIR, file);
@@ -498,7 +503,7 @@ md += `---\n\n`;
 // Version-specific distributions (including daily split)
 md += `### **MAE/MAFE Distributions By Strategy Version**\n\n`;
 uniqueVersions.forEach(v => {
-    const vTrades = flatTrades.filter(t => t.date === d);
+    const vTrades = flatTrades.filter(t => t.versionNum === v);
     md += `### **${v} MAE/MAFE Distributions**\n\n`;
     
     md += `#### **Cumulative (All Dates)**\n\n`;
@@ -625,10 +630,10 @@ try {
     
     // Construct unique filename: backtest_analysis_report_<YYYY-MM-DD_HH-mm>.md
     const timestamp = getFormattedTimestamp();
-    const targetFile = path.join(OUTPUT_DIR, `backtest_analysis_report_${timestamp}.md`);
+    const targetFile = path.join(OUTPUT_DIR, `${isLive ? 'live' : 'backtest'}_analysis_report_${timestamp}.md`);
     
     fs.writeFileSync(targetFile, md, 'utf8');
-    console.log(`Success! Complete portfolio-wide multi-day analysis written to '${targetFile}'`);
+    console.log(`Success! Complete${isLive ? ' live backtest' : ''} portfolio-wide multi-day analysis written to '${targetFile}'`);
 } catch (e) {
     console.error(`Failed to write markdown output:`, e);
 }

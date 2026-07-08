@@ -10,6 +10,7 @@ candlegenerate*
 output*
 plan\ for\ next\ steps
 test-result-comparison*
+backtest_analysis_report.md
 
 # Data directories (all market data)
 market_data/

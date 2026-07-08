@@ -139,12 +139,16 @@ function getAverageBarRange(candles, currentIdx, lookback = 10) {
     return count > 0 ? sum / count : 0;
 }
 
-// Upgraded Swing Scanner: Scans strictly right-to-left to lock onto the most recent pivot
+// Swing Pivot Detection
+// Scans backwards from currentIdx to find the most recent extreme value within lookback.
+// Returns the index of the bar with the highest high (or lowest low).
+// Excludes the first and last indices of the candle array for safety.
 function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
     let bestIdx = null;
     let bestVal = direction === 'high' ? -Infinity : Infinity;
     const start = Math.max(0, currentIdx - lookback);
     for (let i = currentIdx - 1; i >= start; i--) {
+        if (i <= 0 || i >= candles.length - 1) continue;
         const val = direction === 'high' ? candles[i].high : candles[i].low;
         const isBetter = direction === 'high' ? val > bestVal : val < bestVal;
         if (isBetter) {
@@ -1928,6 +1932,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
 module.exports = { 
     DEFAULT_PARAMS, 
     calculateEMA, 
+    findPullbackSwingIndex,
     evaluateH2Setup, 
     evaluateL2Setup,
     evaluateStrictH2Setup,
