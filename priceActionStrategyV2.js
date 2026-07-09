@@ -1,14 +1,20 @@
 /**
  * Price Action Strategy V2 (Fixed Editions Engine)
  * 
- * Inherits all V1–V53 strategies from priceActionStrategy.js untouched.
- * Introduces V51–V100 (fixed clones of V1–V50) and V104–V106 (fixed clones of V101–V103).
+ * Inherits all V1-V50 strategies from priceActionStrategy.js untouched.
+ * Generates V51-V250 (batch fix clones) and V251-V850 (individual fix clones).
+ * Brooks strategies at V851-V904.
  * 
  * Version Map:
- *   V1–V50     → Preserved from original (UNCHANGED)
- *   V51–V53    → Renamed to V101–V103 (preserved, UNCHANGED)
- *   V51–V100   → Fixed clones of V1–V50 with all corrections applied
- *   V104–V106  → Fixed clones of V101–V103 with all corrections applied
+ *   V1-V50     → Original strategies (preserved from priceActionStrategy.js)
+ *   V51-V100   → Batch: Entry/Stop fixes (renumbered from old V101-V150)
+ *   V101-V150  → Batch: Trend fixes (renumbered from old V151-V200)
+ *   V151-V200  → Batch: Leg Quality fixes (renumbered from old V201-V250)
+ *   V201-V250  → Batch: Exit Mgmt fixes (renumbered from old V251-V300)
+ *   V251-V850  → Individual fix clones: 12 fixes × 50 originals
+ *   V851-V853  → Brooks Original
+ *   V854-V868  → Brooks × 5 batch profiles
+ *   V869-V904  → Brooks × 12 individual fix profiles
  * 
  * Each fix is named and logged in signal metadata for root-cause tracking:
  *   - TREND_ABR_NORMALIZED_SLOPE  (#1)
@@ -191,6 +197,44 @@ const FIX_PROFILES = {
         enableTimeExit: true,
         useBarPathExitResolution: true,
     },
+
+    // ─── Individual Fix Profiles (1 fix each) ──────────────────────
+    "stop_wider":     { stopOffsetRatio: 0.30 },
+    "trigger_wider":  { triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08 },
+    "atr_floor":      { enableATRStopFloor: true },
+    "slippage":       { slippageTicks: 1 },
+    "abr_slope":      { useABRNormalizedSlope: true },
+    "adx_filter":     { enableADXFilter: true },
+    "gap_optional":   { requireGapBar: false },
+    "leg_depth":      { minSecondLegDepthRatio: 0.60 },
+    "pivot_struct":   { useStructuralPivotDetection: true },
+    "trailing":       { enableTrailingStop: true },
+    "time_exit":      { enableTimeExit: true },
+    "bar_path":       { useBarPathExitResolution: true },
+};
+
+// Ordered list of all individual fix profiles
+const INDIVIDUAL_FIX_ORDER = [
+    "stop_wider", "trigger_wider", "atr_floor", "slippage",
+    "abr_slope", "adx_filter", "gap_optional",
+    "leg_depth", "pivot_struct",
+    "trailing", "time_exit", "bar_path",
+];
+
+// Label map
+const INDIVIDUAL_FIX_LABELS = {
+    "stop_wider":     "(Stop Wider)",
+    "trigger_wider":  "(Trigger Wider)",
+    "atr_floor":      "(ATR Floor)",
+    "slippage":       "(Slippage)",
+    "abr_slope":      "(ABR Slope)",
+    "adx_filter":     "(ADX Filter)",
+    "gap_optional":   "(Gap Optional)",
+    "leg_depth":      "(Leg Depth)",
+    "pivot_struct":   "(Pivot Structural)",
+    "trailing":       "(Trailing Stop)",
+    "time_exit":      "(Time Exit)",
+    "bar_path":       "(Bar Path Exit)",
 };
 
 function resolveFixProfile(params = {}) {
@@ -1940,8 +1984,8 @@ function runPriceActionBacktestV2(candles, signals = [], initialCapital = 100000
 }
 
 // ============================================================
-// BATCH VERSIONS GENERATOR — V51–V300 are clones of V1–V50
-// with fix_profile injected for per-batch testing
+// BATCH VERSIONS GENERATOR — V51–V250 are clones of V1–V50 with fix profiles
+// V251–V850: individual fix clones (12 fixes × 50 originals)
 // ============================================================
 
 // Map: V1→V50 name suffixes to their param overrides (mirrors V1-V50 definitions)
@@ -2006,11 +2050,10 @@ const V1_V50_TEMPLATES = [
 
 // Batch definitions: { baseVersion, prefix, fix_profile }
 const BATCHES = [
-    { baseVersion: 51,  prefix: "(Baseline)",   fix_profile: "off",         desc: "Baseline clones — no fixes" },
-    { baseVersion: 101, prefix: "(Entry/Stop)", fix_profile: "entry_stop", desc: "Entry/Stop fixes" },
-    { baseVersion: 151, prefix: "(Trend)",      fix_profile: "trend",      desc: "Trend fixes" },
-    { baseVersion: 201, prefix: "(Leg Quality)",fix_profile: "leg_quality",desc: "Leg Quality fixes" },
-    { baseVersion: 251, prefix: "(Exit Mgmt)",  fix_profile: "exit_mgmt",  desc: "Exit Management fixes" },
+    { baseVersion: 51,  prefix: "(Entry/Stop)", fix_profile: "entry_stop", desc: "Entry/Stop fixes" },
+    { baseVersion: 101, prefix: "(Trend)",      fix_profile: "trend",      desc: "Trend fixes" },
+    { baseVersion: 151, prefix: "(Leg Quality)",fix_profile: "leg_quality",desc: "Leg Quality fixes" },
+    { baseVersion: 201, prefix: "(Exit Mgmt)",  fix_profile: "exit_mgmt",  desc: "Exit Management fixes" },
 ];
 
 function generateBatchStrategies() {
@@ -2039,76 +2082,93 @@ function generateBatchStrategies() {
 const STRATEGIES_V2 = generateBatchStrategies();
 
 // ============================================================
-// BROOKS STRATEGIES (V301–V306)
+// INDIVIDUAL FIX STRATEGIES — V251-V850: 12 fixes × 50 originals
+// Each version applies exactly ONE fix to its base original
 // ============================================================
 
-const BROOKS_STRATEGIES = {
-    // V301–V303: Original Brooks (renamed from V51-V53)
-    "V301: Brooks Structural Pure (Original)": undefined,        // filled from rename map
-    "V302: Brooks Volume-Optimized (Original)": undefined,
-    "V303: Brooks Selective (Win-Rate Focus) (Original)": undefined,
+function generateIndividualFixStrategies() {
+    const strategies = {};
 
-    // V304–V306: Fixed Brooks (clones of V301–V303 with fix_profile)
-    "V304: Brooks Structural Pure (Fixed)": (candles, params = {}) => {
-        return twoLeggedPullbackCoreV2(candles, {
-            ...params,
-            useStructuralRules: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useBrooksTrend: true,
-            minTrendBars: 18,
-            swingLookback: 12,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            useDirectionalEMATest: true,
-            useStructuralTarget: true,
-            structureOffsetRatio: 0.08,
-            doubleTopBottomToleranceRatioV2: 0.12,
-            minBarsBetweenSignals: 3,
-        });
-    },
-    "V305: Brooks Volume-Optimized (Fixed)": (candles, params = {}) => {
-        return twoLeggedPullbackCoreV2(candles, {
-            ...params,
-            useStructuralRules: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useBrooksTrend: true,
-            minTrendBars: 12,
-            swingLookback: 8,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            useDirectionalEMATest: true,
-            useStructuralTarget: true,
-            structureOffsetRatio: 0.10,
-            doubleTopBottomToleranceRatioV2: 0.15,
-            emaTouchRatioV2: 0.18,
-            minBarsBetweenSignals: 4,
-        });
-    },
-    "V306: Brooks Selective (Win-Rate Focus) (Fixed)": (candles, params = {}) => {
-        return twoLeggedPullbackCoreV2(candles, {
-            ...params,
-            useStructuralRules: true,
-            requireStrictSecondLeg: true,
-            requireDoubleTopBottomTrap: true,
-            useBrooksTrend: true,
-            minTrendBars: 20,
-            swingLookback: 14,
-            enableTraps: false,
-            enableConfidenceScoring: false,
-            useDirectionalEMATest: true,
-            useStructuralTarget: true,
-            structureOffsetRatio: 0.08,
-            doubleTopBottomToleranceRatioV2: 0.10,
-            emaTouchRatioV2: 0.12,
-            minBarsBetweenSignals: 5,
-            minSignalBarCloseRatio: 0.70,
-        });
-    },
-};
+    for (let fixIdx = 0; fixIdx < INDIVIDUAL_FIX_ORDER.length; fixIdx++) {
+        const fixProfile = INDIVIDUAL_FIX_ORDER[fixIdx];
+        const fixLabel = INDIVIDUAL_FIX_LABELS[fixProfile];
+        const baseVersion = 251 + fixIdx * 50;
+
+        for (let i = 0; i < V1_V50_TEMPLATES.length; i++) {
+            const tpl = V1_V50_TEMPLATES[i];
+            const verNum = baseVersion + i;
+            const label = `V${verNum}: ${tpl.suffix} ${fixLabel}`;
+
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, {
+                    ...tpl.overrides,
+                    fix_profile: fixProfile,
+                    ...params,
+                });
+            };
+        }
+    }
+
+    return strategies;
+}
+
+const INDIVIDUAL_FIX_STRATEGIES = generateIndividualFixStrategies();
+console.error(`Generated ${Object.keys(INDIVIDUAL_FIX_STRATEGIES).length} individual fix strategies (V251-V${251 + INDIVIDUAL_FIX_ORDER.length * 50 - 1})`);
 
 // ============================================================
+// ============================================================
+// BROOKS STRATEGIES (V851-V904)
+// ============================================================
+
+const BROOKS_BASE_PARAMS = [
+    { suffix: 'Brooks Structural Pure', overrides: { useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12, enableTraps: false, enableConfidenceScoring: false, useDirectionalEMATest: true, useStructuralTarget: true, structureOffsetRatio: 0.08, doubleTopBottomToleranceRatioV2: 0.12, minBarsBetweenSignals: 3 } },
+    { suffix: 'Brooks Volume-Optimized', overrides: { useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useBrooksTrend: true, minTrendBars: 12, swingLookback: 8, enableTraps: false, enableConfidenceScoring: false, useDirectionalEMATest: true, useStructuralTarget: true, structureOffsetRatio: 0.10, doubleTopBottomToleranceRatioV2: 0.15, emaTouchRatioV2: 0.18, minBarsBetweenSignals: 4 } },
+    { suffix: 'Brooks Selective (Win-Rate Focus)', overrides: { useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useBrooksTrend: true, minTrendBars: 20, swingLookback: 14, enableTraps: false, enableConfidenceScoring: false, useDirectionalEMATest: true, useStructuralTarget: true, structureOffsetRatio: 0.08, doubleTopBottomToleranceRatioV2: 0.10, emaTouchRatioV2: 0.12, minBarsBetweenSignals: 5, minSignalBarCloseRatio: 0.70 } },
+];
+
+const BROOKS_BATCH_PROFILES = [
+    { offset: 0,  label: '(Original)',   fix_profile: 'off' },
+    { offset: 3,  label: '(Entry/Stop)', fix_profile: 'entry_stop' },
+    { offset: 6,  label: '(Trend)',      fix_profile: 'trend' },
+    { offset: 9,  label: '(Leg Quality)',fix_profile: 'leg_quality' },
+    { offset: 12, label: '(Exit Mgmt)',  fix_profile: 'exit_mgmt' },
+];
+
+function generateBrooksStrategies() {
+    const strategies = {};
+    const BROOKS_BASE = 851;
+    strategies['V851: Brooks Structural Pure (Original)'] = undefined;
+    strategies['V852: Brooks Volume-Optimized (Original)'] = undefined;
+    strategies['V853: Brooks Selective (Win-Rate Focus) (Original)'] = undefined;
+    for (const batch of BROOKS_BATCH_PROFILES) {
+        if (batch.label === '(Original)') continue;
+        for (let i = 0; i < BROOKS_BASE_PARAMS.length; i++) {
+            const verNum = BROOKS_BASE + 3 + batch.offset + i;
+            const label = 'V' + verNum + ': ' + BROOKS_BASE_PARAMS[i].suffix + ' ' + batch.label;
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, { ...BROOKS_BASE_PARAMS[i].overrides, fix_profile: batch.fix_profile, ...params });
+            };
+        }
+    }
+    const BROOKS_INDIV_BASE = BROOKS_BASE + 3 + 15;
+    for (let fixIdx = 0; fixIdx < INDIVIDUAL_FIX_ORDER.length; fixIdx++) {
+        const fp = INDIVIDUAL_FIX_ORDER[fixIdx];
+        const fl = INDIVIDUAL_FIX_LABELS[fp];
+        for (let i = 0; i < BROOKS_BASE_PARAMS.length; i++) {
+            const verNum = BROOKS_INDIV_BASE + fixIdx * 3 + i;
+            const label = 'V' + verNum + ': ' + BROOKS_BASE_PARAMS[i].suffix + ' ' + fl;
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, { ...BROOKS_BASE_PARAMS[i].overrides, fix_profile: fp, ...params });
+            };
+        }
+    }
+    return strategies;
+}
+
+const BROOKS_STRATEGIES = generateBrooksStrategies();
+console.error('Generated ' + Object.keys(BROOKS_STRATEGIES).filter(k => BROOKS_STRATEGIES[k] !== undefined).length + ' Brooks strategies (V851-V' + (851 + 3 + 15 + 3 * INDIVIDUAL_FIX_ORDER.length - 1) + ')');
+
+
 // BUILD FINAL EXPORT MAP
 // ============================================================
 
@@ -2128,9 +2188,9 @@ for (const [key, fn] of Object.entries(original.STRATEGIES)) {
 
 // Rename original V51-V53 → V301-V303 (Brooks)
 const renameMap = {
-    "V51: Brooks Structural Pure": "V301: Brooks Structural Pure (Original)",
-    "V52: Brooks Volume-Optimized": "V302: Brooks Volume-Optimized (Original)",
-    "V53: Brooks Selective (Win-Rate Focus)": "V303: Brooks Selective (Win-Rate Focus) (Original)",
+    "V51: Brooks Structural Pure": "V851: Brooks Structural Pure (Original)",
+    "V52: Brooks Volume-Optimized": "V852: Brooks Volume-Optimized (Original)",
+    "V53: Brooks Selective (Win-Rate Focus)": "V853: Brooks Selective (Win-Rate Focus) (Original)",
 };
 
 for (const [origName, newName] of Object.entries(renameMap)) {
@@ -2139,12 +2199,17 @@ for (const [origName, newName] of Object.entries(renameMap)) {
     }
 }
 
-// Add all V2 batch strategies (V51–V300)
+// Add all V2 batch strategies (V51–V250)
 for (const [key, fn] of Object.entries(STRATEGIES_V2)) {
     FINAL_STRATEGIES[key] = fn;
 }
 
-// Add Brooks strategies (V301–V306)
+// Add all individual fix strategies (V251–V850)
+for (const [key, fn] of Object.entries(INDIVIDUAL_FIX_STRATEGIES)) {
+    FINAL_STRATEGIES[key] = fn;
+}
+
+// Add Brooks strategies (V851–V306)
 for (const [key, fn] of Object.entries(BROOKS_STRATEGIES)) {
     if (fn !== undefined) {
         FINAL_STRATEGIES[key] = fn;
@@ -2206,7 +2271,7 @@ module.exports = {
     computeATR,
     getActiveFixes,
 
-    // All strategies (V1–V50 original, V51–V100 fixed, V101–V103 preserved original Brooks, V104–V106 fixed Brooks)
+    // All strategies (V1–V50 original, V51–V250 batch fix clones, V251–V850 individual fix clones, V851+ Brooks)
     STRATEGIES: FINAL_STRATEGIES,
 
     // Convenience exports for backward compatibility

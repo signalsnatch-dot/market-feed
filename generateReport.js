@@ -827,17 +827,15 @@ function generateCompactSummary(allTrades) {
 
     // Step 3: Pair originals (V1–V50) with their batch clones and compare
     // Batch mapping: Vn original → Vn offset per batch
-    // V51–V100: baseline clones (offset 50)
-    // V101–V150: entry_stop (offset 100)
-    // V151–V200: trend (offset 150)
-    // V201–V250: leg_quality (offset 200)
-    // V251–V300: exit_mgmt (offset 250)
+    // V51–V100: entry_stop (offset 50)
+    // V101–V150: trend (offset 100)
+    // V151–V200: leg_quality (offset 150)
+    // V201–V250: exit_mgmt (offset 200)
     const BATCH_OFFSETS = [
-        { offset: 50, label: "Baseline" },
-        { offset: 100, label: "Entry/Stop" },
-        { offset: 150, label: "Trend" },
-        { offset: 200, label: "Leg Quality" },
-        { offset: 250, label: "Exit Mgmt" },
+        { offset: 50, label: "Entry/Stop" },
+        { offset: 100, label: "Trend" },
+        { offset: 150, label: "Leg Quality" },
+        { offset: 200, label: "Exit Mgmt" },
     ];
 
     md += `| Orig V | Batch | Original | Original WR | Original Ret | Batch Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`;
@@ -867,20 +865,67 @@ function generateCompactSummary(allTrades) {
     }
     md += `\n`;
 
-    // Also add Brooks comparison: V301↔V304, V302↔V305, V303↔V306
-    md += `### Brooks Strategies\n\n`;
-    md += `| Orig V | Original | Original WR | Original Ret | Fixed | Fixed WR | Fixed Ret | WR Δ | Ret Δ |\n`;
-    md += `| :---: | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+    // Step 4: Brooks comparison — V851-V904 batch profiles
+    md += `### Brooks Strategies — Batch Profiles\n\n`;
+    md += `| Orig V | Profile | Original | Original WR | Original Ret | Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`;
+    md += `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
 
-    for (const [origV, fixedV] of [[301, 304], [302, 305], [303, 306]]) {
+    const brooksOrig = [851, 852, 853];
+    const brooksBatchOffsets = [
+        { offset: 3, label: "Entry/Stop" },
+        { offset: 6, label: "Trend" },
+        { offset: 9, label: "Leg Quality" },
+        { offset: 12, label: "Exit Mgmt" },
+    ];
+    for (const origV of brooksOrig) {
         const origEntry = [...versionCumulative.values()].find(v => v.vNum === origV);
-        const fixedEntry = [...versionCumulative.values()].find(v => v.vNum === fixedV);
-        if (origEntry && fixedEntry && origEntry.totalTrades >= MIN_TRADES && fixedEntry.totalTrades >= MIN_TRADES) {
-            const wrDelta = fixedEntry.winRate - origEntry.winRate;
-            const retDelta = fixedEntry.avgReturn - origEntry.avgReturn;
-            md += `| V${origV} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${fixedEntry.verKey} | ${fixedEntry.winRate.toFixed(1)}% | ${fixedEntry.avgReturn >= 0 ? '+' : ''}${fixedEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
+        if (!origEntry || origEntry.totalTrades < MIN_TRADES) continue;
+        for (const batch of brooksBatchOffsets) {
+            const cloneV = 851 + 3 + batch.offset + (origV - 851);
+            const cloneEntry = [...versionCumulative.values()].find(v => v.vNum === cloneV);
+            if (!cloneEntry || cloneEntry.totalTrades < MIN_TRADES) continue;
+            const wrDelta = cloneEntry.winRate - origEntry.winRate;
+            const retDelta = cloneEntry.avgReturn - origEntry.avgReturn;
+            md += `| V${origV} | ${batch.label} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${cloneEntry.verKey} | ${cloneEntry.winRate.toFixed(1)}% | ${cloneEntry.avgReturn >= 0 ? '+' : ''}${cloneEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
         }
     }
+    md += `\n`;
+
+    // Step 5: Individual fix profile summary — avg WR impact per fix
+    md += `### Individual Fix Profiles — Average WR Impact (V251-V850 vs V1-V50 Originals)\n\n`;
+    md += `| Fix Profile | Avg WR Δ | Best WR Gain | Worst WR Loss | Positive Orig | Negative Orig |\n`;
+    md += `| :--- | :---: | :---: | :---: | :---: | :---: |\n`;
+
+    const FIX_ORDER = ["stop_wider","trigger_wider","atr_floor","slippage","abr_slope","adx_filter","gap_optional","leg_depth","pivot_struct","trailing","time_exit","bar_path"];
+    const FIX_LABELS = {stop_wider:"Stop Wider",trigger_wider:"Trigger Wider",atr_floor:"ATR Floor",slippage:"Slippage",abr_slope:"ABR Slope",adx_filter:"ADX Filter",gap_optional:"Gap Optional",leg_depth:"Leg Depth",pivot_struct:"Pivot Structural",trailing:"Trailing Stop",time_exit:"Time Exit",bar_path:"Bar Path Exit"};
+
+    const fixStats = {};
+    for (let fixIdx = 0; fixIdx < FIX_ORDER.length; fixIdx++) {
+        const fixKey = FIX_ORDER[fixIdx];
+        const baseVersion = 251 + fixIdx * 50;
+        const deltas = [];
+        for (let origV = 1; origV <= 50; origV++) {
+            const origEntry = [...versionCumulative.values()].find(v => v.vNum === origV && v.verKey.includes(`V${origV}:`) && !v.verKey.includes('(Original)'));
+            const fixV = baseVersion + origV - 1;
+            const fixEntry = [...versionCumulative.values()].find(v => v.vNum === fixV);
+            if (origEntry && fixEntry && origEntry.totalTrades >= MIN_TRADES && fixEntry.totalTrades >= MIN_TRADES) {
+                deltas.push(fixEntry.winRate - origEntry.winRate);
+            }
+        }
+        if (deltas.length > 0) {
+            const avg = deltas.reduce((s,d)=>s+d,0)/deltas.length;
+            const best = Math.max(...deltas);
+            const worst = Math.min(...deltas);
+            const positive = deltas.filter(d=>d>0).length;
+            const negative = deltas.filter(d=>d<0).length;
+            fixStats[fixKey] = {avg, best, worst, positive, negative, label: FIX_LABELS[fixKey]};
+        }
+    }
+    const sortedFixes = Object.entries(fixStats).sort((a,b) => b[1].avg - a[1].avg);
+    for (const [key, s] of sortedFixes) {
+        md += `| ${s.label} | ${s.avg >= 0 ? '+' : ''}${s.avg.toFixed(1)}% | ${s.best >= 0 ? '+' : ''}${s.best.toFixed(1)}% | ${s.worst.toFixed(1)}% | ${s.positive} | ${s.negative} |\n`;
+    }
+    md += `\n`;
 
     return md;
 }

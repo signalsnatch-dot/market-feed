@@ -930,6 +930,112 @@ async function cmdRunAll() {
     console.log(`\n✅ Done! Processed ${totalFiles} files into ${RESULTS_DIR}/`);
 }
 
+// ============================================================
+// PARALLEL RUN-ALL using worker_threads
+// ============================================================
+async function cmdRunAllParallel() {
+    const { Worker } = require('worker_threads');
+    const os = require('os');
+    const numWorkers = parseInt(process.env.BACKTEST_WORKERS, 10) || Math.max(1, os.cpus().length - 1);
+
+    const buildConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    const liveConfig = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+
+    const allTickFiles = fs.readdirSync(EXTRACTED_DIR).filter(f => f.toLowerCase().endsWith('.csv'));
+
+    // Build task queue: [{ tickFile, instrumentKey, thresholds, buildInst }] — ONE per file
+    const tasks = [];
+    for (const tickFile of allTickFiles) {
+        const parts = tickFile.replace('.csv', '').split('_raw_ticks_');
+        if (parts.length < 2) continue;
+        const safeKey = parts[0];
+        const lastUnderscore = safeKey.lastIndexOf('_');
+        const instKey = lastUnderscore !== -1
+            ? safeKey.substring(0, lastUnderscore) + '|' + safeKey.substring(lastUnderscore + 1)
+            : safeKey;
+
+        const buildInst = buildConfig.find(x => x.instrument_key === instKey);
+        const liveInst = liveConfig.instruments?.find(x => x.key === instKey);
+        if (!buildInst) continue;
+
+        // Peek for date
+        const peekBuf = Buffer.alloc(65536);
+        const peekFd = fs.openSync(path.join(EXTRACTED_DIR, tickFile), 'r');
+        const bytes = fs.readSync(peekFd, peekBuf, 0, 65536, 0);
+        fs.closeSync(peekFd);
+        const peekStr = peekBuf.toString('utf8', 0, bytes);
+        const fn = peekStr.indexOf('\n');
+        const sn = peekStr.indexOf('\n', fn + 1);
+        const hdrsLine = peekStr.slice(0, fn);
+        const firstDataLine = peekStr.slice(fn + 1, sn !== -1 ? sn : undefined).trim();
+        const cols = buildColumnIndex(hdrsLine);
+        const firstParts = firstDataLine.split(',');
+        let extTs = null;
+        if (cols.idxExt !== -1 && firstParts.length > cols.idxExt) {
+            extTs = parseInt(firstParts[cols.idxExt], 10);
+        }
+        const dateKey = resolveDateKey(extTs);
+        const thresholds = resolveThresholds(buildInst, liveInst, dateKey);
+        if (!thresholds.length) continue;
+
+        tasks.push({ tickFile, instrumentKey: instKey, thresholds, buildInst });
+    }
+
+    console.log(`📂 Found ${allTickFiles.length} files → ${tasks.length} valid files (${tasks.reduce((s, t) => s + t.thresholds.length, 0)} total thresholds)`);
+    console.log(`🔧 Using ${numWorkers} parallel workers (each processes ALL thresholds for one file)`);
+
+    const workerPath = path.resolve(__dirname, 'scripts', 'backtestWorker.js');
+    let completed = 0;
+    let totalTrades = 0;
+    const startTime = Date.now();
+
+    // Spin up workers one at a time, keeping at most numWorkers active concurrently.
+    // Each worker is a full Node.js thread — spawning 154 at once would OOM.
+    let nextTaskIdx = 0;
+
+    function runWorker(task) {
+        return new Promise((resolve) => {
+            const worker = new Worker(workerPath, { workerData: task });
+            worker.on('message', (msg) => {
+                completed++;
+                totalTrades += (msg.totalTrades || 0);
+                if (msg.type === 'error') {
+                    console.error(`   ❌ ${msg.tickFile}: ${msg.error}`);
+                } else {
+                    console.log(`   ✅ ${msg.tickFile}: ${msg.thresholds.length} thresholds, ${msg.totalTrades} trades`);
+                }
+                if (completed % 5 === 0 || completed === tasks.length) {
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+                    console.log(`   📊 ${completed}/${tasks.length} files (${elapsed}s elapsed, ~${numWorkers} active)`);
+                }
+                worker.terminate();
+                resolve();
+            });
+            worker.on('error', (err) => {
+                completed++;
+                console.error(`   ❌ Worker crash: ${err.message}`);
+                worker.terminate();
+                resolve();
+            });
+        });
+    }
+
+    // Pool: keep at most numWorkers running concurrently
+    const running = new Set();
+    for (const task of tasks) {
+        const p = runWorker(task);
+        running.add(p);
+        p.then(() => running.delete(p));
+        if (running.size >= numWorkers) {
+            await Promise.race(Array.from(running));
+        }
+    }
+    await Promise.all(Array.from(running));
+
+    const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`\n✅ Done! ${completed} files, ${totalTrades} total trades in ${totalSec}s`);
+}
+
 function cmdCompare(instrumentKey) {
     if (!instrumentKey) {
         console.error('Usage: node backtesterAsLive.js compare <instrument_key>');
@@ -1045,6 +1151,9 @@ Examples:
         }
         case 'run-all':
             await cmdRunAll();
+            break;
+        case 'run-all-parallel':
+            await cmdRunAllParallel();
             break;
         case 'compare':
             cmdCompare(args[1]);

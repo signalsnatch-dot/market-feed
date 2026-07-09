@@ -215,7 +215,6 @@ class ChartServer {
         });
         
         this.app.get('/api/signals', (req, res) => {
-            this.pruneOldSignals();
             const limit = Math.min(500, Math.max(50, parseInt(req.query.limit, 10) || 200));
             const activeOnly = req.query.activeOnly === 'true';
             const version = req.query.version;
@@ -425,12 +424,6 @@ class ChartServer {
         
         this.io.on('connection', (socket) => {
             console.log("Client connected: " + socket.id);
-            this.pruneOldSignals();
-            
-            const todaySignals = this.tradeSignals.map(sig => ({
-                ...sig,
-                name: this.getInstrumentName(sig.instrument)
-            }));
             
             socket.emit('historical_candles', {
                 instruments: this.instrumentsData,
@@ -674,22 +667,49 @@ class ChartServer {
             const jsonFile = 'signals_today_' + todayTradingDay + '.json';
             const signalsFile = path.join(this.candlesDataDir, jsonFile);
             
+            // Build dedup key function
+            const dedupKey = (sig) =>
+                sig.timestamp + '_' + sig.instrument + '_' + sig.bar_type + '_' + sig.threshold + '_' + sig.barNumber + '_' + sig.type + '_' + sig.version;
+
             const signalMap = new Map();
-            const filteredSignals = this.tradeSignals.filter(sig => {
+
+            // ── Step 1: Load existing signals from disk (if any) ──
+            // This is the critical fix: we MERGE with disk, never lose old signals
+            if (fs.existsSync(signalsFile)) {
+                try {
+                    const existingData = fs.readFileSync(signalsFile, 'utf8');
+                    const existingSignals = JSON.parse(existingData);
+                    for (const sig of existingSignals) {
+                        // Only keep today's trading day signals from disk
+                        if (getTradingDayIST(sig.timestamp) === todayTradingDay) {
+                            signalMap.set(dedupKey(sig), sig);
+                        }
+                    }
+                } catch (readErr) {
+                    // If disk file is corrupt, start fresh (but log it)
+                    console.error('⚠️ Could not read existing signals file, rebuilding:', readErr.message);
+                }
+            }
+
+            // ── Step 2: Merge in-memory signals on top (in-memory wins for freshness) ──
+            const inMemoryToday = this.tradeSignals.filter(sig => {
                 const sigDate = getTradingDayIST(sig.timestamp);
                 return sigDate === todayTradingDay;
             });
-            
-            // Use comprehensive dedup key: timestamp + instrument + bar_type + threshold + barNumber + type + version
-            for (const signal of filteredSignals) {
-                const key = signal.timestamp + '_' + signal.instrument + '_' + signal.bar_type + '_' + signal.threshold + '_' + signal.barNumber + '_' + signal.type + '_' + signal.version;
-                signalMap.set(key, signal);
+            for (const signal of inMemoryToday) {
+                signalMap.set(dedupKey(signal), signal);
             }
-            
+
+            // ── Step 3: Write merged result atomically ──
             const allSignals = Array.from(signalMap.values());
+            allSignals.sort((a, b) => a.timestamp - b.timestamp);
+            
             const tempFile = signalsFile + '.tmp';
             fs.writeFileSync(tempFile, JSON.stringify(allSignals, null, 2), 'utf8');
             fs.renameSync(tempFile, signalsFile);
+
+            // ── Step 4: Refresh in-memory list so it stays consistent with disk ──
+            this.tradeSignals = allSignals;
         } catch (err) {
             console.error('❌ Save signals failed:', err.message);
         }
