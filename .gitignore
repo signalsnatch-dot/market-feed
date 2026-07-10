@@ -11,6 +11,8 @@ output*
 plan\ for\ next\ steps
 test-result-comparison*
 backtest_analysis_report.md
+volume-profiles.json
+latency-analysis-report.json
 
 # Data directories (all market data)
 market_data/
@@ -30,6 +32,8 @@ backtest-results/
 live-performance-report/
 live-backtest-results/
 candles/
+.temp_version_report/
+.temp_live_report/
 
 # Legacy data directories (if any)
 data/

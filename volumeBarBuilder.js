@@ -11,6 +11,7 @@ class VolumeBarBuilder extends EventEmitter {
         this.activeBars = new Map();
         this.completedBars = [];
         this.lastExchangeVolumeToday = new Map();
+        this.lastProcessedTick = new Map(); // per-instrument { ltp, volume_today } for dedup
         this.tickSizeMap = new Map();
         this.instrumentTargetsMap = new Map();
         this.instrumentLotSizeMap = new Map();
@@ -191,9 +192,21 @@ class VolumeBarBuilder extends EventEmitter {
         if (!ltp) return;
         
         const price = parseFloat(ltp);
+        const currentVolToday = parseInt(volume_today, 10);
+
+        // ── Phase 1: Deduplication (gated by delay-management.enabled) ──
+        try {
+            const config = require('./config.json');
+            if (config['delay-management'] && config['delay-management'].enabled && config['delay-management'].deduplicate_ticks) {
+                const last = this.lastProcessedTick.get(instrument_key);
+                if (last && last.ltp === price && last.volume_today === currentVolToday) {
+                    return; // Exact duplicate — same price and cumulative volume
+                }
+                this.lastProcessedTick.set(instrument_key, { ltp: price, volume_today: currentVolToday });
+            }
+        } catch (e) { /* config not available, skip dedup */ }
         
         let tickVolume = 0;
-        const currentVolToday = parseInt(volume_today, 10);
         const lotMultiplier = this.instrumentLotSizeMap.get(instrument_key) || 1;
 
         if (!isNaN(currentVolToday) && currentVolToday > 0) {

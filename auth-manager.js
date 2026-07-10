@@ -165,7 +165,7 @@ class AuthManager {
                 return false;
             }
             // Network error - log but don't fail immediately
-            console.warn(`⚠️ Token test network error: ${error.message}`);
+            console.warn(`⚠️ Token test network error: ${error.message} --- ${token}`);
             return false;
         }
     }

@@ -673,49 +673,201 @@ function generateCompactSummaryStream(merged, cw) {
     const { L3 } = merged;
     const MIN_TRADES = 3;
 
+    // Build reverse p-index lookup: "instrument|date|threshold" → "p1".."p10"
+    const thresholdToPIdx = new Map(); // "instrument|date|rawThreshold" → "p1"|"p2"|...|"p10"
+    const instrumentStaticThresholds = new Map(); // "instrument" → [rawThresholds...] for fallback
+    try {
+        const configPath = path.resolve(__dirname, 'build-version-config.json');
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        for (const entry of config) {
+            const name = getInstrumentDisplayName(entry.instrument_key.replace('|', '_'));
+            if (entry.static_thresholds && Array.isArray(entry.static_thresholds)) {
+                instrumentStaticThresholds.set(name, entry.static_thresholds);
+            }
+            // Date-specific threshold arrays: each value at index i = p(i+1)
+            if (entry.thresholds && typeof entry.thresholds === 'object') {
+                for (const [date, thArray] of Object.entries(entry.thresholds)) {
+                    if (!Array.isArray(thArray)) continue;
+                    for (let i = 0; i < thArray.length; i++) {
+                        thresholdToPIdx.set(`${name}|${date}|${thArray[i]}`, `p${i + 1}`);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // If config not available, fall back to raw threshold display
+    }
+
+    // Helper: resolve threshold to p-index for a given instrument+date
+    function resolvePIdx(instrument, date, threshold) {
+        const thNum = typeof threshold === 'string' ? parseInt(threshold, 10) : threshold;
+        const key = `${instrument}|${date}|${thNum}`;
+        if (thresholdToPIdx.has(key)) return thresholdToPIdx.get(key);
+        // Fallback: find nearest value in static_thresholds
+        const staticTh = instrumentStaticThresholds.get(instrument);
+        if (staticTh && staticTh.length > 0) {
+            let bestIdx = 0, bestDist = Infinity;
+            for (let i = 0; i < staticTh.length; i++) {
+                const dist = Math.abs(staticTh[i] - thNum);
+                if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+            }
+            return `p${bestIdx + 1}`;
+        }
+        return `${thNum}`; // absolute fallback — raw threshold as string
+    }
+
+    // Also build forward lookup for Section G display (p-index → raw threshold per instrument)
+    const pIdxToThreshold = new Map(); // "instrument|p1" → rawThreshold (from static, for display)
+    for (const [inst, st] of instrumentStaticThresholds) {
+        for (let i = 0; i < st.length; i++) {
+            pIdxToThreshold.set(`${inst}|p${i + 1}`, st[i]);
+        }
+    }
+
     write(cw, `# Strategy Performance Compact Summary\n\n`);
     write(cw, `*Generated: ${new Date().toLocaleString()}*\n`);
     write(cw, `*Purpose: LLM-readable summary for strategy refinement*\n\n`);
 
-    // Parse L3 into per-instrument version+threshold combos
-    const instCombos = new Map();
+    // ── Build global threshold→p-index lookup from config (mode across all dates) ──
+    // Since L3 (version|instrument|threshold) lacks date dimension but backtester only
+    // uses that day's threshold array, each threshold uniquely maps to one p-index.
+    // Build by taking the mode p-index for each threshold across all dates in config.
+    const thresholdToPIdxGlobal = new Map(); // "instrument|threshold" → "pX"
+    try {
+        const configPath2 = path.resolve(__dirname, 'build-version-config.json');
+        const config2 = JSON.parse(fs.readFileSync(configPath2, 'utf8'));
+        for (const entry of config2) {
+            const name = getInstrumentDisplayName(entry.instrument_key.replace('|', '_'));
+            const thToPCount = new Map(); // rawThreshold → Map(pIdx → count)
+            if (entry.thresholds && typeof entry.thresholds === 'object') {
+                for (const [date, thArray] of Object.entries(entry.thresholds)) {
+                    if (!Array.isArray(thArray)) continue;
+                    for (let i = 0; i < thArray.length; i++) {
+                        const th = thArray[i];
+                        const pIdx = `p${i + 1}`;
+                        if (!thToPCount.has(th)) thToPCount.set(th, new Map());
+                        const pMap = thToPCount.get(th);
+                        pMap.set(pIdx, (pMap.get(pIdx) || 0) + 1);
+                    }
+                }
+            }
+            // For each threshold, pick the most common p-index
+            for (const [th, pMap] of thToPCount) {
+                let bestP = null, bestCount = 0;
+                for (const [p, cnt] of pMap) {
+                    if (cnt > bestCount) { bestCount = cnt; bestP = p; }
+                }
+                if (bestP) thresholdToPIdxGlobal.set(`${name}|${th}`, bestP);
+            }
+            // Also map static_thresholds for fallback
+            if (entry.static_thresholds && Array.isArray(entry.static_thresholds)) {
+                const st = entry.static_thresholds;
+                for (const th of st) {
+                    // If this threshold wasn't seen in any date-specific array, find nearest in static
+                    if (!thToPCount.has(th)) {
+                        // Already handled by below fallback
+                    }
+                }
+            }
+        }
+    } catch (e) { /* ignore */ }
+
+    // Helper: resolve threshold to p-index for L3-based data (no date context)
+    function resolvePIdxGlobal(instrument, threshold) {
+        const thNum = typeof threshold === 'string' ? parseInt(threshold, 10) : threshold;
+        const key = `${instrument}|${thNum}`;
+        if (thresholdToPIdxGlobal.has(key)) return thresholdToPIdxGlobal.get(key);
+        // Fallback: find nearest in static_thresholds
+        const staticTh = instrumentStaticThresholds.get(instrument);
+        if (staticTh && staticTh.length > 0) {
+            let bestIdx = 0, bestDist = Infinity;
+            for (let i = 0; i < staticTh.length; i++) {
+                const dist = Math.abs(staticTh[i] - thNum);
+                if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+            }
+            return `p${bestIdx + 1}`;
+        }
+        return `${thNum}`;
+    }
+
+    // Parse L3 into p-index-based combos, GROUPED BY (instrument, version, pIdx).
+    // Multiple L3 rows (different raw thresholds) can map to the same p-index for a version+instrument.
+    // We sum their raw {count, wins, sumPnl, sumMafe, sumMae} to avoid duplicate entries.
+    const comboGroup = {}; // "instrument|version|pIdx" → {count, wins, sumPnl, sumMafe, sumMae}
     for (const [key, d] of Object.entries(L3)) {
         const parts = key.split('|');
         if (parts.length < 3) continue;
         const version = parts[0], instrument = parts[1], threshold = parts[2];
         if (d.count < MIN_TRADES) continue;
-        const m = deriveMetrics(d);
-        if (!instCombos.has(instrument)) instCombos.set(instrument, []);
-        instCombos.get(instrument).push({ version, threshold, ...m, trades: d.count });
+        const pIdx = resolvePIdxGlobal(instrument, threshold);
+        const ck = `${instrument}|${version}|${pIdx}`;
+        if (!comboGroup[ck]) comboGroup[ck] = { version, instrument, pIdx, count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 };
+        comboGroup[ck].count += d.count;
+        comboGroup[ck].wins += d.wins;
+        comboGroup[ck].sumPnl += d.sumPnl || 0;
+        comboGroup[ck].sumMafe += d.sumMafe || 0;
+        comboGroup[ck].sumMae += d.sumMae || 0;
     }
 
-    // Section A: Per-Instrument Top 3
-    write(cw, `## Section A: Best Version+P-Index Per Instrument (Top 3 by Win Rate)\n\n`);
-    write(cw, `*P-index = decile position in volume-per-bar array (p1 = fewest candles, p10 = most candles). Consistent across dates.*\n\n`);
-    write(cw, `| Instrument | Rank | Version | P-Idx | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`);
+    // Convert grouped data into instCombos with raw counts (no pre-derived metrics)
+    const instCombos = new Map(); // instrument → [{version, pIdx, count, wins, sumPnl, sumMafe, sumMae}]
+    for (const c of Object.values(comboGroup)) {
+        if (!instCombos.has(c.instrument)) instCombos.set(c.instrument, []);
+        instCombos.get(c.instrument).push(c);
+    }
+
+    // Helper: compute metrics from a combo with raw counts
+    function comboWR(c) { return c.count > 0 ? (c.wins / c.count) * 100 : 0; }
+    function comboAvgRet(c) { return c.count > 0 ? c.sumPnl / c.count : 0; }
+    function comboMafe(c) { return c.count > 0 ? c.sumMafe / c.count : 0; }
+    function comboMae(c) { return c.count > 0 ? c.sumMae / c.count : 0; }
+
+    // Section A: Per-Instrument Top 3 (by Win Rate) — shows P-Value
+    write(cw, `## Section A: Best Version+P-Value Per Instrument (Top 3 by Win Rate)\n\n`);
+    write(cw, `*P-value = decile position in volume-per-bar array (p1 = fewest candles, p10 = most candles). Best p-value per instrument resolved via per-date threshold mapping.*\n\n`);
+    write(cw, `| Instrument | Rank | Version | P-Value | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`);
     write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
 
     const instrumentTop3 = [];
     for (const [inst, combos] of instCombos) {
-        combos.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
+        combos.sort((a, b) => comboWR(b) - comboWR(a) || b.sumPnl - a.sumPnl);
         const top3 = combos.slice(0, 3);
         if (top3.length > 0) instrumentTop3.push({ instrument: inst, top3 });
         top3.forEach((v, idx) => {
-            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
+            const wr = comboWR(v), ar = comboAvgRet(v), mf = comboMafe(v), ma = comboMae(v);
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.pIdx} | ${wr.toFixed(1)}% | ${ar >= 0 ? '+' : ''}${ar.toFixed(2)}% | ${v.sumPnl >= 0 ? '+' : ''}${v.sumPnl.toFixed(2)}% | ${mf.toFixed(0)}% | ${ma.toFixed(0)}% | ${v.count} |\n`);
         });
     }
     write(cw, `\n`);
 
-    // Section B: Overall Best Versions (cross-instrument)
+    // Section A.2: Per-Instrument Top 3 by Total Returns
+    write(cw, `## Section A.2: Best Version+P-Value Per Instrument (Top 3 by Total Return)\n\n`);
+    write(cw, `*Same data as Section A, sorted by cumulative total return instead of win rate to surface combos with more trades and higher P&L.*\n\n`);
+    write(cw, `| Instrument | Rank | Version | P-Value | Win Rate | Avg Return | Total Return | Trades |\n`);
+    write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+
+    const instrumentTop3ByRet = [];
+    for (const [inst, combos] of instCombos) {
+        const sortedByRet = [...combos].sort((a, b) => b.sumPnl - a.sumPnl || comboWR(b) - comboWR(a));
+        const top3 = sortedByRet.slice(0, 3);
+        if (top3.length > 0) instrumentTop3ByRet.push({ instrument: inst, top3 });
+        top3.forEach((v, idx) => {
+            const wr = comboWR(v), ar = comboAvgRet(v);
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.pIdx} | ${wr.toFixed(1)}% | ${ar >= 0 ? '+' : ''}${ar.toFixed(2)}% | ${v.sumPnl >= 0 ? '+' : ''}${v.sumPnl.toFixed(2)}% | ${v.count} |\n`);
+        });
+    }
+    write(cw, `\n`);
+
+    // Section B: Overall Best Versions (cross-instrument) — uses p-value combos with raw counts
     const versionScoreMap = new Map();
     for (const entry of instrumentTop3) {
         for (const v of entry.top3) {
-            const existing = versionScoreMap.get(v.version) || { appearances: 0, totalWinRate: 0, totalReturn: 0, totalTrades: 0, groups: [] };
+            const existing = versionScoreMap.get(v.version) || { appearances: 0, totalCount: 0, totalWins: 0, totalSumPnl: 0, groups: [] };
             existing.appearances++;
-            existing.totalWinRate += v.winRate;
-            existing.totalReturn += v.avgReturn;
-            existing.totalTrades += v.trades;
-            existing.groups.push(`${entry.instrument} (T${v.threshold})`);
+            existing.totalCount += v.count;
+            existing.totalWins += v.wins;
+            existing.totalSumPnl += v.sumPnl;
+            existing.groups.push(`${entry.instrument} (${v.pIdx})`);
             versionScoreMap.set(v.version, existing);
         }
     }
@@ -723,14 +875,15 @@ function generateCompactSummaryStream(merged, cw) {
     for (const [ver, data] of versionScoreMap) {
         versionRankings.push({
             version: ver, ...data,
-            avgWinRate: data.totalWinRate / data.appearances,
-            avgReturn: data.totalReturn / data.appearances,
+            avgWinRate: data.totalCount > 0 ? (data.totalWins / data.totalCount) * 100 : 0,
+            avgReturn: data.totalCount > 0 ? data.totalSumPnl / data.totalCount : 0,
+            totalTrades: data.totalCount,
         });
     }
     versionRankings.sort((a, b) => b.appearances - a.appearances || b.avgWinRate - a.avgWinRate);
 
     write(cw, `## Section B: Overall Best-Performing Versions (Cross-Instrument)\n\n`);
-    write(cw, `*Ranked by number of instrument p-index groups where this version appears in the Top 3.*\n\n`);
+    write(cw, `*Ranked by number of instrument p-value groups where this version appears in the Top 3.*\n\n`);
     write(cw, `| Rank | Version | Groups in Top 3 | Avg Win Rate | Avg Return | Total Trades | Best Instruments |\n`);
     write(cw, `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`);
     versionRankings.slice(0, 20).forEach((v, idx) => {
@@ -738,51 +891,230 @@ function generateCompactSummaryStream(merged, cw) {
     });
     write(cw, `\n`);
 
-    // Section C: Cumulative Cross-Instrument Original vs Batch
-    const versionBest = new Map();
-    const versionCumulative = new Map();
-    for (const [key, d] of Object.entries(L3)) {
-        const parts = key.split('|');
-        if (parts.length < 3) continue;
-        const version = parts[0], instrument = parts[1], threshold = parts[2];
-        if (d.count < MIN_TRADES) continue;
-        if (!versionCumulative.has(version)) versionCumulative.set(version, new Map());
-        const imap = versionCumulative.get(version);
-        if (!imap.has(instrument)) imap.set(instrument, []);
-        imap.get(instrument).push({ threshold, ...d });
+    // Section B.2: Overall Best Versions from A.2 (total return based)
+    const versionScoreMapByRet = new Map();
+    for (const entry of instrumentTop3ByRet) {
+        for (const v of entry.top3) {
+            const existing = versionScoreMapByRet.get(v.version) || { appearances: 0, totalCount: 0, totalWins: 0, totalSumPnl: 0, groups: [] };
+            existing.appearances++;
+            existing.totalCount += v.count;
+            existing.totalWins += v.wins;
+            existing.totalSumPnl += v.sumPnl;
+            existing.groups.push(`${entry.instrument} (${v.pIdx})`);
+            versionScoreMapByRet.set(v.version, existing);
+        }
+    }
+    const versionRankingsByRet = [];
+    for (const [ver, data] of versionScoreMapByRet) {
+        versionRankingsByRet.push({
+            version: ver, ...data,
+            avgWinRate: data.totalCount > 0 ? (data.totalWins / data.totalCount) * 100 : 0,
+            avgReturn: data.totalCount > 0 ? data.totalSumPnl / data.totalCount : 0,
+            totalTrades: data.totalCount,
+            totalSumPnl: data.totalSumPnl,
+        });
+    }
+    versionRankingsByRet.sort((a, b) => b.appearances - a.appearances || b.totalSumPnl - a.totalSumPnl);
+
+    write(cw, `## Section B.2: Overall Best-Performing Versions by Total Return (Cross-Instrument)\n\n`);
+    write(cw, `*Ranked by number of instrument p-value groups where this version appears in A.2's Top 3 (total-return-based).*\n\n`);
+    write(cw, `| Rank | Version | Groups in Top 3 | Avg Win Rate | Total Return | Total Trades | Best Instruments |\n`);
+    write(cw, `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`);
+    versionRankingsByRet.slice(0, 20).forEach((v, idx) => {
+        write(cw, `| #${idx + 1} | ${v.version} | ${v.appearances} | ${v.avgWinRate.toFixed(1)}% | ${v.totalSumPnl >= 0 ? '+' : ''}${v.totalSumPnl.toFixed(2)}% | ${v.totalTrades} | ${v.groups.slice(0, 3).join(', ')} |\n`);
+    });
+    write(cw, `\n`);
+
+    // ── Build versionCumulativeP and versionBest from grouped data (raw counts) ──
+    const versionCumulativeP = new Map(); // version → Map(instrument → [comboItems with raw counts])
+    for (const [inst, combos] of instCombos) {
+        for (const c of combos) {
+            if (!versionCumulativeP.has(c.version)) versionCumulativeP.set(c.version, new Map());
+            const imap = versionCumulativeP.get(c.version);
+            if (!imap.has(inst)) imap.set(inst, []);
+            imap.get(inst).push(c);
+        }
     }
 
-    for (const [version, imap] of versionCumulative) {
-        let totalTrades = 0, winCount = 0, totalPnl = 0, totalPnlAmount = 0, instUsed = 0;
+    const versionBest = new Map();
+    for (const [version, imap] of versionCumulativeP) {
+        const instSeen = new Set();
+        let bestTotalCount = 0, bestTotalWins = 0, bestTotalSumPnl = 0;
         for (const [inst, combos] of imap) {
+            instSeen.add(inst);
+            // Select best p-index for this (version, instrument) by win rate
             let best = null, bestWR = -1;
             for (const c of combos) {
-                const wr = c.count ? (c.wins / c.count) * 100 : 0;
-                if (wr > bestWR) { bestWR = wr; best = c; }
+                const wr = comboWR(c);
+                if (wr > bestWR || (wr === bestWR && best && c.sumPnl > best.sumPnl)) { bestWR = wr; best = c; }
             }
             if (best) {
-                instUsed++;
-                totalTrades += best.count;
-                winCount += best.wins;
-                totalPnl += best.sumPnl;
-                totalPnlAmount += best.sumPnlAmount;
+                bestTotalCount += best.count;
+                bestTotalWins += best.wins;
+                bestTotalSumPnl += best.sumPnl;
             }
         }
-        if (instUsed > 0) {
+        if (instSeen.size > 0 && bestTotalCount > 0) {
             versionBest.set(version, {
-                instrumentsUsed: instUsed,
-                totalTrades,
-                winRate: totalTrades ? (winCount / totalTrades) * 100 : 0,
-                avgReturn: totalTrades ? totalPnl / totalTrades : 0,
-                totalPnlPct: totalPnl,
-                totalPnlAmount,
+                instrumentsUsed: instSeen.size,
+                totalTrades: bestTotalCount,
+                winRate: (bestTotalWins / bestTotalCount) * 100,
+                avgReturn: bestTotalSumPnl / bestTotalCount,
+                totalPnlPct: bestTotalSumPnl,
+                totalPnlAmount: 0,
             });
         }
     }
 
-    write(cw, `## Section C: Cumulative Cross-Instrument Comparison (Best P-Index Per Instrument)\n\n`);
-    write(cw, `*For each original version and its batch clones, we select the best p-index per instrument\n`);
-    write(cw, `(by win rate), then compute cumulative metrics across all instruments.*\n\n`);
+    // ── Section C: Global Best P-Value Analysis ──
+    // C.1: Per-Instrument Global Best P-Value (aggregate raw counts by pIdx)
+    write(cw, `## Section C: Global Best P-Value Analysis\n\n`);
+    write(cw, `*Best p-value (p1-p10) per instrument, determined by win rate from accumulated trades across all versions.*\n\n`);
+
+    write(cw, `### C.1: Global Best P-Value Per Instrument\n\n`);
+    write(cw, `| Instrument | Best P-Value | Win Rate | Avg Return | Total Trades | Versions |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+
+    for (const [inst, combos] of instCombos) {
+        // Aggregate raw counts by pIdx
+        const pAgg = new Map(); // pIdx → {count, wins, sumPnl, sumMafe, sumMae, verSet}
+        for (const c of combos) {
+            if (!pAgg.has(c.pIdx)) pAgg.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0, verSet: new Set() });
+            const e = pAgg.get(c.pIdx);
+            e.count += c.count;
+            e.wins += c.wins;
+            e.sumPnl += c.sumPnl;
+            e.sumMafe += c.sumMafe;
+            e.sumMae += c.sumMae;
+            e.verSet.add(c.version);
+        }
+        let bestP = null, bestWR = -1, bestAR = 0, bestTrades = 0, bestVerCnt = 0;
+        for (const [p, d] of pAgg) {
+            const wr = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+            if (wr > bestWR || (wr === bestWR && d.sumPnl > (bestWR >= 0 ? pAgg.get(bestP)?.sumPnl || 0 : 0))) {
+                bestWR = wr; bestP = p;
+                bestAR = d.count > 0 ? d.sumPnl / d.count : 0;
+                bestTrades = d.count;
+                bestVerCnt = d.verSet.size;
+            }
+        }
+        if (bestP) {
+            write(cw, `| ${inst} | ${bestP} | ${bestWR.toFixed(1)}% | ${bestAR >= 0 ? '+' : ''}${bestAR.toFixed(2)}% | ${bestTrades} | ${bestVerCnt} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // C.2: Global Best P-Value Per Instrument Segment
+    write(cw, `### C.2: Global Best P-Value Per Instrument Segment\n\n`);
+    write(cw, `*Best p-value aggregated by instrument type. Win rates computed from total wins/trades per p-value.*\n\n`);
+
+    const SEGMENT_TYPES = new Map();
+    for (const instName of [...instCombos.keys()]) {
+        if (instName.includes('Future') && (instName.includes('Nifty') || instName.includes('Bank') || instName.includes('Fin') || instName.includes('Midcap'))) {
+            SEGMENT_TYPES.set(instName, 'Index Future');
+        } else if (instName.includes('Future') && !instName.includes('Mini') && !instName.includes('Micro') && !instName.includes('Petal')) {
+            SEGMENT_TYPES.set(instName, 'Equity Future');
+        } else if (instName.includes('Future') || instName.includes('Mini') || instName.includes('Micro') || instName.includes('Petal') || instName.includes('Gold') || instName.includes('Silver') || instName.includes('Crude') || instName.includes('Natural Gas') || instName.includes('Copper') || instName.includes('Aluminium') || instName.includes('Zinc') || instName.includes('Lead')) {
+            SEGMENT_TYPES.set(instName, 'Commodity');
+        } else if (['Nifty 50','Bank Nifty','Fin Nifty','Midcap Nifty'].includes(instName)) {
+            SEGMENT_TYPES.set(instName, 'Index Cash');
+        } else if (instName.includes('(Cash)')) {
+            SEGMENT_TYPES.set(instName, 'Equity Cash');
+        } else {
+            SEGMENT_TYPES.set(instName, 'Equity Cash');
+        }
+    }
+
+    const segPBest = new Map(); // segment → Map(pIdx → {count, wins, sumPnl, instruments})
+    for (const [inst, combos] of instCombos) {
+        const seg = SEGMENT_TYPES.get(inst) || 'Other';
+        if (!segPBest.has(seg)) segPBest.set(seg, new Map());
+        const segMap = segPBest.get(seg);
+        for (const c of combos) {
+            if (!segMap.has(c.pIdx)) segMap.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0, instruments: new Set() });
+            const e = segMap.get(c.pIdx);
+            e.count += c.count;
+            e.wins += c.wins;
+            e.sumPnl += c.sumPnl;
+            e.instruments.add(inst);
+        }
+    }
+
+    write(cw, `| Segment | Best P-Value | Win Rate | Avg Return | Total Trades | Instruments |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+    for (const [seg, pMap] of segPBest) {
+        let bestP = null, bestWR = -1, bestAR = 0, bestTrades = 0, bestInstCnt = 0;
+        for (const [p, d] of pMap) {
+            const wr = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+            if (wr > bestWR || (wr === bestWR && d.sumPnl > (bestWR >= 0 ? pMap.get(bestP)?.sumPnl || 0 : 0))) {
+                bestWR = wr; bestP = p;
+                bestAR = d.count > 0 ? d.sumPnl / d.count : 0;
+                bestTrades = d.count;
+                bestInstCnt = d.instruments.size;
+            }
+        }
+        if (bestP) {
+            write(cw, `| ${seg} | ${bestP} | ${bestWR.toFixed(1)}% | ${bestAR >= 0 ? '+' : ''}${bestAR.toFixed(2)}% | ${bestTrades} | ${bestInstCnt} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // C.1_by_ret: Per-Instrument Global Best P-Value by Total Return
+    write(cw, `### C.1 (by Total Return): Global Best P-Value Per Instrument\n\n`);
+    write(cw, `*Best p-value per instrument selected by cumulative total return (sumPnl) across all versions.*\n\n`);
+    write(cw, `| Instrument | Best P-Value | Win Rate | Total Return | Total Trades | Versions |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+
+    for (const [inst, combos] of instCombos) {
+        const pAgg = new Map();
+        for (const c of combos) {
+            if (!pAgg.has(c.pIdx)) pAgg.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0, verSet: new Set() });
+            const e = pAgg.get(c.pIdx);
+            e.count += c.count;
+            e.wins += c.wins;
+            e.sumPnl += c.sumPnl;
+            e.verSet.add(c.version);
+        }
+        let bestP = null, bestSumPnl = -Infinity, bestWR = 0, bestTrades = 0, bestVerCnt = 0;
+        for (const [p, d] of pAgg) {
+            if (d.sumPnl > bestSumPnl || (d.sumPnl === bestSumPnl && comboWR({ wins: d.wins, count: d.count }) > bestWR)) {
+                bestSumPnl = d.sumPnl; bestP = p;
+                bestWR = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+                bestTrades = d.count;
+                bestVerCnt = d.verSet.size;
+            }
+        }
+        if (bestP) {
+            write(cw, `| ${inst} | ${bestP} | ${bestWR.toFixed(1)}% | ${bestSumPnl >= 0 ? '+' : ''}${bestSumPnl.toFixed(2)}% | ${bestTrades} | ${bestVerCnt} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // C.2_by_ret: Per-Segment Best P-Value by Total Return
+    write(cw, `### C.2 (by Total Return): Global Best P-Value Per Instrument Segment\n\n`);
+    write(cw, `*Best p-value per segment selected by cumulative total return.*\n\n`);
+    write(cw, `| Segment | Best P-Value | Win Rate | Total Return | Total Trades | Instruments |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+    for (const [seg, pMap] of segPBest) {
+        let bestP = null, bestSumPnl = -Infinity, bestWR = 0, bestTrades = 0, bestInstCnt = 0;
+        for (const [p, d] of pMap) {
+            if (d.sumPnl > bestSumPnl || (d.sumPnl === bestSumPnl && d.count > 0 && (d.wins / d.count) * 100 > bestWR)) {
+                bestSumPnl = d.sumPnl; bestP = p;
+                bestWR = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+                bestTrades = d.count;
+                bestInstCnt = d.instruments.size;
+            }
+        }
+        if (bestP) {
+            write(cw, `| ${seg} | ${bestP} | ${bestWR.toFixed(1)}% | ${bestSumPnl >= 0 ? '+' : ''}${bestSumPnl.toFixed(2)}% | ${bestTrades} | ${bestInstCnt} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // ── Section C (cont): Cumulative Cross-Instrument Original vs Batch ──
+    write(cw, `## Section C (cont): Cumulative Cross-Instrument Comparison (Best P-Value Per Instrument)\n\n`);
+    write(cw, `*For each original version and its batch clones, we select the best p-value per instrument\n`);
+    write(cw, `(by win rate from accumulated trades), then compute cumulative metrics across all instruments.*\n\n`);
 
     const BATCH_OFFSETS = [
         { offset: 50, label: "Entry/Stop" },
@@ -867,15 +1199,209 @@ function generateCompactSummaryStream(merged, cw) {
     }
     write(cw, `\n`);
 
-    // Section D: All Versions
-    write(cw, `### Section D: All Versions — Cumulative Cross-Instrument Metrics (Best Threshold Per Instrument)\n\n`);
-    write(cw, `| Version | Instruments | Total Trades | Win Rate | Avg Return | Total Return |\n`);
-    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+    // ── Section D: All Versions + Global P-Value Rankings ──
+    // D.1: Per-version metrics (best p-value per instrument, from raw counts)
+    write(cw, `### Section D.1: All Versions — Cumulative Cross-Instrument Metrics (Best P-Value Per Instrument)\n\n`);
+    write(cw, `| Version | Instruments | Total Trades | Win Rate | Avg Return | Total Return | Best P-Values |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
     const sortedBest = [...versionBest.entries()].sort((a, b) =>
         parseInt(a[0].match(versionRegex)?.[1] || '0') - parseInt(b[0].match(versionRegex)?.[1] || '0')
     );
     for (const [ver, d] of sortedBest) {
-        write(cw, `| ${ver} | ${d.instrumentsUsed} | ${d.totalTrades} | ${d.winRate.toFixed(1)}% | ${d.avgReturn >= 0 ? '+' : ''}${d.avgReturn.toFixed(2)}% | ${d.totalPnlPct >= 0 ? '+' : ''}${d.totalPnlPct.toFixed(2)}% |\n`);
+        const vCombos = versionCumulativeP.get(ver);
+        const bestPVals = [];
+        if (vCombos) {
+            for (const [inst, combos] of vCombos) {
+                let best = null, bestWR = -1;
+                for (const c of combos) {
+                    const wr = comboWR(c);
+                    if (wr > bestWR || (wr === bestWR && best && c.sumPnl > best.sumPnl)) { bestWR = wr; best = c; }
+                }
+                if (best) bestPVals.push(best.pIdx);
+            }
+        }
+        write(cw, `| ${ver} | ${d.instrumentsUsed} | ${d.totalTrades} | ${d.winRate.toFixed(1)}% | ${d.avgReturn >= 0 ? '+' : ''}${d.avgReturn.toFixed(2)}% | ${d.totalPnlPct >= 0 ? '+' : ''}${d.totalPnlPct.toFixed(2)}% | ${bestPVals.join(', ')} |\n`);
+    }
+    write(cw, `\n`);
+
+    // D.2: Global best p-value across all versions and instruments (from raw counts)
+    write(cw, `### Section D.2: Global Best P-Value Rankings (Across All Versions & Instruments)\n\n`);
+    write(cw, `*For each p-value (p1-p10), win rate from total wins/trades across all instruments and versions.*\n\n`);
+
+    const globalPRankings = new Map(); // pIdx → {count, wins, sumPnl}
+    for (const [inst, combos] of instCombos) {
+        for (const c of combos) {
+            if (!globalPRankings.has(c.pIdx)) globalPRankings.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0 });
+            const e = globalPRankings.get(c.pIdx);
+            e.count += c.count;
+            e.wins += c.wins;
+            e.sumPnl += c.sumPnl;
+        }
+    }
+
+    write(cw, `| Rank | P-Value | Win Rate | Avg Return | Total Trades | Combo Count |\n`);
+    write(cw, `| :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+    const rankedP = [...globalPRankings.entries()]
+        .sort((a, b) => {
+            const wrA = a[1].count > 0 ? (a[1].wins / a[1].count) * 100 : 0;
+            const wrB = b[1].count > 0 ? (b[1].wins / b[1].count) * 100 : 0;
+            return wrB - wrA || b[1].sumPnl - a[1].sumPnl;
+        });
+    rankedP.forEach(([p, d], idx) => {
+        const wr = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+        const ar = d.count > 0 ? d.sumPnl / d.count : 0;
+        write(cw, `| #${idx + 1} | ${p} | ${wr.toFixed(1)}% | ${ar >= 0 ? '+' : ''}${ar.toFixed(2)}% | ${d.count} | ${d.count > 0 ? d.count : 0} |\n`);
+    });
+    write(cw, `\n`);
+
+    // D.3: Per-Version Global Best P-Value (fixed single p-value across all instruments)
+    write(cw, `### Section D.3: Per-Version Global Best P-Value (Single P-Value Fixed Across All Instruments)\n\n`);
+    write(cw, `*For each version, uses the SAME p-value across all instruments. Aggregates raw trades to find\n`);
+    write(cw, `the single best p-value globally. Shows which versions work consistently with one setting.*\n\n`);
+    write(cw, `| Rank | Version | Best P-Value | Win Rate | Avg Return | Total Trades | Instruments | Other Top P-Values |\n`);
+    write(cw, `| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |\n`);
+
+    const versionGlobalPBest = [];
+    for (const [version, imap] of versionCumulativeP) {
+        // Aggregate raw counts by pIdx across ALL instruments for this version
+        const pAgg = new Map(); // pIdx → {count, wins, sumPnl, instSet}
+        for (const [inst, combos] of imap) {
+            for (const c of combos) {
+                if (!pAgg.has(c.pIdx)) pAgg.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0, instSet: new Set() });
+                const e = pAgg.get(c.pIdx);
+                e.count += c.count;
+                e.wins += c.wins;
+                e.sumPnl += c.sumPnl;
+                e.instSet.add(inst);
+            }
+        }
+        // Find best pIdx by win rate
+        const pRanked = [...pAgg.entries()]
+            .map(([p, d]) => ({
+                p,
+                wr: d.count > 0 ? (d.wins / d.count) * 100 : 0,
+                ar: d.count > 0 ? d.sumPnl / d.count : 0,
+                trades: d.count,
+                instCnt: d.instSet.size,
+            }))
+            .sort((a, b) => b.wr - a.wr || b.trades - a.trades);
+        if (pRanked.length > 0) {
+            const best = pRanked[0];
+            const others = pRanked.slice(1, 4).map(x => `${x.p}(${x.wr.toFixed(0)}%)`).join(', ');
+            versionGlobalPBest.push({
+                version,
+                bestP: best.p,
+                wr: best.wr,
+                ar: best.ar,
+                trades: best.trades,
+                instCnt: best.instCnt,
+                others,
+            });
+        }
+    }
+    versionGlobalPBest.sort((a, b) => b.wr - a.wr || b.trades - a.trades);
+
+    versionGlobalPBest.forEach((v, idx) => {
+        write(cw, `| #${idx + 1} | ${v.version} | ${v.bestP} | ${v.wr.toFixed(1)}% | ${v.ar >= 0 ? '+' : ''}${v.ar.toFixed(2)}% | ${v.trades} | ${v.instCnt} | ${v.others} |\n`);
+    });
+    write(cw, `\n`);
+
+    // D.2 (by Total Return): Global best p-value ranked by total return
+    write(cw, `### Section D.2 (by Total Return): Global Best P-Value Rankings (Sorted by Total Return)\n\n`);
+    write(cw, `*For each p-value (p1-p10), sorted by cumulative total return across all instruments and versions.*\n\n`);
+    write(cw, `| Rank | P-Value | Win Rate | Total Return | Avg Return | Total Trades |\n`);
+    write(cw, `| :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+    const rankedPByRet = [...globalPRankings.entries()]
+        .sort((a, b) => b[1].sumPnl - a[1].sumPnl || ((b[1].count > 0 ? (b[1].wins / b[1].count) * 100 : 0) - (a[1].count > 0 ? (a[1].wins / a[1].count) * 100 : 0)));
+    rankedPByRet.forEach(([p, d], idx) => {
+        const wr = d.count > 0 ? (d.wins / d.count) * 100 : 0;
+        const ar = d.count > 0 ? d.sumPnl / d.count : 0;
+        write(cw, `| #${idx + 1} | ${p} | ${wr.toFixed(1)}% | ${d.sumPnl >= 0 ? '+' : ''}${d.sumPnl.toFixed(2)}% | ${ar >= 0 ? '+' : ''}${ar.toFixed(2)}% | ${d.count} |\n`);
+    });
+    write(cw, `\n`);
+
+    // D.3 (by Total Return): Per-Version Global Best P-Value by total return
+    write(cw, `### Section D.3 (by Total Return): Per-Version Global Best P-Value (Sorted by Total Return)\n\n`);
+    write(cw, `*Same as D.3 but selects best p-value by cumulative total return instead of win rate.*\n\n`);
+    write(cw, `| Rank | Version | Best P-Value | Win Rate | Total Return | Total Trades | Instruments | Other Top P-Values |\n`);
+    write(cw, `| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |\n`);
+
+    const versionGlobalPBestByRet = [];
+    for (const [version, imap] of versionCumulativeP) {
+        const pAgg = new Map();
+        for (const [inst, combos] of imap) {
+            for (const c of combos) {
+                if (!pAgg.has(c.pIdx)) pAgg.set(c.pIdx, { count: 0, wins: 0, sumPnl: 0, instSet: new Set() });
+                const e = pAgg.get(c.pIdx);
+                e.count += c.count;
+                e.wins += c.wins;
+                e.sumPnl += c.sumPnl;
+                e.instSet.add(inst);
+            }
+        }
+        const pRanked = [...pAgg.entries()]
+            .map(([p, d]) => ({
+                p,
+                wr: d.count > 0 ? (d.wins / d.count) * 100 : 0,
+                sumPnl: d.sumPnl,
+                ar: d.count > 0 ? d.sumPnl / d.count : 0,
+                trades: d.count,
+                instCnt: d.instSet.size,
+            }))
+            .sort((a, b) => b.sumPnl - a.sumPnl || b.wr - a.wr);
+        if (pRanked.length > 0) {
+            const best = pRanked[0];
+            const others = pRanked.slice(1, 4).map(x => `${x.p}(+${x.sumPnl.toFixed(1)}%)`).join(', ');
+            versionGlobalPBestByRet.push({
+                version,
+                bestP: best.p,
+                wr: best.wr,
+                sumPnl: best.sumPnl,
+                ar: best.ar,
+                trades: best.trades,
+                instCnt: best.instCnt,
+                others,
+            });
+        }
+    }
+    versionGlobalPBestByRet.sort((a, b) => b.sumPnl - a.sumPnl || b.wr - a.wr);
+
+    versionGlobalPBestByRet.forEach((v, idx) => {
+        write(cw, `| #${idx + 1} | ${v.version} | ${v.bestP} | ${v.wr.toFixed(1)}% | ${v.sumPnl >= 0 ? '+' : ''}${v.sumPnl.toFixed(2)}% | ${v.trades} | ${v.instCnt} | ${v.others} |\n`);
+    });
+    write(cw, `\n`);
+
+    // ── Live Trade Recommendations ──
+    write(cw, `## Section I: Live Trade Recommendations\n\n`);
+    write(cw, `*Top version+p-value combinations from D.3 that balance high win rate with sufficient trades and instrument coverage.*\n\n`);
+
+    // Pick top candidates from D.3 with decent trade counts
+    const candidates = versionGlobalPBest
+        .filter(v => v.trades >= 10 && v.instCnt >= 3)
+        .slice(0, 10);
+
+    write(cw, `### Top Candidates (Single P-Value, All Instruments)\n\n`);
+    write(cw, `| Version | P-Value | Win Rate | Avg Return | Trades | Instruments | Recommendation |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: | :--- |\n`);
+
+    candidates.forEach((v, idx) => {
+        const grade = v.wr >= 80 && v.trades >= 20 ? '⭐⭐⭐ Strong' :
+                       v.wr >= 70 && v.trades >= 15 ? '⭐⭐ Good' :
+                       v.wr >= 60 && v.trades >= 10 ? '⭐ Moderate' : '— Monitor';
+        write(cw, `| ${v.version} | ${v.bestP} | ${v.wr.toFixed(1)}% | ${v.ar >= 0 ? '+' : ''}${v.ar.toFixed(2)}% | ${v.trades} | ${v.instCnt} | ${grade} |\n`);
+    });
+    write(cw, `\n`);
+
+    write(cw, `### Suggested Live Trading Configuration\n\n`);
+    if (candidates.length > 0) {
+        const best = candidates[0];
+        write(cw, `**Primary**: Use **${best.version}** with **${best.bestP}** across all instruments.\n`);
+        write(cw, `- Expected win rate: ${best.wr.toFixed(1)}% across ${best.trades} trades on ${best.instCnt} instruments\n`);
+        write(cw, `- Avg return per trade: ${best.ar >= 0 ? '+' : ''}${best.ar.toFixed(2)}%\n`);
+        if (candidates.length > 1) {
+            write(cw, `**Fallback**: ${candidates[1].version} with ${candidates[1].bestP} (${candidates[1].wr.toFixed(0)}% WR, ${candidates[1].trades} trades)\n`);
+        }
+        write(cw, `\n**Risk Note**: Backtest results may not predict future performance. Start with minimal position sizing.\n`);
     }
     write(cw, `\n`);
 
@@ -971,30 +1497,37 @@ function generateCompactSummaryStream(merged, cw) {
     for (const [type, combos] of typeCombos) {
         if (combos.length === 0) continue;
 
-        // Aggregate by version across instruments in this type
+        // Aggregate by version across instruments in this type (use raw counts)
         const verMap = new Map();
         for (const c of combos) {
-            if (!verMap.has(c.version)) verMap.set(c.version, { totalWR: 0, totalRet: 0, totalTrades: 0, count: 0, instruments: new Set() });
+            if (!verMap.has(c.version)) verMap.set(c.version, { totalCount: 0, totalWins: 0, totalSumPnl: 0, comboCount: 0, instruments: new Set() });
             const e = verMap.get(c.version);
-            e.totalWR += c.winRate;
-            e.totalRet += c.avgReturn;
-            e.totalTrades += c.trades;
-            e.count++;
+            e.totalCount += c.count;
+            e.totalWins += c.wins;
+            e.totalSumPnl += c.sumPnl;
+            e.comboCount++;
             e.instruments.add(c.instrument);
         }
 
         const ranked = [...verMap.entries()]
-            .sort((a, b) => b[1].totalWR / b[1].count - a[1].totalWR / a[1].count || b[1].count - a[1].count)
+            .map(([v, d]) => ({
+                version: v,
+                wr: d.totalCount > 0 ? (d.totalWins / d.totalCount) * 100 : 0,
+                ar: d.totalCount > 0 ? d.totalSumPnl / d.totalCount : 0,
+                trades: d.totalCount,
+                comboCount: d.comboCount,
+                instCount: d.instruments.size,
+            }))
+            .sort((a, b) => b.wr - a.wr || b.ar - a.ar)
             .slice(0, 3);
 
-        const bestName = ranked[0] ? `${ranked[0][0]} (${(ranked[0][1].totalWR / ranked[0][1].count).toFixed(1)}% WR)` : '—';
-        const bestFixes = ranked.map(([v, d]) => `${v.split(':')[0]}(${(d.totalWR/d.count).toFixed(1)}%)`).join(', ');
-        write(cw, `| ${type} | ${bestName} | ${bestFixes} | ${ranked[0] ? (ranked[0][1].totalWR / ranked[0][1].count).toFixed(1) : '—'}% | ${combos.map(c => c.instrument).filter((v,i,a) => a.indexOf(v) === i).length} |\n`);
+        const bestName = ranked[0] ? `${ranked[0].version} (${ranked[0].wr.toFixed(1)}% WR)` : '—';
+        const bestFixes = ranked.map(r => `${r.version.split(':')[0]}(${r.wr.toFixed(1)}%)`).join(', ');
+        write(cw, `| ${type} | ${bestName} | ${bestFixes} | ${ranked[0] ? ranked[0].wr.toFixed(1) : '—'}% | ${[...new Set(combos.map(c => c.instrument))].length} |\n`);
     }
     write(cw, `\n`);
 
     // ── Req 2: Threshold-Based Top 3 Per Instrument ──
-    const { L3 } = merged;
     write(cw, `## Section G: Best Version+Threshold Per Instrument (Top 3 by Win Rate)\n\n`);
     write(cw, `*Performance grouped by raw threshold value — the actual volume bar threshold to use in live trading.*\n`);
     write(cw, `*Note: Same threshold produces consistent candle counts across dates. Use this to configure volume bars.*\n\n`);
@@ -1016,7 +1549,8 @@ function generateCompactSummaryStream(merged, cw) {
         combos.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
         const top3 = combos.slice(0, 3);
         top3.forEach((v, idx) => {
-            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
+            const thDisplay = pIdxToThreshold.get(`${inst}|${v.threshold}`) || v.threshold;
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${thDisplay} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
         });
     }
     write(cw, `\n`);

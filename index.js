@@ -47,7 +47,7 @@ candleBuilder.on('live_candle_update', (liveCandle) => {
 // Forward candle closures to Server
 candleBuilder.on('bar_close', (bar) => {
     chartServer.broadcastCandle(bar.instrument, bar, bar.type);
-    console.log(`🎯 [${bar.type.toUpperCase()} BAR] ${bar.name} #${bar.barNumber}: ${bar.priceChangePercent}% change`);
+    console.log("🎯 [" + bar.type.toUpperCase() + " BAR] " + bar.name + " #" + bar.barNumber + ": " + bar.priceChangePercent + "% change");
 });
 
 // Forward Trade Signals from the DualCandleBuilder straight to Server (Saves & Broadcasts)
@@ -63,17 +63,40 @@ candleBuilder.on('trade_status_update', (update) => {
 candleBuilder.on('tick_processed', (data) => {
     // Only log occasionally to avoid spam
     if (Math.random() < 0.01) {
-        console.log(`\n📊 Progress Comparison:`);
-        console.log(`   Price Bar: ${data.priceBarProgress?.progress || '0%'}`);
-        console.log(`   Volume Bar: ${data.volumeBarProgress?.progress || '0%'}`);
+        console.log("\n📊 Progress Comparison:");
+        console.log("   Price Bar: " + (data.priceBarProgress ? data.priceBarProgress.progress : '0%'));
+        console.log("   Volume Bar: " + (data.volumeBarProgress ? data.volumeBarProgress.progress : '0%'));
     }
 });
 
-// Process ticks from WebSocket
+// Helper: get IST hour for market-open staleness check (Phase 2)
+function getISTHour() {
+    var istMs = Date.now() + (5.5 * 60 * 60 * 1000);
+    return new Date(istMs).getUTCHours();
+}
+
+// Process ticks from WebSocket with staleness gate (Phase 2)
 feed.on('tick', (tickData) => {
-    const latency = tickData.latency_ms || (Date.now() - (tickData.exchange_timestamp * 1000));
+    var latency = tickData.latency_ms || (Date.now() - (tickData.exchange_timestamp * 1000));
     if (latency > 1000) {
-        console.warn(`⚠️ High latency: ${latency}ms for ${tickData.instrument_key}`);
+        console.warn("⚠️ High latency: " + latency + "ms for " + tickData.instrument_key);
+    }
+
+    // Phase 2: Staleness gate (gated by delay-management.enabled in config.json)
+    try {
+        var dmConfig = config['delay-management'];
+        if (dmConfig && dmConfig.enabled) {
+            var isMarketOpenHour = getISTHour() === 9;
+            var maxLatency = isMarketOpenHour
+                ? (dmConfig.market_open_max_staleness_ms || 10000)
+                : (dmConfig.max_staleness_ms || 30000);
+            if (latency > maxLatency) {
+                console.warn("⚠️ Stale tick dropped: " + latency + "ms > " + maxLatency + "ms for " + tickData.instrument_key);
+                return;
+            }
+        }
+    } catch (e) {
+        // config not available, skip staleness check
     }
 
     candleBuilder.processTick(tickData);
@@ -130,5 +153,5 @@ app.get('/api/instruments', (req, res) => {
 // Start the HTTP server alongside your existing feed
 const HTTP_PORT = 3000;
 app.listen(HTTP_PORT, () => {
-    console.log(`📡 HTTP server on port ${HTTP_PORT}`);
+    console.log("📡 HTTP server on port " + HTTP_PORT);
 });

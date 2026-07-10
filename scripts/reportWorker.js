@@ -173,18 +173,31 @@ try {
     const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
     for (const entry of config) {
         const name = getInstrumentDisplayName(entry.instrument_key.replace('|', '_'));
+        const staticThresholds = entry.static_thresholds;
         if (!entry.thresholds || typeof entry.thresholds !== 'object') continue;
-        for (const [dateKey, thresholds] of Object.entries(entry.thresholds)) {
-            if (!Array.isArray(thresholds)) continue;
+        for (const [dateKey, pIdxOrThresholds] of Object.entries(entry.thresholds)) {
             // Convert DD/MM/YY to YYYY-MM-DD for matching
             const parts = dateKey.split('/');
             if (parts.length !== 3) continue;
             const yyyy = '20' + parts[2];
             const isoDate = `${yyyy}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            for (let i = 0; i < thresholds.length; i++) {
-                const pIndex = `p${i + 1}`;
-                const key = `${name}|${isoDate}|${thresholds[i]}`;
-                pIndexLookup.set(key, pIndex);
+
+            if (Array.isArray(pIdxOrThresholds)) {
+                // Older format: array of actual threshold values → derive p-index from position
+                for (let i = 0; i < pIdxOrThresholds.length; i++) {
+                    const pIndex = `p${i + 1}`;
+                    const key = `${name}|${isoDate}|${pIdxOrThresholds[i]}`;
+                    pIndexLookup.set(key, pIndex);
+                }
+            } else if (typeof pIdxOrThresholds === 'number' && staticThresholds && Array.isArray(staticThresholds)) {
+                // Newer format: number is the p-index (1-10), look up raw threshold from static_thresholds
+                const pIdxNum = pIdxOrThresholds;
+                const pIndex = `p${pIdxNum}`;
+                const rawThreshold = staticThresholds[pIdxNum - 1];
+                if (rawThreshold !== undefined) {
+                    const key = `${name}|${isoDate}|${rawThreshold}`;
+                    pIndexLookup.set(key, pIndex);
+                }
             }
         }
     }

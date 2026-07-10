@@ -2633,5 +2633,11 @@
     "directories": {
         "rawDataDir": "./raw_ticks_data",
         "candlesDir": "./candles_data"
+    },
+    "delay-management": {
+        "enabled": false,
+        "deduplicate_ticks": true,
+        "max_staleness_ms": 30000,
+        "market_open_max_staleness_ms": 10000
     }
 }

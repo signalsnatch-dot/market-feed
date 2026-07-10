@@ -101,6 +101,7 @@ class PriceBarBuilder extends EventEmitter {
         this.activeBars = new Map();
         this.completedBars = [];
         this.lastExchangeVolumeToday = new Map();
+        this.lastProcessedTick = new Map(); // per-instrument { ltp, volume_today } for dedup
         this.tickSizeMap = new Map();
         this.instrumentTargetsMap = new Map();
         
@@ -277,6 +278,19 @@ class PriceBarBuilder extends EventEmitter {
         const { instrument_key, ltp, last_traded_quantity, volume_today, exchange_timestamp, timestamp } = tickData;
         if (!ltp) return;
         const price = parseFloat(ltp);
+        const currentVolToday = parseInt(volume_today, 10);
+
+        // ── Phase 1 + Phase 3: Dedup + volume_today tracking (gated by delay-management.enabled) ──
+        try {
+            const config = require('./config.json');
+            if (config['delay-management'] && config['delay-management'].enabled && config['delay-management'].deduplicate_ticks) {
+                const last = this.lastProcessedTick.get(instrument_key);
+                if (last && last.ltp === price && last.volume_today === currentVolToday) {
+                    return; // Exact duplicate — same price and cumulative volume
+                }
+                this.lastProcessedTick.set(instrument_key, { ltp: price, volume_today: currentVolToday });
+            }
+        } catch (e) { /* config not available, skip dedup */ }
         
         let exchangeTimeMs = Number(exchange_timestamp);
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
@@ -326,9 +340,8 @@ class PriceBarBuilder extends EventEmitter {
             bar.lastUpdateTime = currentTime;
             bar.lastUpdateTimestamp = exchangeTimeISO || receiveTimeISO;
 
-            // Calculate tick volume
+            // Calculate tick volume (Phase 3: use volume_today tracking)
             let tickVolume = 0;
-            const currentVolToday = parseInt(volume_today, 10);
             const lotMultiplier = getLotMultiplier(instrument_key);
 
             if (!isNaN(currentVolToday) && currentVolToday > 0) {
@@ -398,7 +411,6 @@ class PriceBarBuilder extends EventEmitter {
         }
 
         // Store cumulative volume baseline after parallel streams complete
-        const currentVolToday = parseInt(volume_today, 10);
         if (!isNaN(currentVolToday) && currentVolToday > 0) {
             this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
         }
