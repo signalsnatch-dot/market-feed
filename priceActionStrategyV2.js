@@ -2116,8 +2116,183 @@ const INDIVIDUAL_FIX_STRATEGIES = generateIndividualFixStrategies();
 console.error(`Generated ${Object.keys(INDIVIDUAL_FIX_STRATEGIES).length} individual fix strategies (V251-V${251 + INDIVIDUAL_FIX_ORDER.length * 50 - 1})`);
 
 // ============================================================
+// COMBINED FIX PROFILES — V51-V100: best winning fix combination per base version
+// Each version applies the UNION of all winning batch fix profiles for that base.
+// Generated from Section C WR Delta analysis.
 // ============================================================
-// BROOKS STRATEGIES (V851-V904)
+
+const COMBINED_FIX_PROFILES = {
+  "combined_v1": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true},                        // V51: Double Traps (Leg Quality)
+  "combined_v2": {},                                                                                         // V52: EMA Pullback (no winners)
+  "combined_v3": {},                                                                                         // V53: High Confidence (no winners)
+  "combined_v4": {},                                                                                         // V54: Aggressive (no winners)
+  "combined_v5": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V55: Wade Structural (Entry/Stop + Exit Mgmt + Trend)
+  "combined_v6": {"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},                        // V56: Double Traps Strict (Exit Mgmt + Trend)
+  "combined_v7": {},                                                                                         // V57: EMA Pullback Strict (no winners)
+  "combined_v8": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V58: High Confidence Strict (all 4)
+  "combined_v9": {"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false},                // V59: Aggressive Strict (Trend)
+  "combined_v10": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V60: Wade Structural Strict (all 4)
+  "combined_v11": {},                                                                                        // V61: Double Traps Calibrated (no winners)
+  "combined_v12": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true},                        // V62: EMA Pullback Calibrated (Leg Quality)
+  "combined_v13": {},                                                                                        // V63: High Confidence Calibrated (no winners)
+  "combined_v14": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true},                        // V64: Aggressive Calibrated (Leg Quality)
+  "combined_v15": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V65: Wade Structural Calibrated (Entry/Stop + Exit Mgmt + Trend)
+  "combined_v16": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V66-V70: Strict-Calibrated (all 4)
+  "combined_v17": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v18": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v19": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v20": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v21": {},                                                                                        // V71: Double Traps Structural-Calibrated (no winners — already optimal)
+  "combined_v22": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V72-V80: Strict-Structural-Calibrated (all 4)
+  "combined_v24": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v25": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V75: Wade Structural Structural-Calibrated (all 4)
+  "combined_v26": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v27": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v28": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v29": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v30": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v31": {"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},  // V81: Double Traps Upgraded (Exit Mgmt + Leg Quality + Trend)
+  "combined_v32": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},   // V82: (all 4)
+  "combined_v33": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},   // V83: High Confidence Upgraded (Exit Mgmt + Leg Quality)
+  "combined_v34": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},   // V84-V85: (all 4)
+  "combined_v35": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v36": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V86: (Entry/Stop + Exit Mgmt + Leg Quality)
+  "combined_v37": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V87
+  "combined_v38": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true}, // V88: High Confidence Strict Upgraded (Leg Quality)
+  "combined_v39": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V89
+  "combined_v41": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true}, // V91: Double Traps Structural-Calibrated Upgraded (Leg Quality)
+  "combined_v42": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V92
+  "combined_v43": {"useABRNormalizedSlope":true,"enableADXFilter":true,"requireGapBar":false,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V93: High Confidence SC Upgraded (Exit Mgmt + Trend)
+  "combined_v44": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V94-V97: Entry/Stop + Exit Mgmt
+  "combined_v45": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v46": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v47": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true},
+  "combined_v48": {"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true}, // V98: High Confidence SSU (Leg Quality)
+  "combined_v49": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V99
+  "combined_v50": {"stopOffsetRatio":0.3,"triggerOffsetRatio":0.08,"triggerOffsetRatioV2":0.08,"enableATRStopFloor":true,"slippageTicks":1,"minSecondLegDepthRatio":0.6,"useStructuralPivotDetection":true,"enableTrailingStop":true,"enableTimeExit":true,"useBarPathExitResolution":true}, // V100
+};
+
+// ============================================================
+// V51-V100: BASE + COMBINED FIXES (best winning fix combination per version)
+// ============================================================
+
+const COMBINED_FIX_LABELS = {
+    "combined_v1": "(Leg Quality)", "combined_v2": "(Base)", "combined_v3": "(Base)", "combined_v4": "(Base)",
+    "combined_v5": "(Entry/Stop + Trend + Exit Mgmt)", "combined_v6": "(Trend + Exit Mgmt)", "combined_v7": "(Base)",
+    "combined_v8": "(All 4 Fixes)", "combined_v9": "(Trend)", "combined_v10": "(All 4 Fixes)",
+    "combined_v11": "(Base)", "combined_v12": "(Leg Quality)", "combined_v13": "(Base)", "combined_v14": "(Leg Quality)",
+    "combined_v15": "(Entry/Stop + Trend + Exit Mgmt)", "combined_v16": "(All 4 Fixes)", "combined_v17": "(All 4 Fixes)",
+    "combined_v18": "(All 4 Fixes)", "combined_v19": "(All 4 Fixes)", "combined_v20": "(All 4 Fixes)",
+    "combined_v21": "(Base - Already Optimal)", "combined_v22": "(All 4 Fixes)",
+    "combined_v24": "(All 4 Fixes)", "combined_v25": "(All 4 Fixes)",
+    "combined_v26": "(All 4 Fixes)", "combined_v27": "(All 4 Fixes)", "combined_v28": "(All 4 Fixes)",
+    "combined_v29": "(All 4 Fixes)", "combined_v30": "(All 4 Fixes)",
+    "combined_v31": "(Trend + Leg Quality + Exit Mgmt)", "combined_v32": "(All 4 Fixes)",
+    "combined_v33": "(Leg Quality + Exit Mgmt)", "combined_v34": "(All 4 Fixes)", "combined_v35": "(All 4 Fixes)",
+    "combined_v36": "(Entry/Stop + Leg Quality + Exit Mgmt)", "combined_v37": "(Entry/Stop + Leg Quality + Exit Mgmt)",
+    "combined_v38": "(Leg Quality)", "combined_v39": "(Entry/Stop + Leg Quality + Exit Mgmt)",
+    "combined_v41": "(Leg Quality)", "combined_v42": "(Entry/Stop + Leg Quality + Exit Mgmt)",
+    "combined_v43": "(Trend + Exit Mgmt)", "combined_v44": "(Entry/Stop + Exit Mgmt)", "combined_v45": "(Entry/Stop + Exit Mgmt)",
+    "combined_v46": "(Entry/Stop + Exit Mgmt)", "combined_v47": "(Entry/Stop + Exit Mgmt)",
+    "combined_v48": "(Leg Quality)", "combined_v49": "(Entry/Stop + Exit Mgmt)", "combined_v50": "(Entry/Stop + Leg Quality + Exit Mgmt)",
+};
+
+function generateCombinedFixStrategies() {
+    const strategies = {};
+    // Bases where NO batch fix improves WR — skip combined fix version
+    const SKIP_BASES = new Set([2, 3, 4, 7, 11, 13, 21, 23]);
+
+    for (let i = 0; i < V1_V50_TEMPLATES.length; i++) {
+        const origV = i + 1;
+        if (SKIP_BASES.has(origV)) continue;
+        
+        const tpl = V1_V50_TEMPLATES[i];
+        const verNum = origV + 50; // V51-V100
+        const profileKey = 'combined_v' + origV;
+        const fixParams = COMBINED_FIX_PROFILES[profileKey];
+        const labelSuffix = COMBINED_FIX_LABELS[profileKey] || '(Combined Fixes)';
+        const label = `V${verNum}: ${tpl.suffix} ${labelSuffix}`;
+
+        strategies[label] = (candles, params = {}) => {
+            // Apply combined fix parameters directly as overrides (not via fix_profile)
+            return twoLeggedPullbackCoreV2(candles, {
+                ...tpl.overrides,
+                ...fixParams,
+                ...params,
+            });
+        };
+    }
+
+    return strategies;
+}
+
+const COMBINED_FIX_STRATEGIES = generateCombinedFixStrategies();
+console.error('Generated ' + Object.keys(COMBINED_FIX_STRATEGIES).length + ' combined fix strategies (V51-V100, 8 bases excluded)');
+
+// ============================================================
+// SUBSET FALLBACK PROFILES — V115-V133: smaller fix combos
+// For bases with 3+ winning profiles, test subsets in case full combination reduces trades
+// ============================================================
+
+const SUBSET_FALLBACKS = [
+    // V5: Wade Structural — 3 winning profiles (Entry/Stop, Trend, Exit Mgmt)
+    { base: 5, ver: 115, label: '(Exit Mgmt)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    { base: 5, ver: 116, label: '(Trend)', overrides: { useABRNormalizedSlope: true, enableADXFilter: true, requireGapBar: false } },
+    { base: 5, ver: 117, label: '(Exit Mgmt + Trend)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true, useABRNormalizedSlope: true, enableADXFilter: true, requireGapBar: false } },
+    // V8: High Confidence Strict — 4 winning profiles
+    { base: 8, ver: 118, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    { base: 8, ver: 119, label: '(Leg Quality + Exit Mgmt)', overrides: { minSecondLegDepthRatio: 0.60, useStructuralPivotDetection: true, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    { base: 8, ver: 120, label: '(Entry/Stop + Leg Quality + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, minSecondLegDepthRatio: 0.60, useStructuralPivotDetection: true, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V15: Wade Structural Calibrated — 3 winning profiles
+    { base: 15, ver: 121, label: '(Exit Mgmt)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    { base: 15, ver: 122, label: '(Trend)', overrides: { useABRNormalizedSlope: true, enableADXFilter: true, requireGapBar: false } },
+    // V25: Wade Structural SC — 4 winning profiles
+    { base: 25, ver: 123, label: '(Exit Mgmt)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    { base: 25, ver: 124, label: '(Trend)', overrides: { useABRNormalizedSlope: true, enableADXFilter: true, requireGapBar: false } },
+    { base: 25, ver: 125, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V16-V20: Strict-Calibrated (all 4) — test without Trend
+    { base: 16, ver: 126, label: '(Entry/Stop + Exit Mgmt + Leg Quality)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, minSecondLegDepthRatio: 0.60, useStructuralPivotDetection: true, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V26-V30: Strict-SC (all 4) — test Exit Mgmt + Trend only
+    { base: 26, ver: 127, label: '(Exit Mgmt + Trend)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true, useABRNormalizedSlope: true, enableADXFilter: true, requireGapBar: false } },
+    // V31: Double Traps Upgraded — Leg Quality only
+    { base: 31, ver: 128, label: '(Leg Quality)', overrides: { minSecondLegDepthRatio: 0.60, useStructuralPivotDetection: true } },
+    // V36-V37: Strict Upgraded — Entry/Stop + Exit Mgmt
+    { base: 36, ver: 129, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V10: Wade Structural Strict — entry/stop + exit mgmt
+    { base: 10, ver: 130, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V18: HC Strict-Calibrated — entry/stop + exit mgmt
+    { base: 18, ver: 131, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V36 Base: Double Traps Strict Upgraded — Exit Mgmt only
+    { base: 36, ver: 132, label: '(Exit Mgmt)', overrides: { enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+    // V50: Wade SSU — Entry/Stop + Exit Mgmt
+    { base: 50, ver: 133, label: '(Entry/Stop + Exit Mgmt)', overrides: { stopOffsetRatio: 0.30, triggerOffsetRatio: 0.08, triggerOffsetRatioV2: 0.08, enableATRStopFloor: true, slippageTicks: 1, enableTrailingStop: true, enableTimeExit: true, useBarPathExitResolution: true } },
+];
+
+function generateSubsetFallbackStrategies() {
+    const strategies = {};
+
+    for (const fb of SUBSET_FALLBACKS) {
+        const tpl = V1_V50_TEMPLATES[fb.base - 1]; // 0-indexed
+        if (!tpl) continue;
+        const label = `V${fb.ver}: ${tpl.suffix} ${fb.label}`;
+
+        strategies[label] = (candles, params = {}) => {
+            return twoLeggedPullbackCoreV2(candles, {
+                ...tpl.overrides,
+                ...fb.overrides,
+                ...params,
+            });
+        };
+    }
+
+    return strategies;
+}
+
+const SUBSET_FALLBACK_STRATEGIES = generateSubsetFallbackStrategies();
+console.error('Generated ' + Object.keys(SUBSET_FALLBACK_STRATEGIES).length + ' subset fallback strategies (V115-V133)');
+
+// ============================================================
+// BROOKS BASE PARAM TEMPLATES (used by both V851+ and V101-V114)
 // ============================================================
 
 const BROOKS_BASE_PARAMS = [
@@ -2168,68 +2343,314 @@ function generateBrooksStrategies() {
 const BROOKS_STRATEGIES = generateBrooksStrategies();
 console.error('Generated ' + Object.keys(BROOKS_STRATEGIES).filter(k => BROOKS_STRATEGIES[k] !== undefined).length + ' Brooks strategies (V851-V' + (851 + 3 + 15 + 3 * INDIVIDUAL_FIX_ORDER.length - 1) + ')');
 
-
-// BUILD FINAL EXPORT MAP
+// ============================================================
+// BROOKS V101-V114: remapped Brooks strategies for final 106-set
+// (Must be after BROOKS_BASE_PARAMS is defined)
 // ============================================================
 
-// Re-export V1–V50 unchanged from original
+const BROOKS_V101_V114 = [
+    { ver: 101, base: 0, label: '(Original)' },
+    { ver: 102, base: 1, label: '(Original)' },
+    { ver: 103, base: 2, label: '(Original)' },
+    { ver: 104, base: 2, label: '(Exit Mgmt)', fix: 'exit_mgmt' },
+    { ver: 105, base: 2, label: '(Leg Quality)', fix: 'leg_quality' },
+    { ver: 106, base: 2, label: '(Stop Wider)', fix: 'stop_wider' },
+    { ver: 107, base: 2, label: '(Entry/Stop)', fix: 'entry_stop' },
+    { ver: 108, base: 0, label: '(Exit Mgmt)', fix: 'exit_mgmt' },
+    { ver: 109, base: 1, label: '(Exit Mgmt)', fix: 'exit_mgmt' },
+    { ver: 110, base: 2, label: '(ABR Slope)', fix: 'abr_slope' },
+    { ver: 111, base: 2, label: '(Bar Path Exit)', fix: 'bar_path' },
+    { ver: 112, base: 0, label: '(Leg Quality)', fix: 'leg_quality' },
+    { ver: 113, base: 1, label: '(Leg Quality)', fix: 'leg_quality' },
+    { ver: 114, base: 2, label: '(Trailing Stop)', fix: 'trailing' },
+];
+
+function generateBrooks101to114() {
+    const strategies = {};
+
+    for (const entry of BROOKS_V101_V114) {
+        const bp = BROOKS_BASE_PARAMS[entry.base];
+        if (!bp) continue;
+        const label = `V${entry.ver}: ${bp.suffix} ${entry.label}`;
+
+        if (entry.fix) {
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, {
+                    ...bp.overrides,
+                    fix_profile: entry.fix,
+                    ...params,
+                });
+            };
+        } else {
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, {
+                    ...bp.overrides,
+                    ...params,
+                });
+            };
+        }
+    }
+
+    return strategies;
+}
+
+const BROOKS_101_114_STRATEGIES = generateBrooks101to114();
+console.error('Generated ' + Object.keys(BROOKS_101_114_STRATEGIES).length + ' Brooks V101-V114 strategies');
+
+
+// ============================================================
+// NEW COMBINATORIAL FIX GENERATOR — V901-V950
+// Combines individual fixes NOT covered by existing group/batch fixes
+// Each combo applies a union of 2-3 positive individual fix profiles
+// ============================================================
+
+const COMBINATORIAL_COMBOS = [
+    // ABR Slope + ADX Filter (for Double Traps / High Confidence families)
+    { profiles: ["abr_slope", "adx_filter"], label: "(ABR Slope + ADX Filter)", note: "2-fix combo — beats Group Trend for Double Traps" },
+    // ATR Floor + ADX Filter (for Struct-Cal High Conf / Wade families)
+    { profiles: ["atr_floor", "adx_filter"], label: "(ATR Floor + ADX Filter)", note: "2-fix combo — strongest for Struct-Cal" },
+    // ATR Floor + ABR Slope (for Struct-Cal families)
+    { profiles: ["atr_floor", "abr_slope"], label: "(ATR Floor + ABR Slope)", note: "2-fix combo — both positive for Struct-Cal" },
+    // ATR Floor + ABR Slope + ADX Filter — Triple combo
+    { profiles: ["atr_floor", "abr_slope", "adx_filter"], label: "(ATR Floor + ABR Slope + ADX Filter)", note: "Triple combo — maximum positive fixes" },
+];
+
+function buildCombinatorialProfile(profiles) {
+    const merged = {};
+    for (const pName of profiles) {
+        const profile = FIX_PROFILES[pName];
+        if (profile) Object.assign(merged, profile);
+    }
+    return merged;
+}
+
+function generateCombinatorialFixStrategies() {
+    const strategies = {};
+    // Only generate combinatorials for specific base families (1-5, 11-15, 21-25, 31-35, 41-45)
+    // i.e., skip strict versions (6-10, 16-20, 26-30, 36-40, 46-50)
+    const TARGET_INDICES = [0,1,2,3,4, 10,11,12,13,14, 20,21,22,23,24, 30,31,32,33,34, 40,41,42,43,44];
+
+    for (let comboIdx = 0; comboIdx < COMBINATORIAL_COMBOS.length; comboIdx++) {
+        const combo = COMBINATORIAL_COMBOS[comboIdx];
+        const baseVersion = 901 + comboIdx * 10; // V901, V911, V921, V931
+        const mergedParams = buildCombinatorialProfile(combo.profiles);
+
+        for (let ti = 0; ti < TARGET_INDICES.length; ti++) {
+            const i = TARGET_INDICES[ti];
+            if (i >= V1_V50_TEMPLATES.length) continue;
+            const tpl = V1_V50_TEMPLATES[i];
+            const verNum = baseVersion + (i % 100);
+            const label = `V${verNum}: ${tpl.suffix} ${combo.label}`;
+            strategies[label] = (candles, params = {}) => {
+                return twoLeggedPullbackCoreV2(candles, {
+                    ...tpl.overrides,
+                    ...mergedParams,
+                    ...params,
+                });
+            };
+        }
+    }
+    return strategies;
+}
+
+const COMBINATORIAL_FIX_STRATEGIES = generateCombinatorialFixStrategies();
+console.error(`Generated ${Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} combinatorial fix strategies (V901-V${901 + COMBINATORIAL_COMBOS.length * 10})`);
+
+// ============================================================
+// INSTRUMENT-PINDEX ANNOTATIONS for top-performing versions
+// Appended to version name for live-trading reference
+// ============================================================
+const INSTRUMENT_ANNOTATIONS = {
+    "V55: Wade Structural (Entry/Stop + Trend + Exit Mgmt)": " [SilverMini-p1, RelianceFut-p1, GoldPetal-p8]",
+    "V92: EMA Pullback (Structural-Calibrated Upgraded) (Entry/Stop + Leg Quality + Exit Mgmt)": " [CrudeOil-p9, InfosysFut-p3, ApolloHospFut-p3]",
+    "V94: Aggressive (Structural-Calibrated Upgraded) (Entry/Stop + Exit Mgmt)": " [CrudeOil-p6, AdaniEnt-p2]",
+    "V125: Wade Structural (Structural-Calibrated) (Entry/Stop + Exit Mgmt)": " [ZincFut-p3, CrudeOilMini-p4, BajajFin-p1]",
+    "V371: Double Traps (Structural-Calibrated) (ATR Floor)": " [TataSteel-p9, SAILFut-p10, JSWSteelFut-p1, BhartiAirtelFut-p3]",
+    "V373: High Confidence (Structural-Calibrated) (ATR Floor)": " [TataSteel-p9, AdaniEnt-p9, TCS-p3, HindalcoFut-p9, KotakBankFut-p5]",
+    "V375: Wade Structural (Structural-Calibrated) (ATR Floor)": " [ZincFut-p3, CrudeOilMini-p4, BajajFin-p1, NiftyBankFut-p9, SunPharma-p5]",
+    "V376: Double Traps (Strict Structural-Calibrated) (ATR Floor)": " [GoldPetal-p6, TRENT-p8, Reliance-p1]",
+    "V455: Wade Structural (ABR Slope)": " [PAYTM-p1, SilverMini-p10, Gold-p9]",
+    "V523: High Confidence (Structural-Calibrated) (ADX Filter)": " [HDFCBank-p5, GAILFut-p3, TRENT-p5, TRENTFut-p3, AdaniEntFut-p3]",
+    "V525: Wade Structural (Structural-Calibrated) (ADX Filter)": " [RelianceFut-p5, ICICIBank-p5]",
+};
+
+// ============================================================
+// VERSION WHITELIST — keep ~122 versions (all V1-V50 + best fixes)
+// ============================================================
+const KEEP_VERSIONS = new Set([
+
+    // === V1-V50: ALL BASE VERSIONS (including strict for future data) ===
+    "V1: Double Traps", "V2: EMA Pullback", "V3: High Confidence", "V4: Aggressive", "V5: Wade Structural",
+    "V6: Double Traps (Strict)", "V7: EMA Pullback (Strict)", "V8: High Confidence (Strict)", "V9: Aggressive (Strict)", "V10: Wade Structural (Strict)",
+    "V11: Double Traps (Calibrated)", "V12: EMA Pullback (Calibrated)", "V13: High Confidence (Calibrated)", "V14: Aggressive (Calibrated)", "V15: Wade Structural (Calibrated)",
+    "V16: Double Traps (Strict-Calibrated)", "V17: EMA Pullback (Strict-Calibrated)", "V18: High Confidence (Strict-Calibrated)", "V19: Aggressive (Strict-Calibrated)", "V20: Wade Structural (Strict-Calibrated)",
+    "V21: Double Traps (Structural-Calibrated)", "V22: EMA Pullback (Structural-Calibrated)", "V23: High Confidence (Structural-Calibrated)", "V24: Aggressive (Structural-Calibrated)", "V25: Wade Structural (Structural-Calibrated)",
+    "V26: Double Traps (Strict Structural-Calibrated)", "V27: EMA Pullback (Strict Structural-Calibrated)", "V28: High Confidence (Strict Structural-Calibrated)", "V29: Aggressive (Strict Structural-Calibrated)", "V30: Wade Structural (Strict Structural-Calibrated)",
+    "V31: Double Traps (Upgraded)", "V32: EMA Pullback (Upgraded)", "V33: High Confidence (Upgraded)", "V34: Aggressive (Upgraded)", "V35: Wade Structural (Upgraded)",
+    "V36: Double Traps (Strict Upgraded)", "V37: EMA Pullback (Strict Upgraded)", "V38: High Confidence (Strict Upgraded)", "V39: Aggressive (Strict Upgraded)", "V40: Wade Structural (Strict Upgraded)",
+    "V41: Double Traps (Structural-Calibrated Upgraded)", "V42: EMA Pullback (Structural-Calibrated Upgraded)", "V43: High Confidence (Structural-Calibrated Upgraded)", "V44: Aggressive (Structural-Calibrated Upgraded)", "V45: Wade Structural (Structural-Calibrated Upgraded)",
+    "V46: Double Traps (Strict Structural-Calibrated Upgraded)", "V47: EMA Pullback (Strict Structural-Calibrated Upgraded)", "V48: High Confidence (Strict Structural-Calibrated Upgraded)", "V49: Aggressive (Strict Structural-Calibrated Upgraded)", "V50: Wade Structural (Strict Structural-Calibrated Upgraded)",
+
+    // === V51-V100: Best Combined Fix Winners (8) ===
+    "V55: Wade Structural (Entry/Stop + Trend + Exit Mgmt)",
+    "V60: Wade Structural (Strict) (All 4 Fixes)",
+    "V65: Wade Structural (Calibrated) (Entry/Stop + Trend + Exit Mgmt)",
+    "V70: Wade Structural (Strict-Calibrated) (All 4 Fixes)",
+    "V83: High Confidence (Upgraded) (Leg Quality + Exit Mgmt)",
+    "V90: Wade Structural (Strict Upgraded) (Combined Fixes)",
+    "V92: EMA Pullback (Structural-Calibrated Upgraded) (Entry/Stop + Leg Quality + Exit Mgmt)",
+    "V94: Aggressive (Structural-Calibrated Upgraded) (Entry/Stop + Exit Mgmt)",
+
+    // === V101-V250: Best Batch Clones (15) ===
+    "V101: Double Traps (Trend)",
+    "V103: High Confidence (Trend)",
+    "V105: Wade Structural (Trend)",
+    "V111: Double Traps (Calibrated) (Trend)",
+    "V125: Wade Structural (Structural-Calibrated) (Entry/Stop + Exit Mgmt)",
+    "V153: High Confidence (Leg Quality)",
+    "V163: High Confidence (Calibrated) (Leg Quality)",
+    "V171: Double Traps (Structural-Calibrated) (Leg Quality)",
+    "V203: High Confidence (Exit Mgmt)",
+    "V205: Wade Structural (Exit Mgmt)",
+    "V225: Wade Structural (Structural-Calibrated) (Exit Mgmt)",
+    "V233: High Confidence (Upgraded) (Exit Mgmt)",
+    "V115: Wade Structural (Exit Mgmt)",             // subset fallback
+    "V124: Wade Structural (Structural-Calibrated) (Trend)",  // subset fallback
+    "V123: Wade Structural (Structural-Calibrated) (Exit Mgmt)", // subset fallback
+
+    // === V251-V350 Entry/Stop: Wade variants only (3, rest redundant) ===
+    "V255: Wade Structural (Stop Wider)",
+    "V305: Wade Structural (Trigger Wider)",
+
+    // === V351-V400 ATR Floor (12) ===
+    "V351: Double Traps (ATR Floor)",
+    "V353: High Confidence (ATR Floor)",
+    "V355: Wade Structural (ATR Floor)",
+    "V356: Double Traps (Strict) (ATR Floor)",
+    "V361: Double Traps (Calibrated) (ATR Floor)",
+    "V365: Wade Structural (Calibrated) (ATR Floor)",
+    "V371: Double Traps (Structural-Calibrated) (ATR Floor)",
+    "V373: High Confidence (Structural-Calibrated) (ATR Floor)",
+    "V375: Wade Structural (Structural-Calibrated) (ATR Floor)",
+    "V376: Double Traps (Strict Structural-Calibrated) (ATR Floor)",
+    "V381: Double Traps (Upgraded) (ATR Floor)",
+    "V391: Double Traps (Structural-Calibrated Upgraded) (ATR Floor)",
+
+    // === V451-V500 ABR Slope (6) ===
+    "V451: Double Traps (ABR Slope)",
+    "V453: High Confidence (ABR Slope)",
+    "V455: Wade Structural (ABR Slope)",
+    "V461: Double Traps (Calibrated) (ABR Slope)",
+    "V475: Wade Structural (Structural-Calibrated) (ABR Slope)",
+    "V495: Wade Structural (Structural-Calibrated Upgraded) (ABR Slope)",
+
+    // === V501-V550 ADX Filter (8) ===
+    "V501: Double Traps (ADX Filter)",
+    "V503: High Confidence (ADX Filter)",
+    "V505: Wade Structural (ADX Filter)",
+    "V511: Double Traps (Calibrated) (ADX Filter)",
+    "V521: Double Traps (Structural-Calibrated) (ADX Filter)",
+    "V523: High Confidence (Structural-Calibrated) (ADX Filter)",
+    "V525: Wade Structural (Structural-Calibrated) (ADX Filter)",
+    "V531: Double Traps (Upgraded) (ADX Filter)",
+
+    // === V651-V700 Pivot Structural (3) ===
+    "V651: Double Traps (Pivot Structural)",
+    "V653: High Confidence (Pivot Structural)",
+    "V671: Double Traps (Structural-Calibrated) (Pivot Structural)",
+]);
+
+// ============================================================
+// BUILD FINAL_EXPORT_MAP (~122 versions)
+// ============================================================
+
 const FINAL_STRATEGIES = {};
 
-// Copy V1-V50 from original
+// Step 1: Copy V1-V50 from original
 for (const [key, fn] of Object.entries(original.STRATEGIES)) {
-    const versionMatch = key.match(/^V(\d+):/);
-    if (versionMatch) {
-        const vNum = parseInt(versionMatch[1], 10);
+    const vMatch = key.match(/^V(\d+):/);
+    if (vMatch) {
+        const vNum = parseInt(vMatch[1], 10);
         if (vNum >= 1 && vNum <= 50) {
-            FINAL_STRATEGIES[key] = fn;
+            const baseKey = key.split(" [")[0]; // strip any existing annotation
+            FINAL_STRATEGIES[baseKey] = fn;
         }
     }
 }
 
-// Rename original V51-V53 → V301-V303 (Brooks)
-const renameMap = {
+// Step 2: From COMBINED_FIX_STRATEGIES — only whitelisted V51-V100
+for (const [key, fn] of Object.entries(COMBINED_FIX_STRATEGIES)) {
+    const baseKey = key.split(" [")[0];
+    if (KEEP_VERSIONS.has(baseKey)) {
+        const annotatedKey = INSTRUMENT_ANNOTATIONS[baseKey] ? baseKey + INSTRUMENT_ANNOTATIONS[baseKey] : baseKey;
+        FINAL_STRATEGIES[annotatedKey] = fn;
+    }
+}
+
+// Step 3: From batch strategies V2 — only whitelisted V101-V250
+for (const [key, fn] of Object.entries(STRATEGIES_V2)) {
+    const baseKey = key.split(" [")[0];
+    if (KEEP_VERSIONS.has(baseKey)) {
+        const annotatedKey = INSTRUMENT_ANNOTATIONS[baseKey] ? baseKey + INSTRUMENT_ANNOTATIONS[baseKey] : baseKey;
+        FINAL_STRATEGIES[annotatedKey] = fn;
+    }
+}
+
+// Step 4: From individual fix strategies — only whitelisted V251+
+for (const [key, fn] of Object.entries(INDIVIDUAL_FIX_STRATEGIES)) {
+    const baseKey = key.split(" [")[0];
+    if (KEEP_VERSIONS.has(baseKey)) {
+        const annotatedKey = INSTRUMENT_ANNOTATIONS[baseKey] ? baseKey + INSTRUMENT_ANNOTATIONS[baseKey] : baseKey;
+        FINAL_STRATEGIES[annotatedKey] = fn;
+    }
+}
+
+// Step 5: From subset fallback — only whitelisted V115-V133
+for (const [key, fn] of Object.entries(SUBSET_FALLBACK_STRATEGIES)) {
+    const baseKey = key.split(" [")[0];
+    if (KEEP_VERSIONS.has(baseKey)) {
+        const annotatedKey = INSTRUMENT_ANNOTATIONS[baseKey] ? baseKey + INSTRUMENT_ANNOTATIONS[baseKey] : baseKey;
+        FINAL_STRATEGIES[annotatedKey] = fn;
+    }
+}
+
+// Step 6: All combinatorial fixes (V901-V950)
+for (const [key, fn] of Object.entries(COMBINATORIAL_FIX_STRATEGIES)) {
+    FINAL_STRATEGIES[key] = fn;
+}
+
+// Step 7: Brooks strategies (minimal set for baseline comparison)
+const BROOKS_RENAME = {
     "V51: Brooks Structural Pure": "V851: Brooks Structural Pure (Original)",
     "V52: Brooks Volume-Optimized": "V852: Brooks Volume-Optimized (Original)",
     "V53: Brooks Selective (Win-Rate Focus)": "V853: Brooks Selective (Win-Rate Focus) (Original)",
 };
-
-for (const [origName, newName] of Object.entries(renameMap)) {
+for (const [origName, newName] of Object.entries(BROOKS_RENAME)) {
     if (original.STRATEGIES[origName]) {
         FINAL_STRATEGIES[newName] = original.STRATEGIES[origName];
     }
 }
-
-// Add all V2 batch strategies (V51–V250)
-for (const [key, fn] of Object.entries(STRATEGIES_V2)) {
-    FINAL_STRATEGIES[key] = fn;
-}
-
-// Add all individual fix strategies (V251–V850)
-for (const [key, fn] of Object.entries(INDIVIDUAL_FIX_STRATEGIES)) {
-    FINAL_STRATEGIES[key] = fn;
-}
-
-// Add Brooks strategies (V851–V306)
-for (const [key, fn] of Object.entries(BROOKS_STRATEGIES)) {
-    if (fn !== undefined) {
+// Also add select Brooks 101-114
+const KEEP_BROOKS_101_114 = ["V101: Brooks Structural Pure (Original)", "V108: Brooks Structural Pure (Exit Mgmt)", "V113: Brooks Volume-Optimized (Leg Quality)"];
+for (const [key, fn] of Object.entries(BROOKS_101_114_STRATEGIES)) {
+    if (KEEP_BROOKS_101_114.includes(key)) {
         FINAL_STRATEGIES[key] = fn;
     }
 }
 
-// Apply useRatios and useStructuralRules flags automatically for original V1-V50
+console.error(`FINAL_STRATEGIES: ${Object.keys(FINAL_STRATEGIES).length} versions selected from ${Object.keys(original.STRATEGIES).length + Object.keys(STRATEGIES_V2).length + Object.keys(INDIVIDUAL_FIX_STRATEGIES).length + Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} total`);
+
+// Step 8: Apply useRatios/useStructuralRules flags for V1-V50 in FINAL_STRATEGIES
 Object.keys(FINAL_STRATEGIES).forEach(key => {
-    const versionMatch = key.match(/^V(\d+):/);
-    const versionNum = versionMatch ? parseInt(versionMatch[1], 10) : 0;
-    const isFixed = versionNum >= 51;
-    // Skip batch-generated and Brooks strategies — they wrap correctly already
+    const vMatch = key.match(/^V(\d+):/);
+    const vNum = vMatch ? parseInt(vMatch[1], 10) : 0;
+    const isFixed = vNum >= 51;
     if (isFixed) return;
 
-    const isCalibrated = key.includes("(Calibrated)") ||
-        key.includes("-Calibrated)") ||
-        key.includes("Structural-Calibrated");
+    const isCalibrated = key.includes("(Calibrated)") || key.includes("-Calibrated)") || key.includes("Structural-Calibrated");
     const isStructural = key.includes("Structural-Calibrated");
     const isBrooksTrend = key.includes("Upgraded");
-    const isStrictLegInit = versionNum >= 10;
+    const isStrictLegInit = vNum >= 10;
 
     const originalFunc = FINAL_STRATEGIES[key];
     FINAL_STRATEGIES[key] = (candles, params = {}) => {

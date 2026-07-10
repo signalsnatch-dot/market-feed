@@ -7,18 +7,7 @@
                 150,
                 250
             ],
-            "volumePerBar": [
-                725,
-                766,
-                812,
-                857,
-                914,
-                980,
-                1056,
-                1133,
-                1236,
-                1360
-            ],
+            "volumePerBar": 1308,
             "lotSize": 1,
             "tickSize": 0.1,
             "exchange": "MCX_FO",
@@ -40,18 +29,7 @@
                 200,
                 330
             ],
-            "volumePerBar": [
-                1141,
-                1205,
-                1277,
-                1348,
-                1438,
-                1542,
-                1662,
-                1783,
-                1945,
-                2139
-            ],
+            "volumePerBar": 2110,
             "lotSize": 1,
             "tickSize": 0.1,
             "exchange": "MCX_FO",
@@ -73,18 +51,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                229,
-                242,
-                256,
-                271,
-                289,
-                310,
-                334,
-                358,
-                390,
-                429
-            ],
+            "volumePerBar": 418,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -106,18 +73,7 @@
                 250,
                 400
             ],
-            "volumePerBar": [
-                818,
-                864,
-                916,
-                967,
-                1032,
-                1106,
-                1192,
-                1279,
-                1395,
-                1534
-            ],
+            "volumePerBar": 1328,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -172,18 +128,7 @@
                 110,
                 180
             ],
-            "volumePerBar": [
-                228,
-                241,
-                256,
-                270,
-                288,
-                309,
-                333,
-                357,
-                389,
-                428
-            ],
+            "volumePerBar": 341,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -205,18 +150,7 @@
                 240,
                 400
             ],
-            "volumePerBar": [
-                754,
-                797,
-                845,
-                891,
-                951,
-                1020,
-                1099,
-                1179,
-                1286,
-                1415
-            ],
+            "volumePerBar": 1176,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -238,18 +172,7 @@
                 35,
                 60
             ],
-            "volumePerBar": [
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18
-            ],
+            "volumePerBar": 13,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -271,18 +194,7 @@
                 10,
                 18
             ],
-            "volumePerBar": [
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10
-            ],
+            "volumePerBar": 2,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -304,18 +216,7 @@
                 3,
                 5
             ],
-            "volumePerBar": [
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1
-            ],
+            "volumePerBar": 1,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -337,18 +238,7 @@
                 10,
                 18
             ],
-            "volumePerBar": [
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11
-            ],
+            "volumePerBar": 3,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -370,18 +260,7 @@
                 25,
                 40
             ],
-            "volumePerBar": [
-                44,
-                46,
-                49,
-                52,
-                55,
-                59,
-                64,
-                68,
-                74,
-                82
-            ],
+            "volumePerBar": 64,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -436,18 +315,7 @@
                 300,
                 500
             ],
-            "volumePerBar": [
-                1600,
-                1690,
-                1791,
-                1889,
-                2016,
-                2162,
-                2329,
-                2499,
-                2726,
-                2999
-            ],
+            "volumePerBar": 2596,
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -469,18 +337,7 @@
                 450,
                 750
             ],
-            "volumePerBar": [
-                274,
-                289,
-                306,
-                323,
-                345,
-                370,
-                399,
-                428,
-                466,
-                513
-            ],
+            "volumePerBar": 567,
             "lotSize": 75,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -502,18 +359,7 @@
                 280,
                 460
             ],
-            "volumePerBar": [
-                111,
-                117,
-                124,
-                131,
-                139,
-                150,
-                161,
-                173,
-                189,
-                207
-            ],
+            "volumePerBar": 246,
             "lotSize": 30,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -535,18 +381,7 @@
                 30,
                 50
             ],
-            "volumePerBar": [
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1
-            ],
+            "volumePerBar": 2,
             "lotSize": 40,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -568,18 +403,7 @@
                 140,
                 230
             ],
-            "volumePerBar": [
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                29,
-                31,
-                33,
-                34
-            ],
+            "volumePerBar": 36,
             "lotSize": 120,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -601,18 +425,7 @@
                 170,
                 280
             ],
-            "volumePerBar": [
-                172,
-                182,
-                192,
-                203,
-                217,
-                232,
-                250,
-                268,
-                293,
-                322
-            ],
+            "volumePerBar": 311,
             "lotSize": 500,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -634,18 +447,7 @@
                 170,
                 280
             ],
-            "volumePerBar": [
-                86217,
-                91074,
-                96511,
-                101831,
-                108676,
-                116509,
-                125558,
-                134713,
-                146960,
-                161656
-            ],
+            "volumePerBar": 13134,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -667,18 +469,7 @@
                 250,
                 420
             ],
-            "volumePerBar": [
-                373,
-                395,
-                418,
-                441,
-                471,
-                505,
-                544,
-                584,
-                637,
-                700
-            ],
+            "volumePerBar": 595,
             "lotSize": 650,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -700,18 +491,7 @@
                 250,
                 420
             ],
-            "volumePerBar": [
-                266589,
-                281608,
-                298420,
-                314869,
-                336036,
-                360255,
-                388236,
-                416545,
-                454413,
-                499854
-            ],
+            "volumePerBar": 42475,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -733,18 +513,7 @@
                 170,
                 280
             ],
-            "volumePerBar": [
-                130,
-                137,
-                145,
-                153,
-                164,
-                176,
-                189,
-                203,
-                221,
-                244
-            ],
+            "volumePerBar": 219,
             "lotSize": 700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -766,18 +535,7 @@
                 170,
                 280
             ],
-            "volumePerBar": [
-                89177,
-                94201,
-                99825,
-                105327,
-                112408,
-                120509,
-                129869,
-                139339,
-                152006,
-                167206
-            ],
+            "volumePerBar": 14194,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -799,18 +557,7 @@
                 140,
                 230
             ],
-            "volumePerBar": [
-                87,
-                92,
-                97,
-                102,
-                109,
-                117,
-                126,
-                135,
-                148,
-                162
-            ],
+            "volumePerBar": 157,
             "lotSize": 750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -832,18 +579,7 @@
                 140,
                 230
             ],
-            "volumePerBar": [
-                73241,
-                77368,
-                81987,
-                86506,
-                92321,
-                98975,
-                106662,
-                114440,
-                124843,
-                137328
-            ],
+            "volumePerBar": 11702,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -865,18 +601,7 @@
                 100,
                 170
             ],
-            "volumePerBar": [
-                220,
-                232,
-                246,
-                259,
-                277,
-                297,
-                320,
-                343,
-                374,
-                412
-            ],
+            "volumePerBar": 307,
             "lotSize": 225,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -898,18 +623,7 @@
                 100,
                 170
             ],
-            "volumePerBar": [
-                33649,
-                35545,
-                37667,
-                39743,
-                42415,
-                45472,
-                49004,
-                52577,
-                57357,
-                63092
-            ],
+            "volumePerBar": 4452,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -931,18 +645,7 @@
                 176,
                 290
             ],
-            "volumePerBar": [
-                319,
-                337,
-                357,
-                377,
-                402,
-                431,
-                464,
-                498,
-                543,
-                598
-            ],
+            "volumePerBar": 519,
             "lotSize": 400,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -964,18 +667,7 @@
                 176,
                 290
             ],
-            "volumePerBar": [
-                108141,
-                114234,
-                121054,
-                127726,
-                136313,
-                146137,
-                157487,
-                168971,
-                184332,
-                202765
-            ],
+            "volumePerBar": 14496,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -997,18 +689,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                70,
-                74,
-                79,
-                83,
-                89,
-                95,
-                102,
-                110,
-                120,
-                132
-            ],
+            "volumePerBar": 124,
             "lotSize": 1725,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1030,18 +711,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                84862,
-                89643,
-                94995,
-                100231,
-                106969,
-                114679,
-                123586,
-                132597,
-                144652,
-                159117
-            ],
+            "volumePerBar": 14504,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1063,18 +733,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                66,
-                70,
-                74,
-                78,
-                84,
-                90,
-                97,
-                104,
-                113,
-                125
-            ],
+            "volumePerBar": 140,
             "lotSize": 475,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1096,18 +755,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                43553,
-                46007,
-                48753,
-                51441,
-                54899,
-                58855,
-                63427,
-                68052,
-                74238,
-                81662
-            ],
+            "volumePerBar": 6721,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1129,18 +777,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                80,
-                84,
-                90,
-                94,
-                101,
-                108,
-                116,
-                125,
-                136,
-                150
-            ],
+            "volumePerBar": 148,
             "lotSize": 625,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1162,18 +799,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                39236,
-                41446,
-                43921,
-                46341,
-                49457,
-                53021,
-                57139,
-                61306,
-                66879,
-                73567
-            ],
+            "volumePerBar": 6296,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1195,18 +821,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                76,
-                80,
-                85,
-                90,
-                96,
-                103,
-                111,
-                119,
-                129,
-                142
-            ],
+            "volumePerBar": 143,
             "lotSize": 175,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1228,18 +843,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                12368,
-                13064,
-                13844,
-                14607,
-                15589,
-                16713,
-                18011,
-                19324,
-                21081,
-                23189
-            ],
+            "volumePerBar": 2384,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1261,18 +865,7 @@
                 176,
                 290
             ],
-            "volumePerBar": [
-                61,
-                64,
-                68,
-                72,
-                77,
-                82,
-                89,
-                95,
-                104,
-                114
-            ],
+            "volumePerBar": 107,
             "lotSize": 2750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1294,18 +887,7 @@
                 176,
                 290
             ],
-            "volumePerBar": [
-                201497,
-                212849,
-                225557,
-                237989,
-                253988,
-                272294,
-                293443,
-                314840,
-                343461,
-                377807
-            ],
+            "volumePerBar": 28491,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1327,18 +909,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                26,
-                27,
-                29,
-                30,
-                31,
-                32,
-                34,
-                36,
-                38,
-                40
-            ],
+            "volumePerBar": 37,
             "lotSize": 300,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1360,18 +931,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                59649,
-                63009,
-                66771,
-                70451,
-                75188,
-                80606,
-                86867,
-                93201,
-                101674,
-                111841
-            ],
+            "volumePerBar": 8345,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1393,18 +953,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                92,
-                97,
-                103,
-                108,
-                115,
-                124,
-                133,
-                143,
-                156,
-                172
-            ],
+            "volumePerBar": 170,
             "lotSize": 750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1426,18 +975,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                63064,
-                66617,
-                70594,
-                74485,
-                79493,
-                85222,
-                91841,
-                98538,
-                107496,
-                118246
-            ],
+            "volumePerBar": 10348,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1459,18 +997,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                78,
-                82,
-                87,
-                92,
-                98,
-                106,
-                114,
-                122,
-                133,
-                146
-            ],
+            "volumePerBar": 146,
             "lotSize": 2000,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1492,18 +1019,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                128624,
-                135871,
-                143982,
-                151918,
-                162131,
-                173817,
-                187317,
-                200975,
-                219246,
-                241171
-            ],
+            "volumePerBar": 23869,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1525,18 +1041,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                42,
-                45,
-                47,
-                50,
-                53,
-                57,
-                62,
-                66,
-                72,
-                79
-            ],
+            "volumePerBar": 81,
             "lotSize": 350,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1558,18 +1063,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                12097,
-                12778,
-                13541,
-                14288,
-                15248,
-                16347,
-                17617,
-                18901,
-                20620,
-                22681
-            ],
+            "volumePerBar": 2122,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1591,18 +1085,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                40,
-                42,
-                45,
-                47,
-                50,
-                54,
-                58,
-                62,
-                68,
-                75
-            ],
+            "volumePerBar": 56,
             "lotSize": 675,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1624,18 +1107,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                10396,
-                10982,
-                11638,
-                12279,
-                13105,
-                14049,
-                15140,
-                16244,
-                17721,
-                19493
-            ],
+            "volumePerBar": 1496,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1657,18 +1129,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                47,
-                50,
-                53,
-                56,
-                59,
-                64,
-                69,
-                74,
-                80,
-                88
-            ],
+            "volumePerBar": 85,
             "lotSize": 1350,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1690,18 +1151,7 @@
                 120,
                 200
             ],
-            "volumePerBar": [
-                41384,
-                43716,
-                46326,
-                48879,
-                52165,
-                55925,
-                60269,
-                64663,
-                70542,
-                77596
-            ],
+            "volumePerBar": 6275,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1723,18 +1173,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                81,
-                85,
-                90,
-                95,
-                102,
-                109,
-                118,
-                126,
-                138,
-                152
-            ],
+            "volumePerBar": 147,
             "lotSize": 309,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1756,18 +1195,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                15502,
-                16375,
-                17353,
-                18310,
-                19540,
-                20949,
-                22576,
-                24222,
-                26424,
-                29066
-            ],
+            "volumePerBar": 2418,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1789,18 +1217,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                42,
-                45,
-                47,
-                50,
-                53,
-                57,
-                62,
-                66,
-                72,
-                80
-            ],
+            "volumePerBar": 69,
             "lotSize": 475,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1822,18 +1239,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                15402,
-                16270,
-                17241,
-                18192,
-                19415,
-                20814,
-                22430,
-                24066,
-                26254,
-                28879
-            ],
+            "volumePerBar": 2001,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1855,18 +1261,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                70,
-                74,
-                79,
-                83,
-                89,
-                95,
-                102,
-                110,
-                120,
-                132
-            ],
+            "volumePerBar": 121,
             "lotSize": 700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1888,18 +1283,7 @@
                 160,
                 265
             ],
-            "volumePerBar": [
-                41544,
-                43884,
-                46504,
-                49068,
-                52366,
-                56140,
-                60501,
-                64912,
-                70813,
-                77895
-            ],
+            "volumePerBar": 6431,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1921,18 +1305,7 @@
                 80,
                 140
             ],
-            "volumePerBar": [
-                19,
-                20,
-                21,
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28
-            ],
+            "volumePerBar": 25,
             "lotSize": 125,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1954,18 +1327,7 @@
                 96,
                 160
             ],
-            "volumePerBar": [
-                1897,
-                2004,
-                2124,
-                2241,
-                2391,
-                2564,
-                2763,
-                2964,
-                3234,
-                3557
-            ],
+            "volumePerBar": 318,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1987,18 +1349,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                40,
-                42,
-                43,
-                45,
-                47,
-                49,
-                52,
-                54,
-                57,
-                60
-            ],
+            "volumePerBar": 58,
             "lotSize": 8000,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2020,18 +1371,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                108778,
-                114906,
-                121767,
-                128478,
-                137115,
-                146997,
-                158415,
-                169966,
-                185417,
-                203959
-            ],
+            "volumePerBar": 17630,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2053,18 +1393,7 @@
                 80,
                 140
             ],
-            "volumePerBar": [
-                44,
-                46,
-                48,
-                49,
-                52,
-                54,
-                57,
-                59,
-                63,
-                66
-            ],
+            "volumePerBar": 63,
             "lotSize": 4700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2086,18 +1415,7 @@
                 80,
                 140
             ],
-            "volumePerBar": [
-                126363,
-                133482,
-                141451,
-                149247,
-                159281,
-                170760,
-                184023,
-                197442,
-                215391,
-                236930
-            ],
+            "volumePerBar": 18214,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2119,18 +1437,7 @@
                 140,
                 230
             ],
-            "volumePerBar": [
-                42,
-                43,
-                45,
-                47,
-                49,
-                51,
-                54,
-                57,
-                60,
-                63
-            ],
+            "volumePerBar": 53,
             "lotSize": 12700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2152,18 +1459,7 @@
                 140,
                 230
             ],
-            "volumePerBar": [
-                527822,
-                557558,
-                590845,
-                623412,
-                665322,
-                713273,
-                768673,
-                824722,
-                899696,
-                989666
-            ],
+            "volumePerBar": 69260,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2185,18 +1481,7 @@
                 80,
                 140
             ],
-            "volumePerBar": [
-                38,
-                39,
-                41,
-                42,
-                45,
-                46,
-                49,
-                51,
-                54,
-                57
-            ],
+            "volumePerBar": 61,
             "lotSize": 725,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2251,18 +1536,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                24,
-                25,
-                26,
-                27,
-                29,
-                30,
-                31,
-                33,
-                35,
-                36
-            ],
+            "volumePerBar": 30,
             "lotSize": 1925,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2284,18 +1558,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                35954,
-                37980,
-                40248,
-                42466,
-                45321,
-                48587,
-                52361,
-                56179,
-                61286,
-                67415
-            ],
+            "volumePerBar": 3828,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2317,18 +1580,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                30,
-                31,
-                33
-            ],
+            "volumePerBar": 23,
             "lotSize": 5425,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2350,18 +1602,7 @@
                 110,
                 185
             ],
-            "volumePerBar": [
-                131583,
-                138996,
-                147295,
-                155413,
-                165861,
-                177815,
-                191626,
-                205599,
-                224289,
-                246718
-            ],
+            "volumePerBar": 16475,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2383,18 +1624,7 @@
                 90,
                 150
             ],
-            "volumePerBar": [
-                18,
-                19,
-                20,
-                21,
-                22,
-                23,
-                24,
-                25,
-                26,
-                27
-            ],
+            "volumePerBar": 20,
             "lotSize": 4525,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2416,18 +1646,7 @@
                 90,
                 150
             ],
-            "volumePerBar": [
-                32854,
-                34705,
-                36777,
-                38804,
-                41413,
-                44397,
-                47846,
-                51335,
-                56001,
-                61602
-            ],
+            "volumePerBar": 4123,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2449,18 +1668,7 @@
                 90,
                 150
             ],
-            "volumePerBar": [
-                43,
-                45,
-                48,
-                51,
-                54,
-                58,
-                63,
-                67,
-                73,
-                81
-            ],
+            "volumePerBar": 79,
             "lotSize": 2625,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2482,18 +1690,7 @@
                 90,
                 150
             ],
-            "volumePerBar": [
-                113378,
-                119765,
-                126916,
-                133911,
-                142913,
-                153213,
-                165113,
-                177153,
-                193258,
-                212583
-            ],
+            "volumePerBar": 17793,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -2515,18 +1712,7 @@
                 90,
                 150
             ],
-            "volumePerBar": [
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                30,
-                31,
-                33
-            ],
+            "volumePerBar": 27,
             "lotSize": 3550,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2581,18 +1767,7 @@
                 100,
                 169
             ],
-            "volumePerBar": [
-                70,
-                74,
-                78,
-                82,
-                88,
-                94,
-                101,
-                109,
-                119,
-                131
-            ],
+            "volumePerBar": 109,
             "lotSize": 225,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -2614,18 +1789,7 @@
                 144,
                 240
             ],
-            "volumePerBar": [
-                17630,
-                18623,
-                19735,
-                20823,
-                22223,
-                23824,
-                25675,
-                27547,
-                30051,
-                33056
-            ],
+            "volumePerBar": 2303,
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",

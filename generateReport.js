@@ -1,173 +1,96 @@
+#!/usr/bin/env node
+// generateReport.js - Multi-day backtest report generator with sharded worker processing.
+// Phase 1: Spawn worker processes to aggregate backtest files in parallel (avoids OOM).
+// Phase 2: Merge aggregated outputs and generate the full markdown report + compact summary.
+//
+// Usage:
+//   node generateReport.js --live          (process ./live-backtest-results)
+//   node generateReport.js                (process ./version-backtest-results)
+//   node generateReport.js --live --workers 4   (override worker count)
+
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { spawn } = require('child_process');
 
-const RESULTS_DIR = process.argv.includes('--live') ? './live-backtest-results' : './version-backtest-results';
+const IS_LIVE = process.argv.includes('--live');
+const RESULTS_DIR = IS_LIVE ? './live-backtest-results' : './version-backtest-results';
 const OUTPUT_DIR = './version-backtest-report';
+const TEMP_DIR = IS_LIVE ? './.temp_live_report' : './.temp_version_report';
 
-// Matches any V1 to V106 strategy strictly
 const versionRegex = /^V(\d+):/;
-const isLive = process.argv.includes('--live');
+const workersIdx = process.argv.findIndex((a, i) => a === '--workers' && process.argv[i + 1]);
+const NUM_WORKERS = workersIdx !== -1 ? parseInt(process.argv[workersIdx + 1], 10) : Math.max(1, os.cpus().length - 1);
 
-// All active High Confidence versions (original + fixed) producing confidence metric outputs
+// ── Constants (mirrored from original) ──
+
 const confidenceVersions = [
-    // Original High Confidence versions
-    'V3: High Confidence',
-    'V8: High Confidence (Strict)',
-    'V13: High Confidence (Calibrated)',
-    'V18: High Confidence (Strict-Calibrated)',
-    'V23: High Confidence (Structural-Calibrated)',
-    'V28: High Confidence (Strict Structural-Calibrated)',
-    'V33: High Confidence (Upgraded)',
-    'V38: High Confidence (Strict Upgraded)',
-    'V43: High Confidence (Structural-Calibrated Upgraded)',
+    'V3: High Confidence', 'V8: High Confidence (Strict)', 'V13: High Confidence (Calibrated)',
+    'V18: High Confidence (Strict-Calibrated)', 'V23: High Confidence (Structural-Calibrated)',
+    'V28: High Confidence (Strict Structural-Calibrated)', 'V33: High Confidence (Upgraded)',
+    'V38: High Confidence (Strict Upgraded)', 'V43: High Confidence (Structural-Calibrated Upgraded)',
     'V48: High Confidence (Strict Structural-Calibrated Upgraded)',
-    // Fixed High Confidence versions (V2 engine)
-    'V53: Fixed High Confidence',
-    'V58: Fixed High Confidence (Strict)',
-    'V63: Fixed High Confidence (Calibrated)',
-    'V68: Fixed High Confidence (Strict-Calibrated)',
-    'V73: Fixed High Confidence (Structural-Calibrated)',
-    'V78: Fixed High Confidence (Strict Structural-Calibrated)',
-    'V83: Fixed High Confidence (Upgraded)',
-    'V88: Fixed High Confidence (Strict Upgraded)',
+    'V53: Fixed High Confidence', 'V58: Fixed High Confidence (Strict)',
+    'V63: Fixed High Confidence (Calibrated)', 'V68: Fixed High Confidence (Strict-Calibrated)',
+    'V73: Fixed High Confidence (Structural-Calibrated)', 'V78: Fixed High Confidence (Strict Structural-Calibrated)',
+    'V83: Fixed High Confidence (Upgraded)', 'V88: Fixed High Confidence (Strict Upgraded)',
     'V93: Fixed High Confidence (Structural-Calibrated Upgraded)',
     'V98: Fixed High Confidence (Strict Structural-Calibrated Upgraded)',
 ];
 
-const INSTRUMENT_NAMES = {
-    // Standard ISINs
-    'INE002A01018': 'Reliance Industries',
-    'INE040A01034': 'HDFC Bank',
-    'INE090A01021': 'ICICI Bank',
-    'INE062A01020': 'SBI',
-    'INE467B01029': 'TCS',
-    'INE009A01021': 'Infosys (INFY)',
-    'INE154A01025': 'ITC',
-    'INE397D01024': 'Bharti Airtel',
-    'INE238A01034': 'Axis Bank',
-    'INE018A01030': 'L&T',
-    'INE081A01020': 'Tata Steel',
-    'INE155A01022': 'Tata Motors',
-    'INE1TAE01010': 'Tata Motors (Cash)',
-    'INE296A01032': 'Bajaj Finance',
-    'INE237A01036': 'Kotak Bank',
-    'INE044A01036': 'Sun Pharma',
-    'INE019A01038': 'JSW Steel',
-    'INE522F01014': 'Coal India',
-    'INE423A01024': 'Adani Enterprises',
-    'INE742F01042': 'Adani Ports',
-    'INE038A01020': 'Hindalco',
-    'INE437A01024': 'Apollo Hospitals',
-    'INE160A01022': 'PNB',
-    'INE114A01011': 'SAIL',
-    'INE040H01021': 'SUZLON',
-    'INE928J01020': 'PAYTM',
-    'INE415G01027': 'RVNL',
-    'INE053F01010': 'IRFC',
-    'INE202E01016': 'IREDA',
-    'INE257A01026': 'BHEL',
-    'INE129A01025': 'GAIL',
-    'INE849A01020': 'TRENT',
-
-    // Standard F&O Segment Tokens
-    '538685': 'Natural Gas Future',
-    '538686': 'Natural Gas Mini Future',
-    '520702': 'Crude Oil Future',
-    '520703': 'Crude Oil Mini Future',
-    '464150': 'Silver Future',
-    '471726': 'Silver Mini Future',
-    '488788': 'Silver Micro Future',
-    '568831': 'Copper Future',
-    '568836': 'Zinc Future',
-    '568833': 'Lead Future',
-    '568830': 'Aluminium Future',
-    '466583': 'Gold Future',
-    '510764': 'Gold Mini Future',
-    '552721': 'Gold Petal Future',
-    '61093': 'Nifty 50 Future',
-    '61088': 'Nifty Bank Future',
-    '61091': 'Fin Nifty Future',
-    '61092': 'Midcap Nifty Future',
-    '61284': 'Reliance Future',
-    '61189': 'HDFC Bank Future',
-    '61197': 'ICICI Bank Future',
-    '61289': 'SBI Future',
-    '61304': 'TCS Future',
-    '61209': 'Infosys Future',
-    '61216': 'ITC Future',
-    '61127': 'Bharti Airtel Future',
-    '61114': 'Axis Bank Future',
-    '61232': 'L&T Future',
-    '61303': 'Tata Steel Future',
-    '61235': 'Tata Motors Future',
-    '61118': 'Bajaj Finance Future',
-    '61226': 'Kotak Bank Future',
-    '61296': 'Sun Pharma Future',
-    '61220': 'JSW Steel Future',
-    '61143': 'Coal India Future',
-    '61099': 'Adani Enterprises Future',
-    '61101': 'Adani Ports Future',
-    '61192': 'Hindalco Future',
-    '61108': 'Apollo Hospitals Future',
-    '61274': 'PNB Future',
-    '61286': 'SAIL Future',
-    '61298': 'SUZLON Future',
-    '61265': 'PAYTM Future',
-    '61285': 'RVNL Future',
-    '61215': 'IRFC Future',
-    '61214': 'IREDA Future',
-    '61128': 'BHEL Future',
-    '61170': 'GAIL Future',
-    '61310': 'TRENT Future',
-    
-    // Legacy support keys
-    '552706': 'Aluminium (MCX)',
-    '552709': 'Lead (MCX)',
-    '552708': 'Copper (MCX)',
-    '552711': 'Zinc (MCX)',
-    '464151': 'Silver Mini (MCX)',
-    '477177': 'Silver Micro (MCX)',
-    '510464': 'Gold Petal (MCX)',
-    '62329': 'Nifty 50',
-    '62326': 'Bank Nifty',
-    '62327': 'Fin Nifty',
-    '62328': 'Midcap Nifty'
-};
-
-// Strict non-overlapping confidence buckets
 const confidenceBuckets = [
-    '< 45', '45-49', '50-54', '55-59', '60-64', '65-69', 
+    '< 45', '45-49', '50-54', '55-59', '60-64', '65-69',
     '70-74', '75-79', '80-84', '85-89', '90-94', '95-100'
 ];
 
-// Refined non-overlapping MAFE buckets extended up to and beyond 200%
 const mafeBuckets = [
-    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', '81% - 99%', 
-    '100% (Hit TP)', '101% - 110%', '111% - 120%', '121% - 130%', 
-    '131% - 140%', '141% - 150%', '151% - 160%', '161% - 170%', 
+    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', '81% - 99%',
+    '100% (Hit TP)', '101% - 110%', '111% - 120%', '121% - 130%',
+    '131% - 140%', '141% - 150%', '151% - 160%', '161% - 170%',
     '171% - 180%', '181% - 190%', '191% - 200%', '> 200%'
 ];
 
-// Strict non-overlapping MAE buckets
 const maeBuckets = [
-    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%', 
+    '0% - 20%', '21% - 40%', '41% - 60%', '61% - 80%',
     '81% - 100%', '101% - 115%', '116% - 130%', '> 130%'
 ];
 
-// Flat Trade Store
-const flatTrades = [];
-
-// --- Helper Functions ---
-
-function getFormattedTimestamp() {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}_${hours}-${minutes}`;
-}
+const INSTRUMENT_NAMES = {
+    'INE002A01018': 'Reliance Industries', 'INE040A01034': 'HDFC Bank',
+    'INE090A01021': 'ICICI Bank', 'INE062A01020': 'SBI', 'INE467B01029': 'TCS',
+    'INE009A01021': 'Infosys (INFY)', 'INE154A01025': 'ITC', 'INE397D01024': 'Bharti Airtel',
+    'INE238A01034': 'Axis Bank', 'INE018A01030': 'L&T', 'INE081A01020': 'Tata Steel',
+    'INE155A01022': 'Tata Motors', 'INE1TAE01010': 'Tata Motors (Cash)',
+    'INE296A01032': 'Bajaj Finance', 'INE237A01036': 'Kotak Bank', 'INE044A01036': 'Sun Pharma',
+    'INE019A01038': 'JSW Steel', 'INE522F01014': 'Coal India', 'INE423A01024': 'Adani Enterprises',
+    'INE742F01042': 'Adani Ports', 'INE038A01020': 'Hindalco', 'INE437A01024': 'Apollo Hospitals',
+    'INE160A01022': 'PNB', 'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON',
+    'INE928J01020': 'PAYTM', 'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC',
+    'INE202E01016': 'IREDA', 'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL',
+    'INE849A01020': 'TRENT',
+    '538685': 'Natural Gas Future', '538686': 'Natural Gas Mini Future',
+    '520702': 'Crude Oil Future', '520703': 'Crude Oil Mini Future',
+    '464150': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
+    '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
+    '568830': 'Aluminium Future', '466583': 'Gold Future', '510764': 'Gold Mini Future',
+    '552721': 'Gold Petal Future',
+    '61093': 'Nifty 50 Future', '61088': 'Nifty Bank Future', '61091': 'Fin Nifty Future',
+    '61092': 'Midcap Nifty Future', '61284': 'Reliance Future', '61189': 'HDFC Bank Future',
+    '61197': 'ICICI Bank Future', '61289': 'SBI Future', '61304': 'TCS Future',
+    '61209': 'Infosys Future', '61216': 'ITC Future', '61127': 'Bharti Airtel Future',
+    '61114': 'Axis Bank Future', '61232': 'L&T Future', '61303': 'Tata Steel Future',
+    '61235': 'Tata Motors Future', '61118': 'Bajaj Finance Future', '61226': 'Kotak Bank Future',
+    '61296': 'Sun Pharma Future', '61220': 'JSW Steel Future', '61143': 'Coal India Future',
+    '61099': 'Adani Enterprises Future', '61101': 'Adani Ports Future', '61192': 'Hindalco Future',
+    '61108': 'Apollo Hospitals Future', '61274': 'PNB Future', '61286': 'SAIL Future',
+    '61298': 'SUZLON Future', '61265': 'PAYTM Future', '61285': 'RVNL Future',
+    '61215': 'IRFC Future', '61214': 'IREDA Future', '61128': 'BHEL Future',
+    '61170': 'GAIL Future', '61310': 'TRENT Future',
+    '552706': 'Aluminium (MCX)', '552709': 'Lead (MCX)', '552708': 'Copper (MCX)',
+    '552711': 'Zinc (MCX)', '464151': 'Silver Mini (MCX)', '477177': 'Silver Micro (MCX)',
+    '510464': 'Gold Petal (MCX)', '62329': 'Nifty 50', '62326': 'Bank Nifty',
+    '62327': 'Fin Nifty', '62328': 'Midcap Nifty'
+};
 
 function getInstrumentDisplayName(rawInstrument) {
     for (const [key, value] of Object.entries(INSTRUMENT_NAMES)) {
@@ -176,661 +99,691 @@ function getInstrumentDisplayName(rawInstrument) {
     return rawInstrument.replace(/_raw_ticks$/, '');
 }
 
-function getConfidenceBucket(val) {
-    if (val === null || val === undefined || isNaN(val)) return null;
-    if (val < 45) return '< 45';
-    if (val >= 45 && val < 50) return '45-49';
-    if (val >= 50 && val < 55) return '50-54';
-    if (val >= 55 && val < 60) return '55-59';
-    if (val >= 60 && val < 65) return '60-64';
-    if (val >= 65 && val < 70) return '65-69';
-    if (val >= 70 && val < 75) return '70-74';
-    if (val >= 75 && val < 80) return '75-79';
-    if (val >= 80 && val < 85) return '80-84';
-    if (val >= 85 && val < 90) return '85-89';
-    if (val >= 90 && val < 95) return '90-94';
-    if (val >= 95 && val <= 100) return '95-100';
-    return null;
+function getFormattedTimestamp() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function getMafeBucket(val) {
-    if (val === null || val === undefined || isNaN(val)) return null;
-    if (val >= 0 && val <= 20) return '0% - 20%';
-    if (val > 20 && val <= 40) return '21% - 40%';
-    if (val > 40 && val <= 60) return '41% - 60%';
-    if (val > 60 && val <= 80) return '61% - 80%';
-    if (val > 80 && val < 100) return '81% - 99%';
-    if (val >= 100 && val <= 100.01) return '100% (Hit TP)';
-    if (val > 100.01 && val <= 110) return '101% - 110%';
-    if (val > 110 && val <= 120) return '111% - 120%';
-    if (val > 120 && val <= 130) return '121% - 130%';
-    if (val > 130 && val <= 140) return '131% - 140%';
-    if (val > 140 && val <= 150) return '141% - 150%';
-    if (val > 150 && val <= 160) return '151% - 160%';
-    if (val > 160 && val <= 170) return '161% - 170%';
-    if (val > 170 && val <= 180) return '171% - 180%';
-    if (val > 180 && val <= 190) return '181% - 190%';
-    if (val > 190 && val <= 200) return '191% - 200%';
-    if (val > 200) return '> 200%';
-    return null;
+// ── Helper: derive metrics from aggregated data ──
+
+function deriveMetrics(d) {
+    const count = d.count || 0;
+    if (count === 0) return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0 };
+    const winRate = (d.wins / count) * 100;
+    const avgReturn = d.sumPnl / count;
+    const avgMafe = d.sumMafe / count;
+    const avgMae = d.sumMae / count;
+    return { totalTrades: count, winRate, totalReturn: d.sumPnl, avgReturn, avgMafe, avgMae };
 }
 
-function getMaeBucket(val) {
-    if (val === null || val === undefined || isNaN(val)) return null;
-    if (val >= 0 && val <= 20) return '0% - 20%';
-    if (val > 20 && val <= 40) return '21% - 40%';
-    if (val > 40 && val <= 60) return '41% - 60%';
-    if (val > 60 && val <= 80) return '61% - 80%';
-    if (val > 80 && val <= 100) return '81% - 100%';
-    if (val > 100 && val <= 115) return '101% - 115%';
-    if (val > 115 && val <= 130) return '116% - 130%';
-    if (val > 130) return '> 130%';
-    return null;
-}
+// ── Phase 1: Parallel aggregation via worker processes ──
 
-function computeMetrics(tradesList) {
-    const totalTrades = tradesList.length;
-    if (totalTrades === 0) {
-        return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0 };
+async function collectAggregatedData() {
+    if (!fs.existsSync(RESULTS_DIR)) {
+        console.error(`Error: Directory '${RESULTS_DIR}' not found.`);
+        process.exit(1);
     }
-    const wins = tradesList.filter(t => t.pnlAmount > 0).length;
-    const winRate = (wins / totalTrades) * 100;
-    // Use pnl field (version-backtest-results and live-backtest-results both store trade return % in 'pnl')
-    const totalReturn = tradesList.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
-    const avgReturn = totalReturn / totalTrades;
 
-    const validMafe = tradesList.filter(t => t.mafePercentage !== undefined && t.mafePercentage !== null);
-    const avgMafe = validMafe.length > 0 
-        ? validMafe.reduce((sum, t) => sum + parseFloat(t.mafePercentage), 0) / validMafe.length 
-        : 0;
+    const allFiles = fs.readdirSync(RESULTS_DIR).filter(f =>
+        path.extname(f) === '.json' && f.startsWith(IS_LIVE ? 'live_' : 'continuous_')
+    );
+    if (allFiles.length === 0) {
+        console.log('No backtest result JSON files found.');
+        process.exit(0);
+    }
 
-    const validMae = tradesList.filter(t => t.maePercentage !== undefined && t.maePercentage !== null);
-    const avgMae = validMae.length > 0 
-        ? validMae.reduce((sum, t) => sum + parseFloat(t.maePercentage), 0) / validMae.length 
-        : 0;
+    console.log(`Found ${allFiles.length} backtest files`);
 
-    return { totalTrades, winRate, totalReturn, avgReturn, avgMafe, avgMae };
-}
+    // Split files into batches (at most NUM_WORKERS batches, minimum ~10 files per worker)
+    const totalBatches = Math.min(NUM_WORKERS, Math.max(1, Math.floor(allFiles.length / 10)));
+    const filesPerBatch = Math.ceil(allFiles.length / totalBatches);
+    const batches = [];
+    for (let i = 0; i < allFiles.length; i += filesPerBatch) {
+        const slice = allFiles.slice(i, i + filesPerBatch).map(f => path.resolve(RESULTS_DIR, f));
+        batches.push(slice);
+    }
 
-// --- Dynamic Table Builder Functions ---
+    console.log(`Split into ${batches.length} batches (${NUM_WORKERS} workers)`);
 
-function buildConfidenceTable(tradesList) {
-    let out = `| Confidence Bucket | Number of Trades | Win Rate % | Total Return % | Avg Return per Trade % |\n`;
-    out += `| :--- | :---: | :---: | :---: | :---: |\n`;
-    confidenceBuckets.forEach(b => {
-        const bTrades = tradesList.filter(t => getConfidenceBucket(t.trade.confidence) === b);
-        const bm = computeMetrics(bTrades.map(t => t.trade));
-        out += `| **${b}** | ${bm.totalTrades} | ${bm.winRate.toFixed(2)}% | ${bm.totalReturn >= 0 ? '+' : ''}${bm.totalReturn.toFixed(2)}% | ${bm.avgReturn >= 0 ? '+' : ''}${bm.avgReturn.toFixed(3)}% |\n`;
-    });
-    out += `\n`;
-    return out;
-}
+    // Create temp directory
+    if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
-function buildMaeMafeTables(tradesList) {
-    let out = `*MAFE Closeness-to-TP Distribution:*\n`;
-    out += `| MAFE Bucket | Trade Count | Win Rate % | Avg Return % |\n`;
-    out += `| :--- | :---: | :---: | :---: |\n`;
-    mafeBuckets.forEach(b => {
-        const bucketTrades = tradesList.filter(t => getMafeBucket(t.trade.mafePercentage) === b);
-        const m = computeMetrics(bucketTrades.map(t => t.trade));
-        out += `| **${b}** | ${m.totalTrades} | ${m.winRate.toFixed(2)}% | ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}% |\n`;
-    });
-    out += `\n`;
+    // Write batch files
+    const batchFiles = [];
+    for (let i = 0; i < batches.length; i++) {
+        const batchPath = path.join(TEMP_DIR, `batch_${i}.json`);
+        fs.writeFileSync(batchPath, JSON.stringify(batches[i]));
+        batchFiles.push(batchPath);
+    }
 
-    out += `*MAE Drawdown Distribution:*\n`;
-    out += `| MAE Bucket | Trade Count | Win Rate % | Avg Return % |\n`;
-    out += `| :--- | :---: | :---: | :---: |\n`;
-    maeBuckets.forEach(b => {
-        const bucketTrades = tradesList.filter(t => getMaeBucket(t.trade.maePercentage) === b);
-        const m = computeMetrics(bucketTrades.map(t => t.trade));
-        out += `| **${b}** | ${m.totalTrades} | ${m.winRate.toFixed(2)}% | ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}% |\n`;
-    });
-    out += `\n`;
-    return out;
-}
+    // Spawn workers with batch concurrency
+    const workerScript = path.resolve(__dirname, 'scripts', 'reportWorker.js');
+    const mergedOutputFiles = [];
+    let completed = 0;
+    const startTime = Date.now();
 
-// --- Directory Parsing Logic ---
+    for (let i = 0; i < batchFiles.length; i += NUM_WORKERS) {
+        const chunk = batchFiles.slice(i, i + NUM_WORKERS);
+        const promises = chunk.map((batchFile, idx) => {
+            const batchNum = i + idx;
+            const outputFile = path.join(TEMP_DIR, `output_${batchNum}.json`);
+            return new Promise((resolve) => {
+                const child = spawn('node', ['--max-old-space-size=512', workerScript, batchFile, outputFile], {
+                    stdio: ['ignore', 'pipe', 'pipe']
+                });
 
-if (!fs.existsSync(RESULTS_DIR)) {
-    console.error(`Error: Directory '${RESULTS_DIR}' not found. Please ensure it exists.`);
-    process.exit(1);
-}
+                let stderr = '';
+                child.stderr.on('data', d => { stderr += d.toString(); });
 
-const files = fs.readdirSync(RESULTS_DIR).filter(file => path.extname(file) === '.json');
+                child.on('close', (code) => {
+                    completed++;
+                    if (code === 0 && fs.existsSync(outputFile) && fs.statSync(outputFile).size > 10) {
+                        try {
+                            // Validate file is parseable JSON
+                            JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+                            mergedOutputFiles.push(outputFile);
+                            // Parse to read meta
+                            const meta = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+                            console.log(`   ✅ Worker ${batchNum + 1}/${batchFiles.length}: ${meta.meta?.filesProcessed || '?'} files, ${(meta.meta?.totalRows || 0).toLocaleString()} trades`);
+                        } catch (e) {
+                            console.error(`   ❌ Worker ${batchNum + 1}: invalid JSON in output file: ${e.message}`);
+                        }
+                    } else {
+                        console.error(`   ❌ Worker ${batchNum + 1}: exit ${code}${stderr ? ' ' + stderr.slice(0, 200) : ''}`);
+                    }
+                    resolve();
+                });
 
-if (files.length === 0) {
-    console.log("No valid backtest result JSON files found.");
-    process.exit(0);
-}
-
-console.log(`Processing ${files.length} backtest files...`);
-
-files.forEach(file => {
-    // Parse format: continuous_<thresholdValue>_<instrument>_<date>.json or live_<thresholdValue>_<instrument>_<date>.json
-    const match = file.match(/^(?:continuous|live)_(\d+)_(.+?)\.json$/);
-    if (!match) return;
-
-    const threshold = match[1];
-    const rawInstrument = match[2];
-    // Try to extract date from filename or rawInstrument
-    let date = 'unknown';
-    const dateMatch = file.match(/_(\d{4}-\d{2}-\d{2})\.json$/);
-    if (dateMatch) date = dateMatch[1];
-    const instrumentName = getInstrumentDisplayName(rawInstrument);
-
-    const filePath = path.join(RESULTS_DIR, file);
-    try {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const data = JSON.parse(fileContent);
-
-        if (!data || !data.strategies) return;
-
-        Object.keys(data.strategies).forEach(stratKey => {
-            const vMatch = stratKey.match(versionRegex);
-            if (!vMatch) return; // Skip baseline strategies
-
-            const versionNum = parseInt(vMatch[1], 10);
-            const strategyData = data.strategies[stratKey];
-            if (!strategyData || !Array.isArray(strategyData.results?.trades)) return;
-
-            strategyData.results.trades.forEach(trade => {
-                flatTrades.push({
-                    trade,
-                    strategy: stratKey,
-                    versionNum,
-                    instrument: instrumentName,
-                    threshold,
-                    date
+                child.on('error', (err) => {
+                    completed++;
+                    console.error(`   ❌ Worker ${batchNum + 1}: spawn error ${err.message}`);
+                    resolve();
                 });
             });
         });
-    } catch (e) {
-        console.error(`Failed to parse file ${file}:`, e);
+        await Promise.all(promises);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+        console.log(`   📊 ${completed}/${batchFiles.length} batches done (${elapsed}s)`);
     }
-});
 
-if (flatTrades.length === 0) {
-    console.log("No version-specific trades detected inside backtest output files.");
-    process.exit(0);
+    console.log(`\nMerging ${mergedOutputFiles.length} worker outputs...`);
+
+    // ── Phase 2: Merge aggregated outputs AND build indexed lookups ──
+    const merged = { L1: {}, L1_mafe: {}, L1_mae: {}, L2: {}, L3: {}, L3_candle: {} };
+    // Indexed lookups for O(1) access during report generation
+    const l2ByVersion = new Map();    // version → [{key, ...val}]
+    const l2ByInstTh = new Map();     // "instrument|threshold" → [{key, ...val}]
+    const l2ByVersionInst = new Map(); // "version|instrument" → Map(threshold → val)
+
+    for (const outputFile of mergedOutputFiles) {
+        const data = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+
+        // Merge L1: {count, wins}
+        for (const [key, val] of Object.entries(data.L1 || {})) {
+            if (!merged.L1[key]) merged.L1[key] = { count: 0, wins: 0 };
+            merged.L1[key].count += val.count;
+            merged.L1[key].wins += val.wins;
+        }
+
+        // Merge L1_mafe: count
+        for (const [key, val] of Object.entries(data.L1_mafe || {})) {
+            merged.L1_mafe[key] = (merged.L1_mafe[key] || 0) + val;
+        }
+
+        // Merge L1_mae: count
+        for (const [key, val] of Object.entries(data.L1_mae || {})) {
+            merged.L1_mae[key] = (merged.L1_mae[key] || 0) + val;
+        }
+
+        // Merge L2: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumConfidence}
+        for (const [key, val] of Object.entries(data.L2 || {})) {
+            if (!merged.L2[key]) {
+                merged.L2[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumConfidence: 0 };
+            }
+            merged.L2[key].count += val.count;
+            merged.L2[key].wins += val.wins;
+            merged.L2[key].sumPnl += val.sumPnl || 0;
+            merged.L2[key].sumPnlAmount += val.sumPnlAmount || 0;
+            merged.L2[key].sumMafe += val.sumMafe || 0;
+            merged.L2[key].sumMae += val.sumMae || 0;
+            merged.L2[key].sumConfidence += val.sumConfidence || 0;
+        }
+
+        // Merge L3: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae}
+        for (const [key, val] of Object.entries(data.L3 || {})) {
+            if (!merged.L3[key]) {
+                merged.L3[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0 };
+            }
+            merged.L3[key].count += val.count;
+            merged.L3[key].wins += val.wins;
+            merged.L3[key].sumPnl += val.sumPnl || 0;
+            merged.L3[key].sumPnlAmount += val.sumPnlAmount || 0;
+            merged.L3[key].sumMafe += val.sumMafe || 0;
+            merged.L3[key].sumMae += val.sumMae || 0;
+        }
+
+        // Merge L3_candle: (version, instrument, candleBucket) → {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae}
+        for (const [key, val] of Object.entries(data.L3_candle || {})) {
+            if (!merged.L3_candle[key]) {
+                merged.L3_candle[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0 };
+            }
+            merged.L3_candle[key].count += val.count;
+            merged.L3_candle[key].wins += val.wins;
+            merged.L3_candle[key].sumPnl += val.sumPnl || 0;
+            merged.L3_candle[key].sumPnlAmount += val.sumPnlAmount || 0;
+            merged.L3_candle[key].sumMafe += val.sumMafe || 0;
+            merged.L3_candle[key].sumMae += val.sumMae || 0;
+        }
+
+        // Merge candleCountMap for percentile computation
+        if (data.candleCountMap) {
+            Object.assign(merged._candleCountMap || (merged._candleCountMap = {}), data.candleCountMap);
+        }
+    }
+
+    // Build indexed lookups from merged L2
+    const l2Entries = Object.entries(merged.L2);
+    for (const [key, val] of l2Entries) {
+        const parts = key.split('|');
+        if (parts.length < 4) continue;
+        const version = parts[0], instrument = parts[1], threshold = parts[2];
+
+        // l2ByVersion
+        if (!l2ByVersion.has(version)) l2ByVersion.set(version, []);
+        l2ByVersion.get(version).push({ key, ...val });
+
+        // l2ByInstTh
+        const instThKey = `${instrument}|${threshold}`;
+        if (!l2ByInstTh.has(instThKey)) l2ByInstTh.set(instThKey, []);
+        l2ByInstTh.get(instThKey).push({ key, ...val });
+
+        // l2ByVersionInst: version|instrument → Map(threshold → val)
+        const viKey = `${version}|${instrument}`;
+        if (!l2ByVersionInst.has(viKey)) l2ByVersionInst.set(viKey, new Map());
+        const thMap = l2ByVersionInst.get(viKey);
+        if (!thMap.has(threshold)) thMap.set(threshold, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 });
+        const existing = thMap.get(threshold);
+        existing.count += val.count;
+        existing.wins += val.wins;
+        existing.sumPnl += val.sumPnl;
+        existing.sumMafe += val.sumMafe;
+        existing.sumMae += val.sumMae;
+    }
+
+    // Build L1 indexes for O(1) confidence/distribution lookups
+    const l1ByVersionConf = new Map(); // "versionName|confbucket" → {count, wins}
+    const distMafeTotal = new Map();    // "mafebucket" → count (collapsed across all versions/dates)
+    const distMaeTotal = new Map();     // "maebucket" → count
+
+    for (const [key, val] of Object.entries(merged.L1)) {
+        const lastPipe = key.lastIndexOf('|');
+        const vConfKey = key.substring(0, lastPipe); // version|instrument|threshold|date → truncated to just version + confbucket
+        // Extract version and bucket from key parts
+        const parts = key.split('|');
+        const version = parts[0];
+        const bucket = parts[parts.length - 1];
+        const vcKey = `${version}|${bucket}`;
+        if (!l1ByVersionConf.has(vcKey)) l1ByVersionConf.set(vcKey, { count: 0, wins: 0 });
+        const e = l1ByVersionConf.get(vcKey);
+        e.count += val.count;
+        e.wins += val.wins;
+    }
+
+    for (const [key, val] of Object.entries(merged.L1_mafe)) {
+        const bucket = key.substring(key.lastIndexOf('|') + 1);
+        distMafeTotal.set(bucket, (distMafeTotal.get(bucket) || 0) + val);
+    }
+
+    for (const [key, val] of Object.entries(merged.L1_mae)) {
+        const bucket = key.substring(key.lastIndexOf('|') + 1);
+        distMaeTotal.set(bucket, (distMaeTotal.get(bucket) || 0) + val);
+    }
+
+    merged._l2ByVersion = l2ByVersion;
+    merged._l2ByInstTh = l2ByInstTh;
+    merged._l2ByVersionInst = l2ByVersionInst;
+    merged._l1ByVersionConf = l1ByVersionConf;
+    merged._distMafeTotal = distMafeTotal;
+    merged._distMaeTotal = distMaeTotal;
+
+    // ── Build per-instrument candle percentiles from raw candleCountMap ──
+    const candlePercentiles = {}; // "instrumentName" → {p20, p50, p80, all: []}
+    if (merged._candleCountMap) {
+        const instAllCounts = {}; // instrumentName → [count1, count2, ...]
+        for (const [key, cc] of Object.entries(merged._candleCountMap)) {
+            // key = "instrumentName|date"
+            const pipeIdx = key.lastIndexOf('|');
+            const inst = key.substring(0, pipeIdx);
+            if (!instAllCounts[inst]) instAllCounts[inst] = [];
+            instAllCounts[inst].push(cc);
+        }
+        for (const [inst, counts] of Object.entries(instAllCounts)) {
+            counts.sort((a, b) => a - b);
+            const n = counts.length;
+            candlePercentiles[inst] = {
+                p20: counts[Math.floor(n * 0.2)] || counts[0],
+                p50: counts[Math.floor(n * 0.5)] || counts[0],
+                p80: counts[Math.floor(n * 0.8)] || counts[0],
+                all: counts,
+            };
+        }
+    }
+    merged._candlePercentiles = candlePercentiles;
+
+    // Remap L3_candle keys from raw counts to percentile bins
+    const candleRemapped = {};
+    for (const [key, val] of Object.entries(merged.L3_candle)) {
+        const parts = key.split('|');
+        if (parts.length < 3) continue;
+        const version = parts[0], instrument = parts[1], rawCount = parseInt(parts[2]);
+        const pcts = candlePercentiles[instrument];
+        let bin = rawCount.toString(); // fallback to raw count
+        if (pcts && pcts.p20 && pcts.p50 && pcts.p80) {
+            if (rawCount <= pcts.p20) bin = `p20@${Math.round(pcts.p20)}`;
+            else if (rawCount <= pcts.p50) bin = `p50@${Math.round(pcts.p50)}`;
+            else if (rawCount <= pcts.p80) bin = `p80@${Math.round(pcts.p80)}`;
+            else bin = `>p80@${Math.round(pcts.p80) + 1}`;
+        }
+        const newKey = `${version}|${instrument}|${bin}`;
+        if (!candleRemapped[newKey]) candleRemapped[newKey] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0 };
+        candleRemapped[newKey].count += val.count;
+        candleRemapped[newKey].wins += val.wins;
+        candleRemapped[newKey].sumPnl += val.sumPnl || 0;
+        candleRemapped[newKey].sumPnlAmount += val.sumPnlAmount || 0;
+        candleRemapped[newKey].sumMafe += val.sumMafe || 0;
+        candleRemapped[newKey].sumMae += val.sumMae || 0;
+    }
+    merged.L3_candle = candleRemapped;
+
+    // Cleanup temp files
+    for (const f of [...batchFiles, ...mergedOutputFiles]) {
+        try { fs.unlinkSync(f); } catch (e) { /* ignore */ }
+    }
+    try { fs.rmdirSync(TEMP_DIR); } catch (e) { /* ignore */ }
+
+    const totalRows = Object.values(merged.L2).reduce((s, v) => s + v.count, 0);
+    console.log(`Merged: ${Object.keys(merged.L2).length} unique (v,inst,th,date) combos | ${totalRows.toLocaleString()} total trades\n`);
+
+    return merged;
 }
 
-// Generate collections of active elements for looping
-const uniqueVersions = [...new Set(flatTrades.map(t => t.strategy))].sort((a,b) => {
-    const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
-    const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
-    return numA - numB;
-});
+// ── Report generation ──
 
-const uniqueInstruments = [...new Set(flatTrades.map(t => t.instrument))].sort();
-const uniqueDates = [...new Set(flatTrades.map(t => t.date))].sort();
-
-// --- Compile Markdown Report Content ---
-
-let md = `# Portfolio Backtest Performance Report (Multi-Day Edition)\n\n`;
-md += `*Report Generated on: ${new Date().toLocaleString()}*\n`;
-md += `*Analyzed Period Range:* ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}\n\n`;
-
-// ============================================================
-// SECTION 1: EXECUTIVE SUMMARY
-// ============================================================
-md += `## Section 1: Executive Summary\n\n`;
-
-const generalMetrics = computeMetrics(flatTrades.map(t => t.trade));
-md += `### **System-Wide Performance Summary**\n`;
-md += `*   **Total Executed Portfolio Trades:** ${generalMetrics.totalTrades}\n`;
-md += `*   **Portfolio Win Rate:** ${generalMetrics.winRate.toFixed(2)}%\n`;
-md += `*   **Portfolio Cumulative Return:** ${generalMetrics.totalReturn >= 0 ? '+' : ''}${generalMetrics.totalReturn.toFixed(2)}%\n`;
-md += `*   **Portfolio Avg. Trade return:** ${generalMetrics.avgReturn >= 0 ? '+' : ''}${generalMetrics.avgReturn.toFixed(3)}%\n\n`;
-
-const versionPerformanceRankings = uniqueVersions.map(v => {
-    const vTrades = flatTrades.filter(t => t.strategy === v);
-    const m = computeMetrics(vTrades.map(t => t.trade));
-    return { name: v, ...m };
-});
-
-const top3 = [...versionPerformanceRankings].sort((a, b) => b.totalReturn - a.totalReturn).slice(0, 3);
-const bottom3 = [...versionPerformanceRankings].sort((a, b) => a.totalReturn - b.totalReturn).slice(0, 3);
-
-md += `### **Strategy Rankings**\n`;
-md += `#### **Top 3 Versions (Cumulative Return)**\n`;
-top3.forEach((v, index) => {
-    md += `${index + 1}. **${v.name}**: Total Return: **${v.totalReturn.toFixed(2)}%** | Win Rate: **${v.winRate.toFixed(2)}%** (${v.totalTrades} Trades)\n`;
-});
-md += `\n#### **Bottom 3 Versions (Cumulative Return)**\n`;
-bottom3.forEach((v, index) => {
-    md += `${index + 1}. **${v.name}**: Total Return: **${v.totalReturn.toFixed(2)}%** | Win Rate: **${v.winRate.toFixed(2)}%** (${v.totalTrades} Trades)\n`;
-});
-md += `\n`;
-
-// ============================================================
-// SECTION 2: DETAILED VERSION PERFORMANCE WITH DAILY BREAKDOWNS
-// ============================================================
-md += `## Section 2: Detailed Performance by Strategy Version (V1 to V106)\n\n`;
-
-uniqueVersions.forEach(v => {
-    const vTrades = flatTrades.filter(t => t.strategy === v);
-    const m = computeMetrics(vTrades.map(t => t.trade));
-
-    md += `### **${v}**\n`;
-    md += `*   **Cumulative Trades:** ${m.totalTrades}\n`;
-    md += `*   **Cumulative Win Rate:** ${m.winRate.toFixed(2)}%\n`;
-    md += `*   **Cumulative Total Return:** ${m.totalReturn >= 0 ? '+' : ''}${m.totalReturn.toFixed(2)}%\n`;
-    md += `*   **Cumulative Avg. Return per Trade:** ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}%\n`;
-    md += `*   **Cumulative Average MAFE:** ${m.avgMafe.toFixed(2)}%\n`;
-    md += `*   **Cumulative Average MAE:** ${m.avgMae.toFixed(2)}%\n\n`;
-
-    // Dynamic Instrument-Threshold breakdown for this version across dates
-    const pairs = [...new Set(vTrades.map(t => `${t.instrument} (Threshold ${t.threshold})`))].sort();
-    
-    md += `#### **Asset & Threshold Breakdowns for ${v}**\n`;
-    pairs.forEach(pair => {
-        const pairTrades = vTrades.filter(t => `${t.instrument} (Threshold ${t.threshold})` === pair);
-        const pm = computeMetrics(pairTrades.map(t => t.trade));
-
-        md += `##### **${pair}**\n`;
-        md += `*   **Cumulative:** ${pm.totalTrades} Trades | Win Rate: ${pm.winRate.toFixed(2)}% | Return: ${pm.totalReturn >= 0 ? '+' : ''}${pm.totalReturn.toFixed(2)}% | MAFE: ${pm.avgMafe.toFixed(1)}% | MAE: ${pm.avgMae.toFixed(1)}%\n`;
-
-        const pairDates = [...new Set(pairTrades.map(t => t.date))].sort();
-        if (pairDates.length > 1) {
-            md += `*   **Breakdown by Date:**\n`;
-            pairDates.forEach(d => {
-                const dtTrades = pairTrades.filter(t => t.date === d);
-                const dm = computeMetrics(dtTrades.map(t => t.trade));
-                md += `    *   **${d}**: ${dm.totalTrades} Trades | Win Rate: ${dm.winRate.toFixed(1)}% | Return: ${dm.totalReturn >= 0 ? '+' : ''}${dm.totalReturn.toFixed(2)}%\n`;
-            });
+function buildConfidenceTable(l1ByVC, versionName) {
+    let out = `| Confidence Bucket | Number of Trades | Win Rate % | Total Return % | Avg Return per Trade % |\n`;
+    out += `| :--- | :---: | :---: | :---: | :---: |\n`;
+    for (const b of confidenceBuckets) {
+        const vcKey = `${versionName}|${b}`;
+        const d = l1ByVC.get(vcKey);
+        const count = d ? d.count : 0;
+        const wins = d ? d.wins : 0;
+        if (count > 0) {
+            const wr = (wins / count) * 100;
+            out += `| **${b}** | ${count} | ${wr.toFixed(2)}% | - | - |\n`;
+        } else {
+            out += `| **${b}** | 0 | 0.00% | 0.00% | 0.000% |\n`;
         }
-        md += `\n`;
-    });
-    md += `---\n\n`;
-});
-
-// ============================================================
-// SECTION 3: CONFIDENCE DISTRIBUTION (SPLIT BY VERSION & DATE)
-// ============================================================
-md += `## Section 3: Confidence Distribution Analysis\n\n`;
-
-confidenceVersions.forEach(v => {
-    const vTrades = flatTrades.filter(t => t.strategy === v);
-    if (vTrades.length === 0) return;
-
-    md += `### **${v} Confidence Distributions**\n\n`;
-    
-    // Overall Cumulative (All Dates)
-    md += `#### **Cumulative Confidence Distribution (All Dates)**\n`;
-    md += buildConfidenceTable(vTrades);
-    md += `\n`;
-
-    // Separate Daily breakdowns if multiple dates exist
-    const vDates = [...new Set(vTrades.map(t => t.date))].sort();
-    if (vDates.length > 1) {
-        vDates.forEach(d => {
-            md += `#### **Confidence Distribution for Date: ${d}**\n`;
-            const dtTrades = vTrades.filter(t => t.date === d);
-            md += buildConfidenceTable(dtTrades);
-            md += `\n`;
-        });
     }
-
-    // Asset-specific breakdowns
-    const vInsts = [...new Set(vTrades.map(t => t.instrument))].sort();
-    vInsts.forEach(inst => {
-        md += `#### **${inst} Confidence Distribution**\n`;
-        
-        const instVTrades = vTrades.filter(t => t.instrument === inst);
-        md += `##### **Cumulative (${inst})**\n`;
-        md += buildConfidenceTable(instVTrades);
-
-        const instDates = [...new Set(instVTrades.map(t => t.date))].sort();
-        if (instDates.length > 1) {
-            instDates.forEach(d => {
-                md += `##### **Breakdown for ${inst} on Date: ${d}**\n`;
-                const instDtTrades = instVTrades.filter(t => t.date === d);
-                md += buildConfidenceTable(instDtTrades);
-            });
-        }
-        md += `\n`;
-    });
-    md += `---\n\n`;
-});
-
-// ============================================================
-// SECTION 4: MAE AND MAFE DISTRIBUTIONS BY VERSION & INSTRUMENT (SPLIT BY DATE)
-// ============================================================
-md += `## Section 4: Lifecycle MAE and MAFE Distribution Analysis\n\n`;
-
-// Portfolio-wide distributions
-md += `### **Overall Global Portfolio-Wide Distributions**\n\n`;
-md += `#### **Cumulative Portfolio MAE/MAFE (All Dates)**\n\n`;
-md += buildMaeMafeTables(flatTrades);
-
-if (uniqueDates.length > 1) {
-    uniqueDates.forEach(d => {
-        md += `#### **Portfolio MAE/MAFE Distribution for Date: ${d}**\n\n`;
-        const dtTrades = flatTrades.filter(t => t.date === d);
-        md += buildMaeMafeTables(dtTrades);
-    });
+    out += `\n`;
+    return out;
 }
-md += `---\n\n`;
 
-// Version-specific distributions (including daily split)
-md += `### **MAE/MAFE Distributions By Strategy Version**\n\n`;
-uniqueVersions.forEach(v => {
-    const vTrades = flatTrades.filter(t => t.versionNum === v);
-    md += `### **${v} MAE/MAFE Distributions**\n\n`;
-    
-    md += `#### **Cumulative (All Dates)**\n\n`;
-    md += buildMaeMafeTables(vTrades);
-
-    const vDates = [...new Set(vTrades.map(t => t.date))].sort();
-    if (vDates.length > 1) {
-        vDates.forEach(d => {
-            md += `#### **Distribution for Date: ${d}**\n\n`;
-            const dtTrades = vTrades.filter(t => t.date === d);
-            md += buildMaeMafeTables(dtTrades);
-        });
+function buildDistTableFromMap(bucketMap, buckets) {
+    let out = '';
+    for (const b of buckets) {
+        out += `| **${b}** | ${bucketMap.get(b) || 0} |\n`;
     }
-    md += `---\n\n`;
-});
+    return out;
+}
 
-// Instrument-specific distributions (including daily split)
-md += `### **MAE/MAFE Distributions By Instrument**\n\n`;
-uniqueInstruments.forEach(inst => {
-    const instTrades = flatTrades.filter(t => t.instrument === inst);
-    md += `### **${inst} MAE/MAFE Distributions**\n\n`;
-    
-    md += `#### **Cumulative (All Dates)**\n\n`;
-    md += buildMaeMafeTables(instTrades);
+function write(w, str) { w.write(str); }
 
-    const instDates = [...new Set(instTrades.map(t => t.date))].sort();
-    if (instDates.length > 1) {
-        instDates.forEach(d => {
-            md += `#### **Distribution for Date: ${d}**\n\n`;
-            const dtTrades = instTrades.filter(t => t.date === d);
-            md += buildMaeMafeTables(dtTrades);
-        });
+async function generateReport(merged) {
+    const { L2, _l2ByVersion, _l2ByInstTh, _l1ByVersionConf, _distMafeTotal, _distMaeTotal } = merged;
+
+    // Extract unique dimensions from indexed lookups (one pass)
+    const versionSet = new Set(_l2ByVersion.keys());
+    const instruments = new Set();
+    const dates = new Set();
+
+    for (const key of Object.keys(L2)) {
+        const parts = key.split('|');
+        instruments.add(parts[1]);
+        dates.add(parts[3]);
     }
-    md += `---\n\n`;
-});
 
-// ============================================================
-// SECTION 5: DEEP DIVE BREAKDOWN BY INSTRUMENT & THRESHOLD (WITH DAILY SPLIT)
-// ============================================================
-md += `## Section 5: Deep Dive Breakdown by Instrument and Threshold\n\n`;
-
-uniqueInstruments.forEach(inst => {
-    const instTrades = flatTrades.filter(t => t.instrument === inst);
-    md += `### **${inst}**\n\n`;
-
-    const thresholds = [...new Set(instTrades.map(t => t.threshold))].sort((a,b) => parseInt(a, 10) - parseInt(b, 10));
-
-    thresholds.forEach(thresh => {
-        const thTrades = instTrades.filter(t => t.threshold === thresh);
-        const thm = computeMetrics(thTrades.map(t => t.trade));
-
-        md += `#### **Threshold: ${thresh}**\n`;
-        md += `*   **Cumulative Trades (This Threshold):** ${thm.totalTrades}\n`;
-        md += `*   **Cumulative Win Rate:** ${thm.winRate.toFixed(2)}%\n`;
-        md += `*   **Cumulative Total Return:** ${thm.totalReturn >= 0 ? '+' : ''}${thm.totalReturn.toFixed(2)}%\n`;
-        md += `*   **Cumulative Avg. Return per Trade:** ${thm.avgReturn >= 0 ? '+' : ''}${thm.avgReturn.toFixed(3)}%\n`;
-        md += `*   **Average MAFE:** ${thm.avgMafe.toFixed(2)}%\n`;
-        md += `*   **Average MAE:** ${thm.avgMae.toFixed(2)}%\n\n`;
-
-        // If there are multiple dates for this threshold, show cumulative daily breakdown
-        const thDates = [...new Set(thTrades.map(t => t.date))].sort();
-        if (thDates.length > 1) {
-            md += `##### **Daily Performance Breakdown (Threshold ${thresh})**\n`;
-            md += `| Date | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`;
-            md += `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-            thDates.forEach(d => {
-                const dtTrades = thTrades.filter(t => t.date === d);
-                const dm = computeMetrics(dtTrades.map(t => t.trade));
-                md += `| **${d}** | ${dm.totalTrades} | ${dm.winRate.toFixed(2)}% | ${dm.totalReturn >= 0 ? '+' : ''}${dm.totalReturn.toFixed(2)}% | ${dm.avgReturn >= 0 ? '+' : ''}${dm.avgReturn.toFixed(3)}% | ${dm.avgMafe.toFixed(1)}% | ${dm.avgMae.toFixed(1)}% |\n`;
-            });
-            md += `\n`;
-        }
-
-        // List version specific performance for this threshold (combining dates first)
-        md += `##### **Strategy Version Performance under Threshold ${thresh}**\n`;
-        md += `| Strategy Version | Cumulative Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`;
-        md += `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-
-        const thVersions = [...new Set(thTrades.map(t => t.strategy))].sort((a,b) => {
-            const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
-            const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
-            return numA - numB;
-        });
-
-        thVersions.forEach(v => {
-            const vThTrades = thTrades.filter(t => t.strategy === v);
-            const vThm = computeMetrics(vThTrades.map(t => t.trade));
-            md += `| **${v}** | ${vThm.totalTrades} | ${vThm.winRate.toFixed(2)}% | ${vThm.totalReturn >= 0 ? '+' : ''}${vThm.totalReturn.toFixed(2)}% | ${vThm.avgReturn >= 0 ? '+' : ''}${vThm.avgReturn.toFixed(3)}% | ${vThm.avgMafe.toFixed(1)}% | ${vThm.avgMae.toFixed(1)}% |\n`;
-        });
-        md += `\n`;
-
-        // --- NEW GRANULAR NESTED BREAKDOWN: Instrument -> Threshold -> Date -> All Strategy Versions ---
-        md += `##### **Daily Strategy Version Performance Breakdown under Threshold ${thresh}**\n\n`;
-        thDates.forEach(d => {
-            const dtTrades = thTrades.filter(t => t.date === d);
-            
-            md += `###### **Date: ${d}**\n`;
-            md += `| Strategy Version | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`;
-            md += `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-
-            const dtVersions = [...new Set(dtTrades.map(t => t.strategy))].sort((a,b) => {
-                const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
-                const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
-                return numA - numB;
-            });
-
-            dtVersions.forEach(v => {
-                const vDtTrades = dtTrades.filter(t => t.strategy === v);
-                const vDtm = computeMetrics(vDtTrades.map(t => t.trade));
-                md += `| **${v}** | ${vDtm.totalTrades} | ${vDtm.winRate.toFixed(2)}% | ${vDtm.totalReturn >= 0 ? '+' : ''}${vDtm.totalReturn.toFixed(2)}% | ${vDtm.avgReturn >= 0 ? '+' : ''}${vDtm.avgReturn.toFixed(3)}% | ${vDtm.avgMafe.toFixed(1)}% | ${vDtm.avgMae.toFixed(1)}% |\n`;
-            });
-            md += `\n`;
-        });
-        md += `\n`;
+    const uniqueVersions = [...versionSet].sort((a, b) => {
+        const na = parseInt(a.match(versionRegex)?.[1] || '0', 10);
+        const nb = parseInt(b.match(versionRegex)?.[1] || '0', 10);
+        return na - nb;
     });
-    md += `---\n\n`;
-});
+    const uniqueInstruments = [...instruments].sort();
+    const uniqueDates = [...dates].sort();
 
-// --- Write Markdown file out to disk ---
+    if (uniqueVersions.length === 0) {
+        console.log('No version-specific data found.');
+        process.exit(0);
+    }
 
-try {
-    // Generate directories recursively if needed
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-    
-    // Construct unique filename: backtest_analysis_report_<YYYY-MM-DD_HH-mm>.md
+    // Create output directory
+    if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     const timestamp = getFormattedTimestamp();
-    const targetFile = path.join(OUTPUT_DIR, `${isLive ? 'live' : 'backtest'}_analysis_report_${timestamp}.md`);
-    
-    fs.writeFileSync(targetFile, md, 'utf8');
-    console.log(`Success! Complete${isLive ? ' live backtest' : ''} portfolio-wide multi-day analysis written to '${targetFile}'`);
+    const targetFile = path.join(OUTPUT_DIR, `${IS_LIVE ? 'live' : 'backtest'}_analysis_report_${timestamp}.md`);
+    const w = fs.createWriteStream(targetFile, 'utf8');
 
-    // --- Also generate compact LLM-friendly summary ---
-    const compactSummary = generateCompactSummary(flatTrades);
-    const compactFile = path.join(OUTPUT_DIR, `${isLive ? 'live' : 'backtest'}_compact_summary_${timestamp}.md`);
-    fs.writeFileSync(compactFile, compactSummary, 'utf8');
-    console.log(`Success! Compact LLM summary written to '${compactFile}'`);
-} catch (e) {
-    console.error(`Failed to write markdown output:`, e);
+    // Global metrics (single pass over L2)
+    let globalCount = 0, globalWins = 0, globalSumPnl = 0;
+    for (const d of Object.values(L2)) {
+        globalCount += d.count; globalWins += d.wins; globalSumPnl += d.sumPnl;
+    }
+
+    // ── Report header ──
+    write(w, `# Portfolio Backtest Performance Report (Multi-Day Edition)\n\n`);
+    write(w, `*Report Generated on: ${new Date().toLocaleString()}*\n`);
+    write(w, `*Analyzed Period Range:* ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}\n\n`);
+
+    // Section 1: Executive Summary
+    write(w, `## Section 1: Executive Summary\n\n`);
+    write(w, `### **System-Wide Performance Summary**\n`);
+    write(w, `*   **Total Executed Portfolio Trades:** ${globalCount.toLocaleString()}\n`);
+    write(w, `*   **Portfolio Win Rate:** ${globalCount ? ((globalWins / globalCount) * 100).toFixed(2) : '0.00'}%\n`);
+    write(w, `*   **Portfolio Cumulative Return:** ${globalSumPnl >= 0 ? '+' : ''}${globalSumPnl.toFixed(2)}%\n`);
+    write(w, `*   **Portfolio Avg. Trade return:** ${globalCount ? (globalSumPnl / globalCount).toFixed(3) : '0.000'}%\n\n`);
+
+    // Version rankings
+    const versionRankings = uniqueVersions.map(v => {
+        const entries = _l2ByVersion.get(v) || [];
+        let count = 0, wins = 0, sumPnl = 0, sumMafe = 0, sumMae = 0;
+        for (const d of entries) {
+            count += d.count; wins += d.wins; sumPnl += d.sumPnl;
+            sumMafe += d.sumMafe; sumMae += d.sumMae;
+        }
+        return { name: v, totalTrades: count, winRate: count ? (wins / count) * 100 : 0, totalReturn: sumPnl, avgReturn: count ? sumPnl / count : 0, avgMafe: count ? sumMafe / count : 0, avgMae: count ? sumMae / count : 0 };
+    });
+
+    const top3 = [...versionRankings].sort((a, b) => b.totalReturn - a.totalReturn).slice(0, 3);
+    const bottom3 = [...versionRankings].sort((a, b) => a.totalReturn - b.totalReturn).slice(0, 3);
+
+    write(w, `### **Strategy Rankings**\n`);
+    write(w, `#### **Top 3 Versions (Cumulative Return)**\n`);
+    top3.forEach((v, idx) => write(w, `${idx + 1}. **${v.name}**: Total Return: **${v.totalReturn.toFixed(2)}%** | Win Rate: **${v.winRate.toFixed(2)}%** (${v.totalTrades} Trades)\n`));
+    write(w, `\n#### **Bottom 3 Versions (Cumulative Return)**\n`);
+    bottom3.forEach((v, idx) => write(w, `${idx + 1}. **${v.name}**: Total Return: **${v.totalReturn.toFixed(2)}%** | Win Rate: **${v.winRate.toFixed(2)}%** (${v.totalTrades} Trades)\n`));
+    write(w, `\n`);
+
+    // Section 2: Detailed Version Performance
+    console.log('Writing Section 2 (version details)...');
+    write(w, `## Section 2: Detailed Performance by Strategy Version\n\n`);
+    let verCount = 0;
+    for (const v of uniqueVersions) {
+        const vEntries = _l2ByVersion.get(v) || [];
+        if (vEntries.length === 0) continue;
+
+        let vCount = 0, vWins = 0, vSumPnl = 0, vSumMafe = 0, vSumMae = 0;
+        for (const d of vEntries) {
+            vCount += d.count; vWins += d.wins; vSumPnl += d.sumPnl;
+            vSumMafe += d.sumMafe; vSumMae += d.sumMae;
+        }
+
+        write(w, `### **${v}**\n`);
+        write(w, `*   **Cumulative Trades:** ${vCount}\n`);
+        write(w, `*   **Cumulative Win Rate:** ${((vWins / vCount) * 100).toFixed(2)}%\n`);
+        write(w, `*   **Cumulative Total Return:** ${vSumPnl >= 0 ? '+' : ''}${vSumPnl.toFixed(2)}%\n`);
+        write(w, `*   **Cumulative Avg. Return per Trade:** ${(vSumPnl / vCount) >= 0 ? '+' : ''}${(vSumPnl / vCount).toFixed(3)}%\n`);
+        write(w, `*   **Cumulative Average MAFE:** ${(vSumMafe / vCount).toFixed(2)}%\n`);
+        write(w, `*   **Cumulative Average MAE:** ${(vSumMae / vCount).toFixed(2)}%\n\n`);
+
+        const pairMap = new Map();
+        for (const d of vEntries) {
+            const parts = d.key.split('|');
+            const pair = `${parts[1]} (Threshold ${parts[2]})`;
+            if (!pairMap.has(pair)) pairMap.set(pair, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 });
+            const e = pairMap.get(pair);
+            e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae;
+        }
+
+        write(w, `#### **Asset & Threshold Breakdowns for ${v}**\n`);
+        for (const [pair, pc] of [...pairMap].sort()) {
+            write(w, `##### **${pair}**\n`);
+            write(w, `*   **Cumulative:** ${pc.count} Trades | Win Rate: ${((pc.wins / pc.count) * 100).toFixed(2)}% | Return: ${pc.sumPnl >= 0 ? '+' : ''}${pc.sumPnl.toFixed(2)}% | MAFE: ${(pc.sumMafe / pc.count).toFixed(1)}% | MAE: ${(pc.sumMae / pc.count).toFixed(1)}%\n\n`);
+        }
+        write(w, `---\n\n`);
+
+        verCount++;
+        if (verCount % 50 === 0) console.log(`   Section 2: ${verCount}/${uniqueVersions.length} versions written`);
+    }
+    console.log(`   Section 2 complete: ${verCount} versions`);
+
+    // Section 3: Confidence Distribution
+    console.log('Writing Section 3 (confidence)...');
+    write(w, `## Section 3: Confidence Distribution Analysis\n\n`);
+    for (const v of confidenceVersions) {
+        if (!versionSet.has(v)) continue;
+        write(w, `### **${v} Confidence Distributions**\n\n`);
+        write(w, `#### **Cumulative Confidence Distribution (All Dates)**\n`);
+        write(w, buildConfidenceTable(_l1ByVersionConf, v));
+        write(w, `---\n\n`);
+    }
+
+    // Section 4: Lifecycle MAE & MAFE
+    console.log('Writing Section 4 (MAE/MAFE)...');
+    write(w, `## Section 4: Lifecycle MAE and MAFE Distribution Analysis\n\n`);
+    write(w, `### **Overall Global Portfolio-Wide Distributions**\n\n`);
+    write(w, `*MAFE Closeness-to-TP Distribution:*\n`);
+    write(w, `| MAFE Bucket | Trade Count |\n`);
+    write(w, `| :--- | :---: |\n`);
+    write(w, buildDistTableFromMap(_distMafeTotal, mafeBuckets));
+    write(w, `\n`);
+    write(w, `*MAE Drawdown Distribution:*\n`);
+    write(w, `| MAE Bucket | Trade Count |\n`);
+    write(w, `| :--- | :---: |\n`);
+    write(w, buildDistTableFromMap(_distMaeTotal, maeBuckets));
+    write(w, `\n---\n\n`);
+
+    // Section 5: Deep Dive by Instrument & Threshold
+    console.log('Writing Section 5 (deep dive)...');
+    write(w, `## Section 5: Deep Dive Breakdown by Instrument and Threshold\n\n`);
+    let instIdx = 0;
+    for (const inst of uniqueInstruments) {
+        instIdx++;
+        write(w, `### **${inst}**\n\n`);
+
+        const instThresholds = new Set();
+        for (const [instThKey] of _l2ByInstTh) {
+            if (instThKey.startsWith(inst + '|')) instThresholds.add(instThKey.split('|')[1]);
+        }
+
+        for (const th of [...instThresholds].sort((a, b) => parseInt(a) - parseInt(b))) {
+            const instThKey = `${inst}|${th}`;
+            const thEntries = _l2ByInstTh.get(instThKey) || [];
+
+            let tc = 0, tw = 0, ts = 0, tmf = 0, tma = 0;
+            for (const d of thEntries) {
+                tc += d.count; tw += d.wins; ts += d.sumPnl; tmf += d.sumMafe; tma += d.sumMae;
+            }
+
+            write(w, `#### **Threshold: ${th}**\n`);
+            write(w, `*   **Cumulative Trades:** ${tc}\n`);
+            write(w, `*   **Cumulative Win Rate:** ${tc ? ((tw / tc) * 100).toFixed(2) : '0.00'}%\n`);
+            write(w, `*   **Cumulative Total Return:** ${ts >= 0 ? '+' : ''}${ts.toFixed(2)}%\n`);
+            write(w, `*   **Cumulative Avg. Return per Trade:** ${tc ? (ts / tc) >= 0 ? '+' : '' + (ts / tc).toFixed(3) : '0.000'}%\n`);
+            write(w, `*   **Average MAFE:** ${tc ? (tmf / tc).toFixed(2) : '0.00'}%\n`);
+            write(w, `*   **Average MAE:** ${tc ? (tma / tc).toFixed(2) : '0.00'}%\n\n`);
+
+            write(w, `##### **Strategy Version Performance under Threshold ${th}**\n`);
+            write(w, `| Strategy Version | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`);
+            write(w, `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+
+            const tvMap = new Map();
+            for (const d of thEntries) {
+                const parts = d.key.split('|');
+                const ver = parts[0];
+                if (!tvMap.has(ver)) tvMap.set(ver, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 });
+                const e = tvMap.get(ver);
+                e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae;
+            }
+
+            const sv = [...tvMap.entries()].sort((a, b) => {
+                const na = parseInt(a[0].match(versionRegex)?.[1] || '0');
+                const nb = parseInt(b[0].match(versionRegex)?.[1] || '0');
+                return na - nb;
+            });
+
+            for (const [ver, vd] of sv) {
+                const m = deriveMetrics(vd);
+                write(w, `| **${ver}** | ${m.totalTrades} | ${m.winRate.toFixed(2)}% | ${m.totalReturn >= 0 ? '+' : ''}${m.totalReturn.toFixed(2)}% | ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}% | ${m.avgMafe.toFixed(1)}% | ${m.avgMae.toFixed(1)}% |\n`);
+            }
+            write(w, `\n`);
+        }
+        write(w, `---\n\n`);
+
+        if (instIdx % 10 === 0) console.log(`   Section 5: ${instIdx}/${uniqueInstruments.length} instruments written`);
+    }
+
+    // Close stream and free large indexes no longer needed
+    await new Promise((resolve, reject) => {
+        w.end(() => {
+            console.log(`Full report written to: ${targetFile}`);
+            resolve();
+        });
+        w.on('error', reject);
+    });
+
+    // Free L2 and its indexes (~2GB) — only L3 + L1 indexes needed for compact summary
+    merged.L2 = null;
+    merged._l2ByVersion = null;
+    merged._l2ByInstTh = null;
+    merged._l2ByVersionInst = null;
+    if (global.gc) global.gc();
+
+    // Generate compact summary — streaming to avoid OOM
+    console.log('Writing compact summary...');
+    const compactFile = path.join(OUTPUT_DIR, `${IS_LIVE ? 'live' : 'backtest'}_compact_summary_${timestamp}.md`);
+    const cw = fs.createWriteStream(compactFile, 'utf8');
+    generateCompactSummaryStream(merged, cw);
+    await new Promise((resolve, reject) => {
+        cw.end(() => { console.log(`Compact summary written to: ${compactFile}`); resolve(); });
+        cw.on('error', reject);
+    });
 }
 
-// ============================================================
-// COMPACT SUMMARY GENERATOR (LLM-friendly)
-// ============================================================
-function generateCompactSummary(allTrades) {
-    const MIN_TRADES = 3; // Minimum trades required for a version to be considered
+// ── Compact summary ──
 
-    let md = `# Strategy Performance Compact Summary\n\n`;
-    md += `*Generated: ${new Date().toLocaleString()}*\n`;
-    md += `*Purpose: LLM-readable summary for strategy refinement*\n\n`;
+function generateCompactSummaryStream(merged, cw) {
+    const { L3 } = merged;
+    const MIN_TRADES = 3;
 
-    // ── Step 1: Per instrument, find best 3 version+threshold combinations by win rate ──
-    const instrumentGroups = new Map();
-    for (const t of allTrades) {
-        if (!instrumentGroups.has(t.instrument)) instrumentGroups.set(t.instrument, []);
-        instrumentGroups.get(t.instrument).push(t);
+    write(cw, `# Strategy Performance Compact Summary\n\n`);
+    write(cw, `*Generated: ${new Date().toLocaleString()}*\n`);
+    write(cw, `*Purpose: LLM-readable summary for strategy refinement*\n\n`);
+
+    // Parse L3 into per-instrument version+threshold combos
+    const instCombos = new Map();
+    for (const [key, d] of Object.entries(L3)) {
+        const parts = key.split('|');
+        if (parts.length < 3) continue;
+        const version = parts[0], instrument = parts[1], threshold = parts[2];
+        if (d.count < MIN_TRADES) continue;
+        const m = deriveMetrics(d);
+        if (!instCombos.has(instrument)) instCombos.set(instrument, []);
+        instCombos.get(instrument).push({ version, threshold, ...m, trades: d.count });
     }
 
-    const perInstrumentTop3 = []; // { instrument, top3: [{version, threshold, ...metrics}] }
+    // Section A: Per-Instrument Top 3
+    write(cw, `## Section A: Best Version+P-Index Per Instrument (Top 3 by Win Rate)\n\n`);
+    write(cw, `*P-index = decile position in volume-per-bar array (p1 = fewest candles, p10 = most candles). Consistent across dates.*\n\n`);
+    write(cw, `| Instrument | Rank | Version | P-Idx | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`);
+    write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
 
-    for (const [instrument, trades] of instrumentGroups) {
-        // Group by version+threshold combination within this instrument
-        const comboMap = new Map(); // "version|threshold" → trades
-        for (const t of trades) {
-            const comboKey = `${t.strategy}|${t.threshold}`;
-            if (!comboMap.has(comboKey)) comboMap.set(comboKey, []);
-            comboMap.get(comboKey).push(t.trade);
-        }
-
-        const comboMetrics = [];
-        for (const [comboKey, comboTrades] of comboMap) {
-            if (comboTrades.length < MIN_TRADES) continue;
-            const [version, threshold] = comboKey.split('|');
-            const m = computeMetrics(comboTrades);
-            comboMetrics.push({ version, threshold, ...m, trades: comboTrades.length });
-        }
-
-        // Sort by win rate descending, then total return descending
-        comboMetrics.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
-        const top3 = comboMetrics.slice(0, 3);
-
-        if (top3.length > 0) {
-            perInstrumentTop3.push({ instrument, top3 });
-        }
-    }
-
-    // ── Section A: Per-Instrument Top 3 Version+Threshold Combinations ──
-    md += `## Section A: Best Version+Threshold Per Instrument (Top 3 by Win Rate)\n\n`;
-    md += `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`;
-    md += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-
-    for (const entry of perInstrumentTop3) {
-        entry.top3.forEach((v, idx) => {
-            md += `| ${entry.instrument} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`;
+    const instrumentTop3 = [];
+    for (const [inst, combos] of instCombos) {
+        combos.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
+        const top3 = combos.slice(0, 3);
+        if (top3.length > 0) instrumentTop3.push({ instrument: inst, top3 });
+        top3.forEach((v, idx) => {
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
         });
     }
-    md += `\n`;
+    write(cw, `\n`);
 
-    // ── Step 2: Cross-reference — which version appears most in top3? ──
+    // Section B: Overall Best Versions (cross-instrument)
     const versionScoreMap = new Map();
-    for (const entry of perInstrumentTop3) {
+    for (const entry of instrumentTop3) {
         for (const v of entry.top3) {
             const existing = versionScoreMap.get(v.version) || { appearances: 0, totalWinRate: 0, totalReturn: 0, totalTrades: 0, groups: [] };
             existing.appearances++;
             existing.totalWinRate += v.winRate;
-            existing.totalReturn += v.totalReturn;
+            existing.totalReturn += v.avgReturn;
             existing.totalTrades += v.trades;
             existing.groups.push(`${entry.instrument} (T${v.threshold})`);
             versionScoreMap.set(v.version, existing);
         }
     }
-
     const versionRankings = [];
     for (const [ver, data] of versionScoreMap) {
         versionRankings.push({
-            version: ver,
-            appearances: data.appearances,
+            version: ver, ...data,
             avgWinRate: data.totalWinRate / data.appearances,
             avgReturn: data.totalReturn / data.appearances,
-            totalTrades: data.totalTrades,
-            groups: data.groups,
         });
     }
     versionRankings.sort((a, b) => b.appearances - a.appearances || b.avgWinRate - a.avgWinRate);
 
-    // ── Section B: Overall Best Versions ──
-    md += `## Section B: Overall Best-Performing Versions (Cross-Instrument)\n\n`;
-    md += `*Ranked by number of instrument-threshold groups where this version appears in the Top 3.*\n\n`;
-    md += `| Rank | Version | Groups in Top 3 | Avg Win Rate | Avg Return | Total Trades | Best Instruments |\n`;
-    md += `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`;
-
+    write(cw, `## Section B: Overall Best-Performing Versions (Cross-Instrument)\n\n`);
+    write(cw, `*Ranked by number of instrument p-index groups where this version appears in the Top 3.*\n\n`);
+    write(cw, `| Rank | Version | Groups in Top 3 | Avg Win Rate | Avg Return | Total Trades | Best Instruments |\n`);
+    write(cw, `| :---: | :--- | :---: | :---: | :---: | :---: | :--- |\n`);
     versionRankings.slice(0, 20).forEach((v, idx) => {
-        const bestGroups = v.groups.slice(0, 3).map(g => g.split(' | ')[0]).join(', ');
-        md += `| #${idx + 1} | ${v.version} | ${v.appearances} | ${v.avgWinRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalTrades} | ${bestGroups}... |\n`;
+        write(cw, `| #${idx + 1} | ${v.version} | ${v.appearances} | ${v.avgWinRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalTrades} | ${v.groups.slice(0, 3).join(', ')} |\n`);
     });
-    md += `\n`;
+    write(cw, `\n`);
 
-    // ── Section C: Cumulative Cross-Instrument Original vs Batch Comparison ──
-    // For each original V1–V50 and its batch clones (V51+, V101+, V151+, V201+, V251+),
-    // compute the BEST threshold per instrument, then aggregate cumulative metrics.
-    md += `## Section C: Cumulative Cross-Instrument Comparison (Best Threshold Per Instrument)\n\n`;
-    md += `*For each original version and its batch clones, we select the best threshold per instrument\n`;
-    md += `(by win rate), then compute cumulative metrics across all instruments.*\n\n`;
-
-    // Step 1: For each version, find best threshold per instrument
-    // Map: version → Map(instrument → bestCombo)
-    const versionBestMap = new Map();
-    for (const t of allTrades) {
-        const vNum = parseInt(t.strategy.match(/^V(\d+):/)?.[1] || '0', 10);
-        if (vNum === 0) continue;
-
-        const verKey = t.strategy; // full version name
-        if (!versionBestMap.has(verKey)) versionBestMap.set(verKey, new Map());
-        const instMap = versionBestMap.get(verKey);
-
-        const comboKey = `${t.threshold}`;
-        if (!instMap.has(t.instrument)) instMap.set(t.instrument, {});
-        if (!instMap.get(t.instrument)[comboKey]) instMap.get(t.instrument)[comboKey] = [];
-        instMap.get(t.instrument)[comboKey].push(t.trade);
+    // Section C: Cumulative Cross-Instrument Original vs Batch
+    const versionBest = new Map();
+    const versionCumulative = new Map();
+    for (const [key, d] of Object.entries(L3)) {
+        const parts = key.split('|');
+        if (parts.length < 3) continue;
+        const version = parts[0], instrument = parts[1], threshold = parts[2];
+        if (d.count < MIN_TRADES) continue;
+        if (!versionCumulative.has(version)) versionCumulative.set(version, new Map());
+        const imap = versionCumulative.get(version);
+        if (!imap.has(instrument)) imap.set(instrument, []);
+        imap.get(instrument).push({ threshold, ...d });
     }
 
-    // Step 2: For each version+instrument, pick the best threshold (by win rate, min 3 trades)
-    // Map: version → { totalTrades, totalWins, totalPnlAmount, totalPnlPct, count }
-    const versionCumulative = new Map();
-
-    for (const [verKey, instMap] of versionBestMap) {
-        const vNum = parseInt(verKey.match(/^V(\d+):/)?.[1] || '0', 10);
-        let cumTrades = 0, cumWins = 0, cumPnlAmount = 0, cumPnlPct = 0;
-        let instrumentsUsed = 0;
-
-        for (const [instrument, thresholdMap] of instMap) {
-            let bestCombo = null;
-            let bestWinRate = -1;
-
-            for (const [threshold, trades] of Object.entries(thresholdMap)) {
-                if (trades.length < MIN_TRADES) continue;
-                const wins = trades.filter(t => t.pnlAmount > 0).length;
-                const wr = (wins / trades.length) * 100;
-                if (wr > bestWinRate || (wr === bestWinRate && bestCombo && trades.length > bestCombo.trades.length)) {
-                    bestWinRate = wr;
-                    bestCombo = { threshold, trades, wins, wr };
-                }
+    for (const [version, imap] of versionCumulative) {
+        let totalTrades = 0, winCount = 0, totalPnl = 0, totalPnlAmount = 0, instUsed = 0;
+        for (const [inst, combos] of imap) {
+            let best = null, bestWR = -1;
+            for (const c of combos) {
+                const wr = c.count ? (c.wins / c.count) * 100 : 0;
+                if (wr > bestWR) { bestWR = wr; best = c; }
             }
-
-            if (bestCombo) {
-                cumTrades += bestCombo.trades.length;
-                cumWins += bestCombo.wins;
-                cumPnlAmount += bestCombo.trades.reduce((s, t) => s + (t.pnlAmount || 0), 0);
-                // Accumulate per-trade PnL% for averaging
-                for (const tr of bestCombo.trades) {
-                    cumPnlPct += (tr.pnl || 0);
-                }
-                instrumentsUsed++;
+            if (best) {
+                instUsed++;
+                totalTrades += best.count;
+                winCount += best.wins;
+                totalPnl += best.sumPnl;
+                totalPnlAmount += best.sumPnlAmount;
             }
         }
-
-        if (instrumentsUsed > 0 && cumTrades > 0) {
-            versionCumulative.set(verKey, {
-                vNum,
-                verKey,
-                instrumentsUsed,
-                totalTrades: cumTrades,
-                winRate: (cumWins / cumTrades) * 100,
-                avgReturn: cumPnlPct / cumTrades, // per-trade average
-                totalPnlPct: cumPnlPct,
-                totalPnlAmount: cumPnlAmount,
+        if (instUsed > 0) {
+            versionBest.set(version, {
+                instrumentsUsed: instUsed,
+                totalTrades,
+                winRate: totalTrades ? (winCount / totalTrades) * 100 : 0,
+                avgReturn: totalTrades ? totalPnl / totalTrades : 0,
+                totalPnlPct: totalPnl,
+                totalPnlAmount,
             });
         }
     }
 
-    // Step 3: Pair originals (V1–V50) with their batch clones and compare
-    // Batch mapping: Vn original → Vn offset per batch
-    // V51–V100: entry_stop (offset 50)
-    // V101–V150: trend (offset 100)
-    // V151–V200: leg_quality (offset 150)
-    // V201–V250: exit_mgmt (offset 200)
+    write(cw, `## Section C: Cumulative Cross-Instrument Comparison (Best P-Index Per Instrument)\n\n`);
+    write(cw, `*For each original version and its batch clones, we select the best p-index per instrument\n`);
+    write(cw, `(by win rate), then compute cumulative metrics across all instruments.*\n\n`);
+
     const BATCH_OFFSETS = [
         { offset: 50, label: "Entry/Stop" },
         { offset: 100, label: "Trend" },
@@ -838,38 +791,30 @@ function generateCompactSummary(allTrades) {
         { offset: 200, label: "Exit Mgmt" },
     ];
 
-    md += `| Orig V | Batch | Original | Original WR | Original Ret | Batch Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`;
-    md += `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+    write(cw, `| Orig V | Batch | Original | Original WR | Original Ret | Batch Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`);
+    write(cw, `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`);
 
     for (let origV = 1; origV <= 50; origV++) {
-        const origEntry = [...versionCumulative.values()].find(
-            v => v.vNum === origV && v.verKey.includes(`V${origV}:`) && !v.verKey.includes('(Original)')
-        );
+        const origEntry = [...versionBest.entries()].find(([k]) => {
+            const vn = parseInt(k.match(versionRegex)?.[1]);
+            return vn === origV && !k.includes('(Original)');
+        });
         if (!origEntry) continue;
-
         for (const batch of BATCH_OFFSETS) {
             const cloneV = origV + batch.offset;
-            const cloneEntry = [...versionCumulative.values()].find(
-                v => v.vNum === cloneV
-            );
+            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
             if (!cloneEntry) continue;
-
-            const wrDelta = cloneEntry.winRate - origEntry.winRate;
-            const retDelta = cloneEntry.avgReturn - origEntry.avgReturn;
-
-            // Only show if both have meaningful data
-            if (origEntry.totalTrades >= MIN_TRADES && cloneEntry.totalTrades >= MIN_TRADES) {
-                md += `| V${origV} | ${batch.label} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${cloneEntry.verKey} | ${cloneEntry.winRate.toFixed(1)}% | ${cloneEntry.avgReturn >= 0 ? '+' : ''}${cloneEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
-            }
+            const o = origEntry[1], c = cloneEntry[1];
+            if (o.totalTrades < MIN_TRADES || c.totalTrades < MIN_TRADES) continue;
+            write(cw, `| V${origV} | ${batch.label} | ${origEntry[0]} | ${o.winRate.toFixed(1)}% | ${o.avgReturn >= 0 ? '+' : ''}${o.avgReturn.toFixed(2)}% | ${cloneEntry[0]} | ${c.winRate.toFixed(1)}% | ${c.avgReturn >= 0 ? '+' : ''}${c.avgReturn.toFixed(2)}% | ${(c.winRate - o.winRate) >= 0 ? '+' : ''}${(c.winRate - o.winRate).toFixed(1)}% | ${(c.avgReturn - o.avgReturn) >= 0 ? '+' : ''}${(c.avgReturn - o.avgReturn).toFixed(2)}% |\n`);
         }
     }
-    md += `\n`;
+    write(cw, `\n`);
 
-    // Step 4: Brooks comparison — V851-V904 batch profiles
-    md += `### Brooks Strategies — Batch Profiles\n\n`;
-    md += `| Orig V | Profile | Original | Original WR | Original Ret | Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`;
-    md += `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
-
+    // Brooks (V851-V904)
+    write(cw, `### Brooks Strategies — Batch Profiles\n\n`);
+    write(cw, `| Orig V | Profile | Original | Original WR | Original Ret | Clone | Clone WR | Clone Ret | WR Δ | Ret Δ |\n`);
+    write(cw, `| :---: | :--- | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: |\n`);
     const brooksOrig = [851, 852, 853];
     const brooksBatchOffsets = [
         { offset: 3, label: "Entry/Stop" },
@@ -878,54 +823,444 @@ function generateCompactSummary(allTrades) {
         { offset: 12, label: "Exit Mgmt" },
     ];
     for (const origV of brooksOrig) {
-        const origEntry = [...versionCumulative.values()].find(v => v.vNum === origV);
-        if (!origEntry || origEntry.totalTrades < MIN_TRADES) continue;
+        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === origV);
+        if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
         for (const batch of brooksBatchOffsets) {
-            const cloneV = 851 + 3 + batch.offset + (origV - 851);
-            const cloneEntry = [...versionCumulative.values()].find(v => v.vNum === cloneV);
-            if (!cloneEntry || cloneEntry.totalTrades < MIN_TRADES) continue;
-            const wrDelta = cloneEntry.winRate - origEntry.winRate;
-            const retDelta = cloneEntry.avgReturn - origEntry.avgReturn;
-            md += `| V${origV} | ${batch.label} | ${origEntry.verKey} | ${origEntry.winRate.toFixed(1)}% | ${origEntry.avgReturn >= 0 ? '+' : ''}${origEntry.avgReturn.toFixed(2)}% | ${cloneEntry.verKey} | ${cloneEntry.winRate.toFixed(1)}% | ${cloneEntry.avgReturn >= 0 ? '+' : ''}${cloneEntry.avgReturn.toFixed(2)}% | ${wrDelta >= 0 ? '+' : ''}${wrDelta.toFixed(1)}% | ${retDelta >= 0 ? '+' : ''}${retDelta.toFixed(2)}% |\n`;
+            const cloneV = 851 + batch.offset + (origV - 851);
+            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
+            if (!cloneEntry || cloneEntry[1].totalTrades < MIN_TRADES) continue;
+            const o = origEntry[1], c = cloneEntry[1];
+            write(cw, `| V${origV} | ${batch.label} | ${origEntry[0]} | ${o.winRate.toFixed(1)}% | ${o.avgReturn >= 0 ? '+' : ''}${o.avgReturn.toFixed(2)}% | ${cloneEntry[0]} | ${c.winRate.toFixed(1)}% | ${c.avgReturn >= 0 ? '+' : ''}${c.avgReturn.toFixed(2)}% | ${(c.winRate - o.winRate) >= 0 ? '+' : ''}${(c.winRate - o.winRate).toFixed(1)}% | ${(c.avgReturn - o.avgReturn) >= 0 ? '+' : ''}${(c.avgReturn - o.avgReturn).toFixed(2)}% |\n`);
         }
     }
-    md += `\n`;
+    write(cw, `\n`);
 
-    // Step 5: Individual fix profile summary — avg WR impact per fix
-    md += `### Individual Fix Profiles — Average WR Impact (V251-V850 vs V1-V50 Originals)\n\n`;
-    md += `| Fix Profile | Avg WR Δ | Best WR Gain | Worst WR Loss | Positive Orig | Negative Orig |\n`;
-    md += `| :--- | :---: | :---: | :---: | :---: | :---: |\n`;
+    // Individual Fix Profile Summary
+    write(cw, `### Individual Fix Profiles — Average WR Impact (V251-V850 vs V1-V50 Originals)\n\n`);
+    write(cw, `| Fix Profile | Avg WR Δ | Best WR Gain | Worst WR Loss | Positive Orig | Negative Orig |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
 
     const FIX_ORDER = ["stop_wider","trigger_wider","atr_floor","slippage","abr_slope","adx_filter","gap_optional","leg_depth","pivot_struct","trailing","time_exit","bar_path"];
     const FIX_LABELS = {stop_wider:"Stop Wider",trigger_wider:"Trigger Wider",atr_floor:"ATR Floor",slippage:"Slippage",abr_slope:"ABR Slope",adx_filter:"ADX Filter",gap_optional:"Gap Optional",leg_depth:"Leg Depth",pivot_struct:"Pivot Structural",trailing:"Trailing Stop",time_exit:"Time Exit",bar_path:"Bar Path Exit"};
 
-    const fixStats = {};
     for (let fixIdx = 0; fixIdx < FIX_ORDER.length; fixIdx++) {
-        const fixKey = FIX_ORDER[fixIdx];
         const baseVersion = 251 + fixIdx * 50;
         const deltas = [];
         for (let origV = 1; origV <= 50; origV++) {
-            const origEntry = [...versionCumulative.values()].find(v => v.vNum === origV && v.verKey.includes(`V${origV}:`) && !v.verKey.includes('(Original)'));
+            const origEntry = [...versionBest.entries()].find(([k]) => {
+                const vn = parseInt(k.match(versionRegex)?.[1]);
+                return vn === origV && !k.includes('(Original)');
+            });
             const fixV = baseVersion + origV - 1;
-            const fixEntry = [...versionCumulative.values()].find(v => v.vNum === fixV);
-            if (origEntry && fixEntry && origEntry.totalTrades >= MIN_TRADES && fixEntry.totalTrades >= MIN_TRADES) {
-                deltas.push(fixEntry.winRate - origEntry.winRate);
+            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            if (origEntry && fixEntry) {
+                const o = origEntry[1], f = fixEntry[1];
+                if (o.totalTrades >= MIN_TRADES && f.totalTrades >= MIN_TRADES) {
+                    deltas.push(f.winRate - o.winRate);
+                }
             }
         }
         if (deltas.length > 0) {
-            const avg = deltas.reduce((s,d)=>s+d,0)/deltas.length;
-            const best = Math.max(...deltas);
-            const worst = Math.min(...deltas);
-            const positive = deltas.filter(d=>d>0).length;
-            const negative = deltas.filter(d=>d<0).length;
-            fixStats[fixKey] = {avg, best, worst, positive, negative, label: FIX_LABELS[fixKey]};
+            const avg = deltas.reduce((s, d) => s + d, 0) / deltas.length;
+            write(cw, `| ${FIX_LABELS[FIX_ORDER[fixIdx]]} | ${avg >= 0 ? '+' : ''}${avg.toFixed(1)}% | ${Math.max(...deltas) >= 0 ? '+' : ''}${Math.max(...deltas).toFixed(1)}% | ${Math.min(...deltas).toFixed(1)}% | ${deltas.filter(d => d > 0).length} | ${deltas.filter(d => d < 0).length} |\n`);
         }
     }
-    const sortedFixes = Object.entries(fixStats).sort((a,b) => b[1].avg - a[1].avg);
-    for (const [key, s] of sortedFixes) {
-        md += `| ${s.label} | ${s.avg >= 0 ? '+' : ''}${s.avg.toFixed(1)}% | ${s.best >= 0 ? '+' : ''}${s.best.toFixed(1)}% | ${s.worst.toFixed(1)}% | ${s.positive} | ${s.negative} |\n`;
-    }
-    md += `\n`;
+    write(cw, `\n`);
 
-    return md;
+    // Section D: All Versions
+    write(cw, `### Section D: All Versions — Cumulative Cross-Instrument Metrics (Best Threshold Per Instrument)\n\n`);
+    write(cw, `| Version | Instruments | Total Trades | Win Rate | Avg Return | Total Return |\n`);
+    write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
+    const sortedBest = [...versionBest.entries()].sort((a, b) =>
+        parseInt(a[0].match(versionRegex)?.[1] || '0') - parseInt(b[0].match(versionRegex)?.[1] || '0')
+    );
+    for (const [ver, d] of sortedBest) {
+        write(cw, `| ${ver} | ${d.instrumentsUsed} | ${d.totalTrades} | ${d.winRate.toFixed(1)}% | ${d.avgReturn >= 0 ? '+' : ''}${d.avgReturn.toFixed(2)}% | ${d.totalPnlPct >= 0 ? '+' : ''}${d.totalPnlPct.toFixed(2)}% |\n`);
+    }
+    write(cw, `\n`);
+
+    // ── Req 1: Brooks V851-V904 Full Improvement Analysis ──
+    write(cw, `## Section E: Brooks Strategy Improvement Matrix (V851-V904)\n\n`);
+    write(cw, `*How each Brooks base strategy improves with batch profiles and individual fixes.*\n\n`);
+
+    // 1. Brooks batch profile impact (already above, but add per-base summary)
+    const BROOKS_BASES = [
+        { v: 851, name: 'Brooks Structural Pure', offsets: [3,6,9,12] },
+        { v: 852, name: 'Brooks Volume-Optimized', offsets: [3,6,9,12] },
+        { v: 853, name: 'Brooks Selective (WR Focus)', offsets: [3,6,9,12] },
+    ];
+
+    for (const base of BROOKS_BASES) {
+        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === base.v);
+        if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
+        write(cw, `### ${base.name} (V${base.v}) — Batch Profile Impact\n\n`);
+        write(cw, `| Profile | Version | WR | Avg Ret | Total Trades | WR Δ vs Base |\n`);
+        write(cw, `| :--- | :--- | :---: | :---: | :---: | :---: |\n`);
+        const o = origEntry[1];
+        write(cw, `| **Base** | V${base.v} | ${o.winRate.toFixed(1)}% | ${o.avgReturn >= 0 ? '+' : ''}${o.avgReturn.toFixed(2)}% | ${o.totalTrades} | — |\n`);
+
+        for (const bo of brooksBatchOffsets) {
+            const cloneV = 851 + bo.offset + (base.v - 851);
+            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
+            if (!cloneEntry || cloneEntry[1].totalTrades < MIN_TRADES) continue;
+            const c = cloneEntry[1];
+            write(cw, `| ${bo.label} | V${cloneV} | ${c.winRate.toFixed(1)}% | ${c.avgReturn >= 0 ? '+' : ''}${c.avgReturn.toFixed(2)}% | ${c.totalTrades} | ${(c.winRate - o.winRate) >= 0 ? '+' : ''}${(c.winRate - o.winRate).toFixed(1)}% |\n`);
+        }
+        write(cw, `\n`);
+    }
+
+    // 2. Brooks fix profile impact
+    write(cw, `### Brooks Strategy — Fix Profile Impact (V854-V904)\n\n`);
+    write(cw, `| Brooks Base | Fix | Version | WR | Avg Ret | Total Trades | WR Δ vs Base |\n`);
+    write(cw, `| :--- | :--- | :--- | :---: | :---: | :---: | :---: |\n`);
+
+    for (const base of BROOKS_BASES) {
+        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === base.v);
+        if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
+        const o = origEntry[1];
+
+        for (let fixIdx = 0; fixIdx < FIX_ORDER.length; fixIdx++) {
+            // Brooks fix versions start at 854 (Structural Pure), 855 (Volume-Opt), 856 (Selective) for fix 0
+            const fixV = 854 + fixIdx * 3 + (base.v - 851);
+            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            if (!fixEntry || fixEntry[1].totalTrades < MIN_TRADES) continue;
+            const f = fixEntry[1];
+            write(cw, `| ${base.name} | ${FIX_LABELS[FIX_ORDER[fixIdx]]} | V${fixV} | ${f.winRate.toFixed(1)}% | ${f.avgReturn >= 0 ? '+' : ''}${f.avgReturn.toFixed(2)}% | ${f.totalTrades} | ${(f.winRate - o.winRate) >= 0 ? '+' : ''}${(f.winRate - o.winRate).toFixed(1)}% |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // ── Req 1: Instrument-Type Cross-Referencing Recommendations ──
+    write(cw, `## Section F: Instrument-Type Strategy Recommendations\n\n`);
+    write(cw, `*Best strategy + fix profile per instrument type based on win rate and cross-instrument consistency.*\n\n`);
+
+    // Instrument type classification
+    const INST_TYPES = new Map();
+    for (const instName of [...new Set([...instCombos.keys()])]) {
+        if (instName.includes('Future') && (instName.includes('Nifty') || instName.includes('Bank') || instName.includes('Fin') || instName.includes('Midcap'))) {
+            INST_TYPES.set(instName, 'Index Future');
+        } else if (instName.includes('Future') && !instName.includes('Mini') && !instName.includes('Micro') && !instName.includes('Petal') && !instName.includes('MCX')) {
+            // Equity futures (not commodity, not MCX mini variants)
+            if (['Reliance Future','HDFC Bank Future','ICICI Bank Future','SBI Future','TCS Future','Infosys Future','ITC Future','Bharti Airtel Future','Axis Bank Future','L&T Future','Tata Steel Future','Tata Motors Future','Bajaj Finance Future','Kotak Bank Future','Sun Pharma Future','JSW Steel Future','Coal India Future','Adani Enterprises Future','Adani Ports Future','Hindalco Future','Apollo Hospitals Future','PNB Future','SAIL Future','SUZLON Future','PAYTM Future','RVNL Future','IRFC Future','IREDA Future','BHEL Future','GAIL Future','TRENT Future'].includes(instName)) {
+                INST_TYPES.set(instName, 'Equity Future');
+            }
+        } else if (instName.includes('Future') || instName.includes('Mini') || instName.includes('Micro') || instName.includes('Petal') || instName.includes('Gold') || instName.includes('Silver') || instName.includes('Crude') || instName.includes('Natural Gas') || instName.includes('Copper') || instName.includes('Aluminium') || instName.includes('Zinc') || instName.includes('Lead')) {
+            INST_TYPES.set(instName, 'Commodity');
+        } else if (instName.includes('(MCX)')) {
+            INST_TYPES.set(instName, 'Commodity');
+        } else if (['Nifty 50','Bank Nifty','Fin Nifty','Midcap Nifty'].includes(instName)) {
+            INST_TYPES.set(instName, 'Index Cash');
+        } else {
+            INST_TYPES.set(instName, 'Equity Cash');
+        }
+    }
+
+    // For each instrument type, find best version (across all V1-V904) + show optimal candle range
+    const typeCombos = new Map(); // type → [{version, instrument, avgWinRate, count, ...}]
+    for (const [inst, combos] of instCombos) {
+        const type = INST_TYPES.get(inst) || 'Other';
+        if (!typeCombos.has(type)) typeCombos.set(type, []);
+        for (const c of combos) {
+            typeCombos.get(type).push({ ...c, instrument: inst });
+        }
+    }
+
+    write(cw, `| Instrument Type | Best Version | Best Fix Group (Top 3) | Avg Win Rate | Instruments Tested |\n`);
+    write(cw, `| :--- | :--- | :--- | :---: | :---: |\n`);
+
+    for (const [type, combos] of typeCombos) {
+        if (combos.length === 0) continue;
+
+        // Aggregate by version across instruments in this type
+        const verMap = new Map();
+        for (const c of combos) {
+            if (!verMap.has(c.version)) verMap.set(c.version, { totalWR: 0, totalRet: 0, totalTrades: 0, count: 0, instruments: new Set() });
+            const e = verMap.get(c.version);
+            e.totalWR += c.winRate;
+            e.totalRet += c.avgReturn;
+            e.totalTrades += c.trades;
+            e.count++;
+            e.instruments.add(c.instrument);
+        }
+
+        const ranked = [...verMap.entries()]
+            .sort((a, b) => b[1].totalWR / b[1].count - a[1].totalWR / a[1].count || b[1].count - a[1].count)
+            .slice(0, 3);
+
+        const bestName = ranked[0] ? `${ranked[0][0]} (${(ranked[0][1].totalWR / ranked[0][1].count).toFixed(1)}% WR)` : '—';
+        const bestFixes = ranked.map(([v, d]) => `${v.split(':')[0]}(${(d.totalWR/d.count).toFixed(1)}%)`).join(', ');
+        write(cw, `| ${type} | ${bestName} | ${bestFixes} | ${ranked[0] ? (ranked[0][1].totalWR / ranked[0][1].count).toFixed(1) : '—'}% | ${combos.map(c => c.instrument).filter((v,i,a) => a.indexOf(v) === i).length} |\n`);
+    }
+    write(cw, `\n`);
+
+    // ── Req 2: Threshold-Based Top 3 Per Instrument ──
+    const { L3 } = merged;
+    write(cw, `## Section G: Best Version+Threshold Per Instrument (Top 3 by Win Rate)\n\n`);
+    write(cw, `*Performance grouped by raw threshold value — the actual volume bar threshold to use in live trading.*\n`);
+    write(cw, `*Note: Same threshold produces consistent candle counts across dates. Use this to configure volume bars.*\n\n`);
+    write(cw, `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`);
+    write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+
+    const instThrCombos = new Map();
+    for (const [key, d] of Object.entries(L3 || {})) {
+        const parts = key.split('|');
+        if (parts.length < 3) continue;
+        const version = parts[0], instrument = parts[1], threshold = parts[2];
+        if (d.count < MIN_TRADES) continue;
+        const m = deriveMetrics(d);
+        if (!instThrCombos.has(instrument)) instThrCombos.set(instrument, []);
+        instThrCombos.get(instrument).push({ version, threshold, ...m, trades: d.count });
+    }
+
+    for (const [inst, combos] of instThrCombos) {
+        combos.sort((a, b) => b.winRate - a.winRate || b.totalReturn - a.totalReturn);
+        const top3 = combos.slice(0, 3);
+        top3.forEach((v, idx) => {
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
+        });
+    }
+    write(cw, `\n`);
+
+    // ── Req 3: Fix Cluster Consolidation (904 → ~240 via correlation clustering) ──
+    write(cw, `## Section H: Fix Profile Consolidation & Correlation Analysis\n\n`);
+    write(cw, `*8 of 12 fixes are near-perfectly correlated (r=0.97-1.00). Only ADX Filter (r≈0.75) and Pivot Structural (r≈0.71) are distinct.*\n`);
+    write(cw, `*Consolidating to 3 truly independent groups based on WR delta correlation across 50 base versions.*\n\n`);
+
+    // Build 50×12 fix delta matrix
+    const fixDeltaMatrix = []; // [{version: 1, fixName: 'stop_wider', origWR: X, fixWR: Y, delta: Z}, ...]
+    for (let fixIdx = 0; fixIdx < FIX_ORDER.length; fixIdx++) {
+        const baseVersion = 251 + fixIdx * 50;
+        for (let origV = 1; origV <= 50; origV++) {
+            const origEntry = [...versionBest.entries()].find(([k]) => {
+                const vn = parseInt(k.match(versionRegex)?.[1]);
+                return vn === origV && !k.includes('(Original)');
+            });
+            const fixV = baseVersion + origV - 1;
+            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            if (origEntry && fixEntry) {
+                const o = origEntry[1], f = fixEntry[1];
+                if (o.totalTrades >= MIN_TRADES && f.totalTrades >= MIN_TRADES) {
+                    fixDeltaMatrix.push({
+                        origV,
+                        fixName: FIX_ORDER[fixIdx],
+                        fixIdx,
+                        origWR: o.winRate,
+                        fixWR: f.winRate,
+                        delta: f.winRate - o.winRate,
+                    });
+                }
+            }
+        }
+    }
+
+    // Build 50-dim vector per fix
+    const fixVectors = {};
+    for (const fixName of FIX_ORDER) {
+        fixVectors[fixName] = [];
+        for (let v = 1; v <= 50; v++) {
+            const row = fixDeltaMatrix.find(r => r.origV === v && r.fixName === fixName);
+            fixVectors[fixName].push(row ? row.delta : 0);
+        }
+    }
+
+    // Compute pairwise correlations
+    function pearson(a, b) {
+        const n = a.length;
+        let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+        for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; }
+        const ma = sa / n, mb = sb / n;
+        for (let i = 0; i < n; i++) {
+            const da = a[i] - ma, db = b[i] - mb;
+            saa += da * da; sbb += db * db; sab += da * db;
+        }
+        const den = Math.sqrt(saa) * Math.sqrt(sbb);
+        return den === 0 ? 0 : sab / den;
+    }
+
+    // Simple hierarchical clustering: merge most correlated pairs recursively
+    let clusters = FIX_ORDER.map(f => [f]); // each fix starts as its own cluster
+    const TARGET_GROUPS = 5;
+
+    while (clusters.length > TARGET_GROUPS) {
+        let bestCorr = -Infinity, bestI = -1, bestJ = -1;
+        for (let i = 0; i < clusters.length; i++) {
+            for (let j = i + 1; j < clusters.length; j++) {
+                // Average correlation between clusters
+                let sum = 0, count = 0;
+                for (const fa of clusters[i]) {
+                    for (const fb of clusters[j]) {
+                        sum += pearson(fixVectors[fa], fixVectors[fb]);
+                        count++;
+                    }
+                }
+                const avg = count > 0 ? sum / count : 0;
+                if (avg > bestCorr) { bestCorr = avg; bestI = i; bestJ = j; }
+            }
+        }
+        // Merge clusters[bestI] and clusters[bestJ]
+        clusters[bestI] = clusters[bestI].concat(clusters[bestJ]);
+        clusters.splice(bestJ, 1);
+    }
+
+    // Override with simplified 3-group structure based on correlation data:
+    // G1: The 10 collinear fixes (Stop Wider, Trigger Wider, ATR Floor, Slippage, ABR Slope, Gap Optional, Leg Depth, Trailing Stop, Time Exit, Bar Path Exit)
+    // G2: ADX Filter (distinct, r≈0.75)
+    // G3: Pivot Structural (distinct, r≈0.71)
+    const simplifiedGroups = [
+        ["stop_wider","trigger_wider","atr_floor","slippage","abr_slope","gap_optional","leg_depth","trailing","time_exit","bar_path"],
+        ["adx_filter"],
+        ["pivot_struct"],
+    ];
+    const simpleGroupNames = ['G1: Entry+Stop (10 fixes)', 'G2: ADX Filter', 'G3: Pivot Structural'];
+
+    write(cw, `### Simplified Fix Groups (3 truly distinct)\n\n`);
+    write(cw, `*Based on correlation analysis — 10 collinear fixes merged into G1. ADX and Pivot Structural are independent.*\n\n`);
+    write(cw, `| Group | Fixes | Avg WR Impact | Best On Versions |\n`);
+    write(cw, `| :--- | :--- | :---: | :--- |\n`);
+
+    for (let g = 0; g < simplifiedGroups.length; g++) {
+        const groupFixes = simplifiedGroups[g];
+        const gDeltas = [];
+        const bestOnVersions = new Map();
+
+        for (let origV = 1; origV <= 50; origV++) {
+            let bestVDelta = -Infinity;
+            for (const fix of groupFixes) {
+                const row = fixDeltaMatrix.find(r => r.origV === origV && r.fixName === fix);
+                if (row && row.delta > bestVDelta) bestVDelta = row.delta;
+            }
+            if (bestVDelta > -Infinity) {
+                gDeltas.push(bestVDelta);
+                bestOnVersions.set(origV, bestVDelta);
+            }
+        }
+
+        const avgDelta = gDeltas.length > 0 ? gDeltas.reduce((s,d) => s + d, 0) / gDeltas.length : 0;
+        const topVersions = [...bestOnVersions.entries()]
+            .sort((a,b) => b[1] - a[1]).slice(0, 5)
+            .map(([v,d]) => `V${v}(${d >= 0 ? '+' : ''}${d.toFixed(1)}%)`).join(', ');
+
+        const fixNames = groupFixes.map(f => FIX_LABELS[f] || f).join(', ');
+        write(cw, `| ${simpleGroupNames[g]} | ${fixNames} | ${avgDelta >= 0 ? '+' : ''}${avgDelta.toFixed(1)}% | ${topVersions} |\n`);
+    }
+    write(cw, `\n`);
+
+    // Keep original 5-group clustering for reference
+    write(cw, `### Original Correlation Clusters (5 groups, auto-detected)\n\n`);
+    const groupNames = ['G1: Entry Protection', 'G2: Filter Quality', 'G3: Pattern Structure', 'G4: Exit Management', 'G5: Entry+Exit Combined'];
+
+    write(cw, `| Group | Fixes | Avg WR Impact | Best On Versions |\n`);
+    for (let g = 0; g < clusters.length; g++) {
+        const groupFixes = clusters[g];
+        // Aggregate: for each base version+instrument, take best fix in group
+        const gDeltas = [];
+        const bestOnVersions = new Map(); // version → best delta
+
+        for (let origV = 1; origV <= 50; origV++) {
+            let bestVDelta = -Infinity;
+            for (const fix of groupFixes) {
+                const row = fixDeltaMatrix.find(r => r.origV === origV && r.fixName === fix);
+                if (row && row.delta > bestVDelta) {
+                    bestVDelta = row.delta;
+                }
+            }
+            if (bestVDelta > -Infinity) {
+                gDeltas.push(bestVDelta);
+                bestOnVersions.set(origV, bestVDelta);
+            }
+        }
+
+        const avgDelta = gDeltas.length > 0 ? gDeltas.reduce((s,d) => s + d, 0) / gDeltas.length : 0;
+        const topVersions = [...bestOnVersions.entries()]
+            .sort((a,b) => b[1] - a[1]).slice(0, 5)
+            .map(([v,d]) => `V${v}(${d >= 0 ? '+' : ''}${d.toFixed(1)}%)`).join(', ');
+
+        const fixNames = groupFixes.map(f => FIX_LABELS[f] || f).join(', ');
+        write(cw, `| ${groupNames[g] || `Group ${g+1}`} | ${fixNames} | ${avgDelta >= 0 ? '+' : ''}${avgDelta.toFixed(1)}% | ${topVersions} |\n`);
+    }
+    write(cw, `\n`);
+
+    // Per-base-version best fix group (using 3 simplified groups)
+    write(cw, `### Per Base Version — Best Fix Group (3 Groups)\n\n`);
+    write(cw, `*Recommendation: use only 3 fix groups for live trading. ADX and Pivot Structural are independent; all others are interchangeable.*\n\n`);
+    write(cw, `| Base Version | Best Fix Group | Top Fix | Viable Alternatives |\n`);
+    write(cw, `| :---: | :--- | :--- | :--- |\n`);
+
+    for (let origV = 1; origV <= 50; origV++) {
+        let bestG = -1, bestGD = -Infinity, bestFix = '';
+        const groupDeltas = []; // [{group: 0, delta: X, fix: 'name'}]
+        for (let g = 0; g < simplifiedGroups.length; g++) {
+            let bestVD = -Infinity, bestF = '';
+            for (const fix of simplifiedGroups[g]) {
+                const row = fixDeltaMatrix.find(r => r.origV === origV && r.fixName === fix);
+                if (row && row.delta > bestVD) { bestVD = row.delta; bestF = fix; }
+            }
+            if (bestVD > -Infinity) {
+                groupDeltas.push({ group: g, delta: bestVD, fix: bestF });
+                if (bestVD > bestGD) { bestGD = bestVD; bestG = g; bestFix = bestF; }
+            }
+        }
+        if (bestG >= 0) {
+            // Show alternatives: any group with delta within 5% of best
+            const alternatives = groupDeltas
+                .filter(d => d.group !== bestG && bestGD - d.delta <= 5.0)
+                .map(d => `${simpleGroupNames[d.group].split(':')[0]}(${d.delta >= 0 ? '+' : ''}${d.delta.toFixed(1)}%)`)
+                .join(', ') || 'none';
+            write(cw, `| V${origV} | ${simpleGroupNames[bestG]} | ${FIX_LABELS[bestFix] || bestFix} (${bestGD >= 0 ? '+' : ''}${bestGD.toFixed(1)}%) | ${alternatives} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // Original per-base from 5-group clustering
+    write(cw, `### Per Base Version — Best Fix Group (5 Groups, Original)\n\n`);
+    write(cw, `| Base Version | Best Fix Group | Avg WR Δ | Top Individual Fix |\n`);
+    for (let origV = 1; origV <= 50; origV++) {
+        let bestGroup = '', bestGroupDelta = -Infinity, bestFixName = '';
+        for (let g = 0; g < clusters.length; g++) {
+            let bestVDelta = -Infinity;
+            let bestName = '';
+            for (const fix of clusters[g]) {
+                const row = fixDeltaMatrix.find(r => r.origV === origV && r.fixName === fix);
+                if (row && row.delta > bestVDelta) {
+                    bestVDelta = row.delta;
+                    bestName = fix;
+                }
+            }
+            if (bestVDelta > bestGroupDelta) {
+                bestGroupDelta = bestVDelta;
+                bestGroup = groupNames[g] || `Group ${g+1}`;
+                bestFixName = bestName;
+            }
+        }
+        if (bestGroup) {
+            write(cw, `| V${origV} | ${bestGroup} | ${bestGroupDelta >= 0 ? '+' : ''}${bestGroupDelta.toFixed(1)}% | ${FIX_LABELS[bestFixName] || bestFixName} |\n`);
+        }
+    }
+    write(cw, `\n`);
+
+    // Fix correlation matrix
+    write(cw, `### Fix Correlation Matrix\n\n`);
+    write(cw, `| Fix | ${FIX_ORDER.map(f => FIX_LABELS[f] || f).join(' | ')} |\n`);
+    write(cw, `| :--- | ${FIX_ORDER.map(() => ':---:').join(' | ')} |\n`);
+    for (const fa of FIX_ORDER) {
+        const corrs = FIX_ORDER.map(fb => {
+            const c = pearson(fixVectors[fa], fixVectors[fb]);
+            return c.toFixed(2);
+        });
+        write(cw, `| ${FIX_LABELS[fa] || fa} | ${corrs.join(' | ')} |\n`);
+    }
+    write(cw, `\n`);
 }
+
+// ── Main ──
+
+(async () => {
+    try {
+        const merged = await collectAggregatedData();
+        await generateReport(merged);
+        console.log('\n✅ Report generation complete.');
+    } catch (err) {
+        console.error('Fatal error:', err);
+        process.exit(1);
+    }
+})();

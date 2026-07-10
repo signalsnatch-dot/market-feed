@@ -1,0 +1,2159 @@
+{
+  "generated_at": "2026-07-09T17:06:58.483Z",
+  "generated_at_ist": "9/7/2026, 10:36:58 pm",
+  "version": "1.0.0",
+  "scoring_formula": {
+    "composite": "(winRatePct × 0.45) + (avgReturnPct × 0.35) + (normalizedTrades × 0.2)",
+    "trades_normalization": "linear min-max per instrument, neutral=50 if single p-index",
+    "win_rate_selection": "best winRate across all versions for same (instrument, p-index)",
+    "confidence_percentile": "75th"
+  },
+  "source": {
+    "compact_summary": "/home/aghilan/ticker/version-backtest-report/live_compact_summary_2026-07-09_14-16.md",
+    "version_backtest_results": "/home/aghilan/ticker/version-backtest-results",
+    "backtest_results": "/home/aghilan/ticker/backtest-results"
+  },
+  "instruments": [
+    {
+      "instrument_key": "MCX_FO|466583",
+      "instrument_name": "Gold Future",
+      "static_thresholds": [
+        44,
+        46,
+        49,
+        52,
+        55,
+        59,
+        64,
+        68,
+        74,
+        82
+      ],
+      "daily_bar_estimates": {
+        "0": 149,
+        "1": 142,
+        "2": 134,
+        "3": 126,
+        "4": 119,
+        "5": 111,
+        "6": 102,
+        "7": 96,
+        "8": 89,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.28,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.33,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "mCX_metal"
+      },
+      "top3": [
+        {
+          "pIndex": 6,
+          "thresholdValue": 64,
+          "compositeScore": 55.06,
+          "winRate": 100,
+          "estimatedBarsPerDay": 102
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 6,
+          "thresholdValue": 64,
+          "winRate": 100,
+          "avgReturnPct": 0.17,
+          "trades": 6,
+          "normalizedTrades": 50,
+          "compositeScore": 55.06,
+          "versionCount": 2,
+          "versions": [
+            "V73: High Confidence (Structural-Calibrated) (Entry/Stop)",
+            "V373: High Confidence (Structural-Calibrated) (ATR Floor)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 6,
+      "bestThreshold": 64,
+      "bestCompositeScore": 55.06
+    },
+    {
+      "instrument_key": "MCX_FO|510764",
+      "instrument_name": "Gold Mini Future",
+      "static_thresholds": [
+        65,
+        95,
+        125,
+        155,
+        185,
+        215,
+        245,
+        275,
+        305,
+        335,
+        365,
+        395,
+        425,
+        455,
+        492
+      ],
+      "daily_bar_estimates": {},
+      "recommended_ratios": {},
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 65,
+          "compositeScore": 55.07,
+          "winRate": 100,
+          "estimatedBarsPerDay": null
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 65,
+          "winRate": 100,
+          "avgReturnPct": 0.21,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.07,
+          "versionCount": 3,
+          "versions": [
+            "V58: High Confidence (Strict) (Entry/Stop)",
+            "V68: High Confidence (Strict-Calibrated) (Entry/Stop)",
+            "V358: High Confidence (Strict) (ATR Floor)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 65,
+      "bestCompositeScore": 55.07
+    },
+    {
+      "instrument_key": "MCX_FO|520703",
+      "instrument_name": "Crude Oil Mini Future",
+      "static_thresholds": [
+        818,
+        864,
+        916,
+        967,
+        1032,
+        1106,
+        1192,
+        1279,
+        1395,
+        1534
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.2,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.17,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "mCX_high_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 864,
+          "compositeScore": 55.16,
+          "winRate": 100,
+          "estimatedBarsPerDay": 142
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 864,
+          "winRate": 100,
+          "avgReturnPct": 0.46,
+          "trades": 4,
+          "normalizedTrades": 50,
+          "compositeScore": 55.16,
+          "versionCount": 3,
+          "versions": [
+            "V153: High Confidence (Leg Quality)",
+            "V163: High Confidence (Calibrated) (Leg Quality)",
+            "V151: Double Traps (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 1,
+      "bestThreshold": 864,
+      "bestCompositeScore": 55.16
+    },
+    {
+      "instrument_key": "MCX_FO|538685",
+      "instrument_name": "Natural Gas Future",
+      "static_thresholds": [
+        725,
+        766,
+        812,
+        857,
+        914,
+        980,
+        1056,
+        1133,
+        1236,
+        1360
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.2,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.17,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "mCX_high_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 725,
+          "compositeScore": 65.13,
+          "winRate": 100,
+          "estimatedBarsPerDay": 150
+        },
+        {
+          "pIndex": 2,
+          "thresholdValue": 812,
+          "compositeScore": 45.17,
+          "winRate": 100,
+          "estimatedBarsPerDay": 134
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 725,
+          "winRate": 100,
+          "avgReturnPct": 0.37,
+          "trades": 4,
+          "normalizedTrades": 100,
+          "compositeScore": 65.13,
+          "versionCount": 2,
+          "versions": [
+            "V651: Double Traps (Pivot Structural)",
+            "V661: Double Traps (Calibrated) (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 2,
+          "thresholdValue": 812,
+          "winRate": 100,
+          "avgReturnPct": 0.48,
+          "trades": 3,
+          "normalizedTrades": 0,
+          "compositeScore": 45.17,
+          "versionCount": 1,
+          "versions": [
+            "V21: Double Traps (Structural-Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 725,
+      "bestCompositeScore": 65.13
+    },
+    {
+      "instrument_key": "MCX_FO|568830",
+      "instrument_name": "Aluminium Future",
+      "static_thresholds": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "daily_bar_estimates": {
+        "0": 125,
+        "1": 83,
+        "2": 63,
+        "3": 50,
+        "4": 42,
+        "5": 36,
+        "6": 31,
+        "7": 28,
+        "8": 25,
+        "9": 23
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.4,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.25,
+        "stopOffsetRatioV2": 0.45,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.22,
+        "structureOffsetRatio": 0.18,
+        "minConfidenceThreshold": 35,
+        "instrumentType": "mCX_base_metal"
+      },
+      "top3": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 3,
+          "compositeScore": 55.03,
+          "winRate": 100,
+          "estimatedBarsPerDay": 83
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 3,
+          "winRate": 100,
+          "avgReturnPct": 0.08,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.03,
+          "versionCount": 3,
+          "versions": [
+            "V21: Double Traps (Structural-Calibrated)",
+            "V23: High Confidence (Structural-Calibrated)",
+            "V11: Double Traps (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 1,
+      "bestThreshold": 3,
+      "bestCompositeScore": 55.03
+    },
+    {
+      "instrument_key": "MCX_FO|568831",
+      "instrument_name": "Copper Future",
+      "static_thresholds": [
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "daily_bar_estimates": {
+        "0": 119,
+        "1": 107,
+        "2": 97,
+        "3": 89,
+        "4": 82,
+        "5": 76,
+        "6": 71,
+        "7": 67,
+        "8": 63,
+        "9": 59
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.28,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.33,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "mCX_metal"
+      },
+      "top3": [
+        {
+          "pIndex": 5,
+          "thresholdValue": 14,
+          "compositeScore": 65.05,
+          "winRate": 100,
+          "estimatedBarsPerDay": 76
+        },
+        {
+          "pIndex": 4,
+          "thresholdValue": 13,
+          "compositeScore": 45.08,
+          "winRate": 100,
+          "estimatedBarsPerDay": 82
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 5,
+          "thresholdValue": 14,
+          "winRate": 100,
+          "avgReturnPct": 0.13,
+          "trades": 6,
+          "normalizedTrades": 100,
+          "compositeScore": 65.05,
+          "versionCount": 1,
+          "versions": [
+            "V15: Wade Structural (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 4,
+          "thresholdValue": 13,
+          "winRate": 100,
+          "avgReturnPct": 0.23,
+          "trades": 3,
+          "normalizedTrades": 0,
+          "compositeScore": 45.08,
+          "versionCount": 2,
+          "versions": [
+            "V192: EMA Pullback (Structural-Calibrated Upgraded) (Leg Quality)",
+            "V193: High Confidence (Structural-Calibrated Upgraded) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 5,
+      "bestThreshold": 14,
+      "bestCompositeScore": 65.05
+    },
+    {
+      "instrument_key": "MCX_FO|568836",
+      "instrument_name": "Zinc Future",
+      "static_thresholds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "daily_bar_estimates": {
+        "0": 130,
+        "1": 65,
+        "2": 43,
+        "3": 32,
+        "4": 26,
+        "5": 22,
+        "6": 19,
+        "7": 16,
+        "8": 14,
+        "9": 13
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.4,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.25,
+        "stopOffsetRatioV2": 0.45,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.22,
+        "structureOffsetRatio": 0.18,
+        "minConfidenceThreshold": 35,
+        "instrumentType": "mCX_base_metal"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 3,
+          "compositeScore": 55.04,
+          "winRate": 100,
+          "estimatedBarsPerDay": 43
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 3,
+          "winRate": 100,
+          "avgReturnPct": 0.12,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.04,
+          "versionCount": 3,
+          "versions": [
+            "V75: Wade Structural (Structural-Calibrated) (Entry/Stop)",
+            "V375: Wade Structural (Structural-Calibrated) (ATR Floor)",
+            "V225: Wade Structural (Structural-Calibrated) (Exit Mgmt)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 3,
+      "bestCompositeScore": 55.04
+    },
+    {
+      "instrument_key": "NSE_EQ|INE038A01020",
+      "instrument_name": "Hindalco Cash Equity",
+      "static_thresholds": [
+        41544,
+        43884,
+        46504,
+        49068,
+        52366,
+        56140,
+        60501,
+        64912,
+        70813,
+        77895
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 52366,
+          "compositeScore": 40.05,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 119
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 52366,
+          "winRate": 66.7,
+          "avgReturnPct": 0.11,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.05,
+          "versionCount": 3,
+          "versions": [
+            "V51: Double Traps (Entry/Stop)",
+            "V61: Double Traps (Calibrated) (Entry/Stop)",
+            "V351: Double Traps (ATR Floor)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 4,
+      "bestThreshold": 52366,
+      "bestCompositeScore": 40.05
+    },
+    {
+      "instrument_key": "NSE_EQ|INE154A01025",
+      "instrument_name": "ITC Cash Equity",
+      "static_thresholds": [
+        84862,
+        89643,
+        94995,
+        100231,
+        106969,
+        114679,
+        123586,
+        132597,
+        144652,
+        159117
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 84862,
+          "compositeScore": 43.81,
+          "winRate": 75,
+          "estimatedBarsPerDay": 150
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 84862,
+          "winRate": 75,
+          "avgReturnPct": 0.16,
+          "trades": 4,
+          "normalizedTrades": 50,
+          "compositeScore": 43.81,
+          "versionCount": 3,
+          "versions": [
+            "V153: High Confidence (Leg Quality)",
+            "V163: High Confidence (Calibrated) (Leg Quality)",
+            "V653: High Confidence (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 84862,
+      "bestCompositeScore": 43.81
+    },
+    {
+      "instrument_key": "NSE_EQ|INE202E01016",
+      "instrument_name": "IREDA Cash Equity",
+      "static_thresholds": [
+        32854,
+        34705,
+        36777,
+        38804,
+        41413,
+        44397,
+        47846,
+        51335,
+        56001,
+        61602
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 32854,
+          "compositeScore": 40.05,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 150
+        },
+        {
+          "pIndex": 1,
+          "thresholdValue": 34705,
+          "compositeScore": 40.04,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 142
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 32854,
+          "winRate": 66.7,
+          "avgReturnPct": 0.11,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.05,
+          "versionCount": 2,
+          "versions": [
+            "V11: Double Traps (Calibrated)",
+            "V13: High Confidence (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 1,
+          "thresholdValue": 34705,
+          "winRate": 66.7,
+          "avgReturnPct": 0.07,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.04,
+          "versionCount": 1,
+          "versions": [
+            "V11: Double Traps (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 32854,
+      "bestCompositeScore": 40.05
+    },
+    {
+      "instrument_key": "NSE_FO|61091",
+      "instrument_name": "Fin Nifty Future",
+      "static_thresholds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        18
+      ],
+      "daily_bar_estimates": {},
+      "recommended_ratios": {},
+      "top3": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 4,
+          "compositeScore": 40,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": null
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 4,
+          "winRate": 66.7,
+          "avgReturnPct": -0.05,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40,
+          "versionCount": 3,
+          "versions": [
+            "V11: Double Traps (Calibrated)",
+            "V13: High Confidence (Calibrated)",
+            "V21: Double Traps (Structural-Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 1,
+      "bestThreshold": 4,
+      "bestCompositeScore": 40
+    },
+    {
+      "instrument_key": "NSE_FO|61092",
+      "instrument_name": "Midcap Nifty Future",
+      "static_thresholds": [
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        31,
+        33,
+        34
+      ],
+      "daily_bar_estimates": {
+        "0": 119,
+        "1": 114,
+        "2": 109,
+        "3": 105,
+        "4": 101,
+        "5": 98,
+        "6": 94,
+        "7": 88,
+        "8": 83,
+        "9": 81
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.28,
+        "triggerOffsetRatio": 0.06,
+        "emaTouchRatio": 0.1,
+        "stopOffsetRatioV2": 0.33,
+        "triggerOffsetRatioV2": 0.06,
+        "emaTouchRatioV2": 0.07,
+        "structureOffsetRatio": 0.1,
+        "minConfidenceThreshold": 50,
+        "instrumentType": "nse_index"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 23,
+          "compositeScore": 47.52,
+          "winRate": 83.3,
+          "estimatedBarsPerDay": 119
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 23,
+          "winRate": 83.3,
+          "avgReturnPct": 0.1,
+          "trades": 6,
+          "normalizedTrades": 50,
+          "compositeScore": 47.52,
+          "versionCount": 3,
+          "versions": [
+            "V11: Double Traps (Calibrated)",
+            "V13: High Confidence (Calibrated)",
+            "V21: Double Traps (Structural-Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 23,
+      "bestCompositeScore": 47.52
+    },
+    {
+      "instrument_key": "NSE_FO|61093",
+      "instrument_name": "Nifty 50 Future",
+      "static_thresholds": [
+        274,
+        289,
+        306,
+        323,
+        345,
+        370,
+        399,
+        428,
+        466,
+        513
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.28,
+        "triggerOffsetRatio": 0.06,
+        "emaTouchRatio": 0.1,
+        "stopOffsetRatioV2": 0.33,
+        "triggerOffsetRatioV2": 0.06,
+        "emaTouchRatioV2": 0.07,
+        "structureOffsetRatio": 0.1,
+        "minConfidenceThreshold": 50,
+        "instrumentType": "nse_index"
+      },
+      "top3": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 345,
+          "compositeScore": 55.02,
+          "winRate": 100,
+          "estimatedBarsPerDay": 119
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 345,
+          "winRate": 100,
+          "avgReturnPct": 0.07,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.02,
+          "versionCount": 1,
+          "versions": [
+            "V171: Double Traps (Structural-Calibrated) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 4,
+      "bestThreshold": 345,
+      "bestCompositeScore": 55.02
+    },
+    {
+      "instrument_key": "NSE_FO|61101",
+      "instrument_name": "Adani Ports July Future",
+      "static_thresholds": [
+        42,
+        45,
+        47,
+        50,
+        53,
+        57,
+        62,
+        66,
+        72,
+        80
+      ],
+      "daily_bar_estimates": {
+        "0": 151,
+        "1": 141,
+        "2": 135,
+        "3": 127,
+        "4": 120,
+        "5": 112,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 53,
+          "compositeScore": 65.08,
+          "winRate": 100,
+          "estimatedBarsPerDay": 120
+        },
+        {
+          "pIndex": 0,
+          "thresholdValue": 42,
+          "compositeScore": 45.13,
+          "winRate": 100,
+          "estimatedBarsPerDay": 151
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 53,
+          "winRate": 100,
+          "avgReturnPct": 0.24,
+          "trades": 6,
+          "normalizedTrades": 100,
+          "compositeScore": 65.08,
+          "versionCount": 1,
+          "versions": [
+            "V471: Double Traps (Structural-Calibrated) (ABR Slope)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 0,
+          "thresholdValue": 42,
+          "winRate": 100,
+          "avgReturnPct": 0.37,
+          "trades": 4,
+          "normalizedTrades": 0,
+          "compositeScore": 45.13,
+          "versionCount": 2,
+          "versions": [
+            "V71: Double Traps (Structural-Calibrated) (Entry/Stop)",
+            "V371: Double Traps (Structural-Calibrated) (ATR Floor)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 4,
+      "bestThreshold": 53,
+      "bestCompositeScore": 65.08
+    },
+    {
+      "instrument_key": "NSE_FO|61108",
+      "instrument_name": "Apollo Hospitals July Future",
+      "static_thresholds": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "daily_bar_estimates": {
+        "0": 118,
+        "1": 112,
+        "2": 107,
+        "3": 102,
+        "4": 98,
+        "5": 94,
+        "6": 90,
+        "7": 86,
+        "8": 83,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 21,
+          "compositeScore": 55.06,
+          "winRate": 100,
+          "estimatedBarsPerDay": 107
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 21,
+          "winRate": 100,
+          "avgReturnPct": 0.16,
+          "trades": 4,
+          "normalizedTrades": 50,
+          "compositeScore": 55.06,
+          "versionCount": 3,
+          "versions": [
+            "V172: EMA Pullback (Structural-Calibrated) (Leg Quality)",
+            "V174: Aggressive (Structural-Calibrated) (Leg Quality)",
+            "V672: EMA Pullback (Structural-Calibrated) (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 21,
+      "bestCompositeScore": 55.06
+    },
+    {
+      "instrument_key": "NSE_FO|61128",
+      "instrument_name": "BHEL July Future",
+      "static_thresholds": [
+        43,
+        45,
+        48,
+        51,
+        54,
+        58,
+        63,
+        67,
+        73,
+        81
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 143,
+        "2": 134,
+        "3": 126,
+        "4": 119,
+        "5": 111,
+        "6": 102,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 48,
+          "compositeScore": 43.78,
+          "winRate": 75,
+          "estimatedBarsPerDay": 134
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 48,
+          "winRate": 75,
+          "avgReturnPct": 0.08,
+          "trades": 4,
+          "normalizedTrades": 50,
+          "compositeScore": 43.78,
+          "versionCount": 1,
+          "versions": [
+            "V55: Wade Structural (Entry/Stop)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 48,
+      "bestCompositeScore": 43.78
+    },
+    {
+      "instrument_key": "NSE_FO|61170",
+      "instrument_name": "GAIL July Future",
+      "static_thresholds": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        30,
+        31,
+        33
+      ],
+      "daily_bar_estimates": {
+        "0": 120,
+        "1": 115,
+        "2": 110,
+        "3": 106,
+        "4": 102,
+        "5": 98,
+        "6": 94,
+        "7": 88,
+        "8": 85,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 24,
+          "compositeScore": 40.07,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 110
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 24,
+          "winRate": 66.7,
+          "avgReturnPct": 0.16,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.07,
+          "versionCount": 3,
+          "versions": [
+            "V53: High Confidence (Entry/Stop)",
+            "V63: High Confidence (Calibrated) (Entry/Stop)",
+            "V353: High Confidence (ATR Floor)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 24,
+      "bestCompositeScore": 40.07
+    },
+    {
+      "instrument_key": "NSE_FO|61214",
+      "instrument_name": "IREDA July Future",
+      "static_thresholds": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "daily_bar_estimates": {
+        "0": 122,
+        "1": 115,
+        "2": 110,
+        "3": 104,
+        "4": 100,
+        "5": 95,
+        "6": 91,
+        "7": 88,
+        "8": 84,
+        "9": 81
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 20,
+          "compositeScore": 40.04,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 110
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 20,
+          "winRate": 66.7,
+          "avgReturnPct": 0.06,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.04,
+          "versionCount": 3,
+          "versions": [
+            "V172: EMA Pullback (Structural-Calibrated) (Leg Quality)",
+            "V174: Aggressive (Structural-Calibrated) (Leg Quality)",
+            "V191: Double Traps (Structural-Calibrated Upgraded) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 20,
+      "bestCompositeScore": 40.04
+    },
+    {
+      "instrument_key": "NSE_FO|61215",
+      "instrument_name": "IRFC July Future",
+      "static_thresholds": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        30,
+        31,
+        33
+      ],
+      "daily_bar_estimates": {
+        "0": 120,
+        "1": 114,
+        "2": 110,
+        "3": 105,
+        "4": 101,
+        "5": 97,
+        "6": 94,
+        "7": 88,
+        "8": 85,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 23,
+          "compositeScore": 40.07,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 114
+        },
+        {
+          "pIndex": 4,
+          "thresholdValue": 26,
+          "compositeScore": 40.04,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 101
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 23,
+          "winRate": 66.7,
+          "avgReturnPct": 0.16,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.07,
+          "versionCount": 2,
+          "versions": [
+            "V171: Double Traps (Structural-Calibrated) (Leg Quality)",
+            "V671: Double Traps (Structural-Calibrated) (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 4,
+          "thresholdValue": 26,
+          "winRate": 66.7,
+          "avgReturnPct": 0.07,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.04,
+          "versionCount": 1,
+          "versions": [
+            "V176: Double Traps (Strict Structural-Calibrated) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 1,
+      "bestThreshold": 23,
+      "bestCompositeScore": 40.07
+    },
+    {
+      "instrument_key": "NSE_FO|61216",
+      "instrument_name": "ITC July Future",
+      "static_thresholds": [
+        70,
+        74,
+        79,
+        83,
+        89,
+        95,
+        102,
+        110,
+        120,
+        132
+      ],
+      "daily_bar_estimates": {
+        "0": 151,
+        "1": 142,
+        "2": 133,
+        "3": 127,
+        "4": 118,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 3,
+          "thresholdValue": 83,
+          "compositeScore": 55.07,
+          "winRate": 100,
+          "estimatedBarsPerDay": 127
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 3,
+          "thresholdValue": 83,
+          "winRate": 100,
+          "avgReturnPct": 0.19,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.07,
+          "versionCount": 1,
+          "versions": [
+            "V173: High Confidence (Structural-Calibrated) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 3,
+      "bestThreshold": 83,
+      "bestCompositeScore": 55.07
+    },
+    {
+      "instrument_key": "NSE_FO|61220",
+      "instrument_name": "JSW Steel July Future",
+      "static_thresholds": [
+        40,
+        42,
+        45,
+        47,
+        50,
+        54,
+        58,
+        62,
+        68,
+        75
+      ],
+      "daily_bar_estimates": {
+        "0": 149,
+        "1": 142,
+        "2": 133,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 5,
+          "thresholdValue": 54,
+          "compositeScore": 40.03,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 111
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 5,
+          "thresholdValue": 54,
+          "winRate": 66.7,
+          "avgReturnPct": 0.03,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.03,
+          "versionCount": 3,
+          "versions": [
+            "V225: Wade Structural (Structural-Calibrated) (Exit Mgmt)",
+            "V275: Wade Structural (Structural-Calibrated) (Stop Wider)",
+            "V325: Wade Structural (Structural-Calibrated) (Trigger Wider)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 5,
+      "bestThreshold": 54,
+      "bestCompositeScore": 40.03
+    },
+    {
+      "instrument_key": "NSE_FO|61226",
+      "instrument_name": "Kotak Bank July Future",
+      "static_thresholds": [
+        78,
+        82,
+        87,
+        92,
+        98,
+        106,
+        114,
+        122,
+        133,
+        146
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 143,
+        "2": 135,
+        "3": 127,
+        "4": 120,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 87,
+          "compositeScore": 55.12,
+          "winRate": 100,
+          "estimatedBarsPerDay": 135
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 2,
+          "thresholdValue": 87,
+          "winRate": 100,
+          "avgReturnPct": 0.34,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.12,
+          "versionCount": 3,
+          "versions": [
+            "V73: High Confidence (Structural-Calibrated) (Entry/Stop)",
+            "V373: High Confidence (Structural-Calibrated) (ATR Floor)",
+            "V173: High Confidence (Structural-Calibrated) (Leg Quality)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 2,
+      "bestThreshold": 87,
+      "bestCompositeScore": 55.12
+    },
+    {
+      "instrument_key": "NSE_FO|61235",
+      "instrument_name": "Tata Motors July Future",
+      "static_thresholds": [
+        26,
+        27,
+        29,
+        30,
+        31,
+        32,
+        34,
+        36,
+        38,
+        40
+      ],
+      "daily_bar_estimates": {
+        "0": 122,
+        "1": 117,
+        "2": 109,
+        "3": 105,
+        "4": 102,
+        "5": 99,
+        "6": 93,
+        "7": 88,
+        "8": 83,
+        "9": 79
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 31,
+          "compositeScore": 53.81,
+          "winRate": 75,
+          "estimatedBarsPerDay": 102
+        },
+        {
+          "pIndex": 5,
+          "thresholdValue": 32,
+          "compositeScore": 45.05,
+          "winRate": 100,
+          "estimatedBarsPerDay": 99
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 31,
+          "winRate": 75,
+          "avgReturnPct": 0.16,
+          "trades": 4,
+          "normalizedTrades": 100,
+          "compositeScore": 53.81,
+          "versionCount": 2,
+          "versions": [
+            "V173: High Confidence (Structural-Calibrated) (Leg Quality)",
+            "V673: High Confidence (Structural-Calibrated) (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 5,
+          "thresholdValue": 32,
+          "winRate": 100,
+          "avgReturnPct": 0.13,
+          "trades": 3,
+          "normalizedTrades": 0,
+          "compositeScore": 45.05,
+          "versionCount": 1,
+          "versions": [
+            "V525: Wade Structural (Structural-Calibrated) (ADX Filter)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 4,
+      "bestThreshold": 31,
+      "bestCompositeScore": 53.81
+    },
+    {
+      "instrument_key": "NSE_FO|61265",
+      "instrument_name": "PAYTM July Future",
+      "static_thresholds": [
+        38,
+        39,
+        41,
+        42,
+        45,
+        46,
+        49,
+        51,
+        54,
+        57
+      ],
+      "daily_bar_estimates": {
+        "0": 120,
+        "1": 117,
+        "2": 111,
+        "3": 108,
+        "4": 101,
+        "5": 99,
+        "6": 93,
+        "7": 89,
+        "8": 84,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 39,
+          "compositeScore": 55.08,
+          "winRate": 100,
+          "estimatedBarsPerDay": 117
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 1,
+          "thresholdValue": 39,
+          "winRate": 100,
+          "avgReturnPct": 0.23,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.08,
+          "versionCount": 3,
+          "versions": [
+            "V205: Wade Structural (Exit Mgmt)",
+            "V215: Wade Structural (Calibrated) (Exit Mgmt)",
+            "V255: Wade Structural (Stop Wider)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 1,
+      "bestThreshold": 39,
+      "bestCompositeScore": 55.08
+    },
+    {
+      "instrument_key": "NSE_FO|61274",
+      "instrument_name": "PNB July Future",
+      "static_thresholds": [
+        40,
+        42,
+        43,
+        45,
+        47,
+        49,
+        52,
+        54,
+        57,
+        60
+      ],
+      "daily_bar_estimates": {
+        "0": 121,
+        "1": 115,
+        "2": 112,
+        "3": 107,
+        "4": 103,
+        "5": 99,
+        "6": 93,
+        "7": 89,
+        "8": 85,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 47,
+          "compositeScore": 55.05,
+          "winRate": 100,
+          "estimatedBarsPerDay": 103
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 4,
+          "thresholdValue": 47,
+          "winRate": 100,
+          "avgReturnPct": 0.15,
+          "trades": 4,
+          "normalizedTrades": 50,
+          "compositeScore": 55.05,
+          "versionCount": 2,
+          "versions": [
+            "V11: Double Traps (Calibrated)",
+            "V13: High Confidence (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 4,
+      "bestThreshold": 47,
+      "bestCompositeScore": 55.05
+    },
+    {
+      "instrument_key": "NSE_FO|61284",
+      "instrument_name": "Reliance July Future",
+      "static_thresholds": [
+        172,
+        182,
+        192,
+        203,
+        217,
+        232,
+        250,
+        268,
+        293,
+        322
+      ],
+      "daily_bar_estimates": {
+        "0": 150,
+        "1": 142,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 3,
+          "thresholdValue": 203,
+          "compositeScore": 55.06,
+          "winRate": 100,
+          "estimatedBarsPerDay": 127
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 3,
+          "thresholdValue": 203,
+          "winRate": 100,
+          "avgReturnPct": 0.16,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.06,
+          "versionCount": 3,
+          "versions": [
+            "V21: Double Traps (Structural-Calibrated)",
+            "V23: High Confidence (Structural-Calibrated)",
+            "V71: Double Traps (Structural-Calibrated) (Entry/Stop)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 3,
+      "bestThreshold": 203,
+      "bestCompositeScore": 55.06
+    },
+    {
+      "instrument_key": "NSE_FO|61285",
+      "instrument_name": "RVNL July Future",
+      "static_thresholds": [
+        24,
+        25,
+        26,
+        27,
+        29,
+        30,
+        31,
+        33,
+        35,
+        36
+      ],
+      "daily_bar_estimates": {
+        "0": 122,
+        "1": 117,
+        "2": 112,
+        "3": 108,
+        "4": 101,
+        "5": 97,
+        "6": 94,
+        "7": 88,
+        "8": 83,
+        "9": 81
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 7,
+          "thresholdValue": 33,
+          "compositeScore": 40.03,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 88
+        },
+        {
+          "pIndex": 8,
+          "thresholdValue": 35,
+          "compositeScore": 40.03,
+          "winRate": 66.7,
+          "estimatedBarsPerDay": 83
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 7,
+          "thresholdValue": 33,
+          "winRate": 66.7,
+          "avgReturnPct": 0.05,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.03,
+          "versionCount": 2,
+          "versions": [
+            "V171: Double Traps (Structural-Calibrated) (Leg Quality)",
+            "V671: Double Traps (Structural-Calibrated) (Pivot Structural)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        },
+        {
+          "pIndex": 8,
+          "thresholdValue": 35,
+          "winRate": 66.7,
+          "avgReturnPct": 0.04,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 40.03,
+          "versionCount": 1,
+          "versions": [
+            "V73: High Confidence (Structural-Calibrated) (Entry/Stop)"
+          ],
+          "confidenceProfile": null,
+          "rank": 2
+        }
+      ],
+      "bestPIndex": 7,
+      "bestThreshold": 33,
+      "bestCompositeScore": 40.03
+    },
+    {
+      "instrument_key": "NSE_FO|61289",
+      "instrument_name": "SBI July Future",
+      "static_thresholds": [
+        87,
+        92,
+        97,
+        102,
+        109,
+        117,
+        126,
+        135,
+        148,
+        162
+      ],
+      "daily_bar_estimates": {
+        "0": 149,
+        "1": 141,
+        "2": 134,
+        "3": 127,
+        "4": 119,
+        "5": 111,
+        "6": 103,
+        "7": 96,
+        "8": 88,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.3,
+        "triggerOffsetRatio": 0.08,
+        "emaTouchRatio": 0.12,
+        "stopOffsetRatioV2": 0.35,
+        "triggerOffsetRatioV2": 0.08,
+        "emaTouchRatioV2": 0.09,
+        "structureOffsetRatio": 0.12,
+        "minConfidenceThreshold": 45,
+        "instrumentType": "nse_stock"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 87,
+          "compositeScore": 55.09,
+          "winRate": 100,
+          "estimatedBarsPerDay": 149
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 87,
+          "winRate": 100,
+          "avgReturnPct": 0.26,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.09,
+          "versionCount": 1,
+          "versions": [
+            "V71: Double Traps (Structural-Calibrated) (Entry/Stop)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 87,
+      "bestCompositeScore": 55.09
+    },
+    {
+      "instrument_key": "NSE_FO|61298",
+      "instrument_name": "SUZLON July Future",
+      "static_thresholds": [
+        42,
+        43,
+        45,
+        47,
+        49,
+        51,
+        54,
+        57,
+        60,
+        63
+      ],
+      "daily_bar_estimates": {
+        "0": 120,
+        "1": 117,
+        "2": 112,
+        "3": 107,
+        "4": 103,
+        "5": 99,
+        "6": 93,
+        "7": 88,
+        "8": 84,
+        "9": 80
+      },
+      "recommended_ratios": {
+        "stopOffsetRatio": 0.35,
+        "triggerOffsetRatio": 0.1,
+        "emaTouchRatio": 0.15,
+        "stopOffsetRatioV2": 0.4,
+        "triggerOffsetRatioV2": 0.1,
+        "emaTouchRatioV2": 0.12,
+        "structureOffsetRatio": 0.15,
+        "minConfidenceThreshold": 40,
+        "instrumentType": "nse_low_vol"
+      },
+      "top3": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 42,
+          "compositeScore": 55.12,
+          "winRate": 100,
+          "estimatedBarsPerDay": 120
+        }
+      ],
+      "rankings": [
+        {
+          "pIndex": 0,
+          "thresholdValue": 42,
+          "winRate": 100,
+          "avgReturnPct": 0.34,
+          "trades": 3,
+          "normalizedTrades": 50,
+          "compositeScore": 55.12,
+          "versionCount": 2,
+          "versions": [
+            "V11: Double Traps (Calibrated)",
+            "V13: High Confidence (Calibrated)"
+          ],
+          "confidenceProfile": null,
+          "rank": 1
+        }
+      ],
+      "bestPIndex": 0,
+      "bestThreshold": 42,
+      "bestCompositeScore": 55.12
+    }
+  ],
+  "unmatched_section_a": [],
+  "summary": {
+    "total_instruments": 29,
+    "instruments_with_data": 29,
+    "instruments_without_section_a_match": 0,
+    "unmatched_rows": 0
+  }
+}
