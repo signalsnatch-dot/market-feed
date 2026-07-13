@@ -231,19 +231,26 @@ function findPullbackSwingIndexV2(candles, currentIdx, lookback, direction, para
     let bestVal = direction === 'high' ? -Infinity : Infinity;
     const start = Math.max(confirmationBars + 1, currentIdx - lookback);
 
+    const isHigh = direction === 'high';
     for (let i = currentIdx - confirmationBars; i >= start; i--) {
         if (i - confirmationBars < 0 || i + confirmationBars >= candles.length) continue;
-        const val = direction === 'high' ? candles[i].high : candles[i].low;
+        const val = isHigh ? candles[i].high : candles[i].low;
         let isPivot = true;
         for (let k = 1; k <= confirmationBars; k++) {
-            if (direction === 'high') {
+            if (isHigh) {
                 if (candles[i - k].high >= val || candles[i + k].high >= val) { isPivot = false; break; }
             } else {
                 if (candles[i - k].low <= val || candles[i + k].low <= val) { isPivot = false; break; }
             }
         }
-        if (isPivot) {
-            const isBetter = direction === 'high' ? val > bestVal : val < bestVal;
+        if (!isPivot) continue;
+        // Forward-dominance: verify no bar after this pivot exceeds it
+        let forwardOk = true;
+        for (let j = i + 1; j < currentIdx; j++) {
+            if (isHigh ? candles[j].high > val : candles[j].low < val) { forwardOk = false; break; }
+        }
+        if (forwardOk) {
+            const isBetter = isHigh ? val > bestVal : val < bestVal;
             if (isBetter) { bestVal = val; bestIdx = i; }
         }
     }
@@ -254,14 +261,34 @@ function findPullbackSwingIndexV2(candles, currentIdx, lookback, direction, para
 }
 
 function originalFindSwing(candles, currentIdx, lookback, direction) {
-    let bestIdx = null;
-    let bestVal = direction === 'high' ? -Infinity : Infinity;
     const start = Math.max(0, currentIdx - lookback);
+    const isHigh = direction === 'high';
+    for (let i = currentIdx - 2; i >= start; i--) {
+        if (i <= 0 || i >= candles.length - 1) continue;
+        const val = isHigh ? candles[i].high : candles[i].low;
+        const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
+        const rightVal = isHigh ? candles[i + 1].high : candles[i + 1].low;
+        if (isHigh ? (val <= leftVal || val <= rightVal) : (val >= leftVal || val >= rightVal)) continue;
+        let ok = true;
+        for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
+        if (ok) return i;
+    }
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
-        const val = direction === 'high' ? candles[i].high : candles[i].low;
-        const isBetter = direction === 'high' ? val > bestVal : val < bestVal;
-        if (isBetter) { bestVal = val; bestIdx = i; }
+        const val = isHigh ? candles[i].high : candles[i].low;
+        const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
+        if (isHigh ? val <= leftVal : val >= leftVal) continue;
+        let ok = true;
+        for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
+        if (ok) return i;
+    }
+    let bestIdx = null, bestVal = isHigh ? -Infinity : Infinity;
+    for (let i = currentIdx - 1; i >= start; i--) {
+        if (i <= 0 || i >= candles.length - 1) continue;
+        const val = isHigh ? candles[i].high : candles[i].low;
+        let ok = true;
+        for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
+        if (ok && (isHigh ? val > bestVal : val < bestVal)) { bestVal = val; bestIdx = i; }
     }
     return bestIdx;
 }

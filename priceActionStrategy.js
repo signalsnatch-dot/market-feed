@@ -138,17 +138,56 @@ function getAverageBarRange(candles, currentIdx, lookback = 10) {
     return count > 0 ? sum / count : 0;
 }
 
+// Swing Pivot Detection with Forward-Dominance Validation
+// Three-pass priority: (1) clean pivot, (2) local peak, (3) any unbreached extreme.
+// All passes verify that no subsequent bar between peak and currentIdx exceeded it.
 function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
-    let bestIdx = null;
-    let bestVal = direction === 'high' ? -Infinity : Infinity;
     const start = Math.max(0, currentIdx - lookback);
+    const isHigh = direction === 'high';
+
+    // Pass 1: Most recent clean pivot (both neighbors confirm) with forward dominance
+    for (let i = currentIdx - 2; i >= start; i--) {
+        if (i <= 0 || i >= candles.length - 1) continue;
+        const val = isHigh ? candles[i].high : candles[i].low;
+        const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
+        const rightVal = isHigh ? candles[i + 1].high : candles[i + 1].low;
+        if (isHigh ? (val <= leftVal || val <= rightVal) : (val >= leftVal || val >= rightVal)) continue;
+
+        let isHighest = true;
+        for (let j = i + 1; j < currentIdx; j++) {
+            if (isHigh ? candles[j].high > val : candles[j].low < val) { isHighest = false; break; }
+        }
+        if (isHighest) return i;
+    }
+
+    // Pass 2: Most recent local peak (higher/lower than left neighbor) with forward dominance
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
-        const val = direction === 'high' ? candles[i].high : candles[i].low;
-        const isBetter = direction === 'high' ? val > bestVal : val < bestVal;
-        if (isBetter) {
-            bestVal = val;
-            bestIdx = i;
+        const val = isHigh ? candles[i].high : candles[i].low;
+        const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
+        if (isHigh ? val <= leftVal : val >= leftVal) continue;
+
+        let isHighest = true;
+        for (let j = i + 1; j < currentIdx; j++) {
+            if (isHigh ? candles[j].high > val : candles[j].low < val) { isHighest = false; break; }
+        }
+        if (isHighest) return i;
+    }
+
+    // Pass 3: Best absolute value that is unbreached forward
+    let bestIdx = null;
+    let bestVal = isHigh ? -Infinity : Infinity;
+    for (let i = currentIdx - 1; i >= start; i--) {
+        if (i <= 0 || i >= candles.length - 1) continue;
+        const val = isHigh ? candles[i].high : candles[i].low;
+
+        let isHighest = true;
+        for (let j = i + 1; j < currentIdx; j++) {
+            if (isHigh ? candles[j].high > val : candles[j].low < val) { isHighest = false; break; }
+        }
+        if (isHighest) {
+            const isBetter = isHigh ? val > bestVal : val < bestVal;
+            if (isBetter) { bestVal = val; bestIdx = i; }
         }
     }
     return bestIdx;
@@ -1259,7 +1298,10 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (passesScore) {
                                         const triggerPrice = structureHigh + triggerOffset;
-                                        const stopLoss = Math.min(sBar.low, structureHigh) - stopOffset;
+
+                                        const stopLoss = p.useStructuralTarget
+                                            ? candles[swingLowIdx].low - stopOffset
+                                            : Math.min(sBar.low, structureHigh) - stopOffset;
 
                                         let takeProfit = triggerPrice + (triggerPrice - stopLoss) * p.rewardRatio;
                                         let structuralTarget = null;
@@ -1341,7 +1383,10 @@ function twoLeggedPullbackCore(candles, params = {}) {
 
                                     if (passesScore) {
                                         const triggerPrice = structureLow - triggerOffset;
-                                        const stopLoss = Math.max(sBar.high, structureLow) + stopOffset;
+
+                                        const stopLoss = p.useStructuralTarget
+                                            ? candles[swingHighIdx].high + stopOffset
+                                            : Math.max(sBar.high, structureLow) + stopOffset;
 
                                         let takeProfit = triggerPrice - (stopLoss - triggerPrice) * p.rewardRatio;
                                         let structuralTarget = null;
