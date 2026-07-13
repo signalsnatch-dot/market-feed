@@ -109,6 +109,11 @@ class ChartServer {
         this.saveInProgress = false;
         this.lastSignalSave = 0;
         this.signalSaveInterval = 30000; // Save signals to disk every 30 seconds
+
+        // Batching & dedup throttle for WebSocket emissions (1-second windows)
+        this.batchedSignals = new Map();    // dedupKey -> signalData
+        this.batchedStatusUpdates = new Map(); // dedupKey -> updateData
+        this.batchFlushInterval = null;
         
         this.setupRoutes();
         this.setupSocketEvents();
@@ -116,7 +121,8 @@ class ChartServer {
         this.loadHistoricalCandles();
         this.rebuildInstrumentIndex();
         this.generateHistoricalSignals(); 
-        this.startPeriodicSignalSave(); 
+        this.startPeriodicSignalSave();
+        this.startBatchFlushInterval();
     }
     
     validateDataDirectory() {
@@ -966,18 +972,61 @@ class ChartServer {
         this.io.to(instrumentKey + '_' + type + '_' + threshold).emit(instrumentKey + '_' + type + '_' + threshold + '_live_candle', candleData);
     }
 
+    // ──────────────────────────────────────────────
+    // Batched WebSocket Emission System (1-second dedup throttle)
+    // ──────────────────────────────────────────────
+
+    _makeDedupKey(data) {
+        // Unique composite key: instrument + bar_type + threshold + barNumber + type + version
+        return data.instrument + '_' + data.bar_type + '_' +
+               String(data.threshold) + '_' + data.barNumber + '_' +
+               data.type + '_' + data.version;
+    }
+
+    startBatchFlushInterval() {
+        // Flush accumulated signals/status updates every 1000ms
+        this.batchFlushInterval = setInterval(() => {
+            this._flushBatchedSignals();
+        }, 1000);
+    }
+
+    _flushBatchedSignals() {
+        // ── Flush trade_signal batch ──
+        if (this.batchedSignals.size > 0) {
+            const signalsArray = Array.from(this.batchedSignals.values());
+            this.batchedSignals.clear();
+            // Emit each unique signal individually (preserves existing client event contract)
+            // but rate-limited to once per second per unique key
+            for (const signal of signalsArray) {
+                this.io.emit('trade_signal', signal);
+            }
+            if (signalsArray.length > 10) {
+                console.log(`📡 Batched ${signalsArray.length} trade_signals in 1s window`);
+            }
+        }
+
+        // ── Flush trade_status_update batch ──
+        if (this.batchedStatusUpdates.size > 0) {
+            const updatesArray = Array.from(this.batchedStatusUpdates.values());
+            this.batchedStatusUpdates.clear();
+            for (const update of updatesArray) {
+                this.io.emit('trade_status_update', update);
+            }
+            if (updatesArray.length > 10) {
+                console.log(`📡 Batched ${updatesArray.length} trade_status_updates in 1s window`);
+            }
+        }
+    }
+
     broadcastTradeSignal(signalData) {
         const todayTradingDay = getTodayISTTradingDay();
         const sigDate = getTradingDayIST(signalData.timestamp);
         if (sigDate !== todayTradingDay) return; 
 
+        // ── Duplicate check against already-stored signals ──
+        const dedupKey = this._makeDedupKey(signalData);
         const isDuplicate = this.tradeSignals.some(sig => 
-            sig.instrument === signalData.instrument &&
-            sig.bar_type === signalData.bar_type &&
-            String(sig.threshold) === String(signalData.threshold) &&
-            sig.barNumber === signalData.barNumber &&
-            sig.type === signalData.type &&
-            sig.version === signalData.version
+            this._makeDedupKey(sig) === dedupKey
         );
         
         if (isDuplicate) return;
@@ -990,8 +1039,10 @@ class ChartServer {
             this.tradeSignals.shift();
         }
         
-        this.io.emit('trade_signal', signalData);
-        console.log("🚀 Broadcasted: " + signalData.version + " | " + signalData.instrument + " | Thresh: " + signalData.threshold + " | Bar #" + signalData.barNumber);
+        // ── Batch for 1-second dedup throttle ──
+        // Latest value wins within the window (same dedup key overwrites previous)
+        this.batchedSignals.set(dedupKey, signalData);
+        console.log("🚀 Queued: " + signalData.version + " | " + signalData.instrument + " | Thresh: " + signalData.threshold + " | Bar #" + signalData.barNumber);
     }
 
     broadcastTradeStatusUpdate(updateData) {
@@ -1004,7 +1055,25 @@ class ChartServer {
             sig.version === updateData.version
         );
 
+        const dedupKey = this._makeDedupKey(updateData);
+
+        // ── TERMINAL-STATE GUARD: Skip if already completed/cancelled ──
         if (matchIndex !== -1) {
+            const storedStatus = this.tradeSignals[matchIndex].status;
+            const incomingStatus = updateData.status;
+            // If the stored signal is already in a terminal state, skip re-emission
+            // unless the incoming update is a different non-terminal status (shouldn't happen)
+            const terminalStates = ['completed', 'cancelled', 'expired'];
+            if (terminalStates.includes(storedStatus) && terminalStates.includes(incomingStatus)) {
+                // Update stored data silently (no WS emission needed for already-terminal trades)
+                if (updateData.exitReason) {
+                    this.tradeSignals[matchIndex].exitReason = updateData.exitReason;
+                    this.tradeSignals[matchIndex].exitPrice = updateData.exitPrice;
+                }
+                return; // SILENT: skip batching/broadcast entirely
+            }
+
+            // Update stored signal state
             this.tradeSignals[matchIndex].status = updateData.status;
             if (updateData.exitReason) {
                 this.tradeSignals[matchIndex].exitReason = updateData.exitReason;
@@ -1015,13 +1084,15 @@ class ChartServer {
                 ...this.tradeSignals[matchIndex],
                 name: this.getInstrumentName(this.tradeSignals[matchIndex].instrument)
             };
-            this.io.emit('trade_status_update', enrichedUpdate);
+            // ── Batch for 1-second dedup throttle ──
+            this.batchedStatusUpdates.set(dedupKey, enrichedUpdate);
         } else {
             const enrichedUpdate = {
                 ...updateData,
                 name: this.getInstrumentName(updateData.instrument)
             };
-            this.io.emit('trade_status_update', enrichedUpdate);
+            // ── Batch for 1-second dedup throttle ──
+            this.batchedStatusUpdates.set(dedupKey, enrichedUpdate);
         }
     }
     
