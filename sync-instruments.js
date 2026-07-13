@@ -13,7 +13,7 @@ const TARGET_EXPIRY_DATE = '2026-06-25'; // Specific date for comparison
 const MCX_EXPIRY_PATTERN = '2026-06';
 
 // Default thresholds for continuous price action candles and volume bars
-const DEFAULT_THRESHOLDS = {
+const SYMBOL_THRESHOLDS = {
     // Indices (June Expiries)
     "NIFTY": { name: "Nifty 50 Future", volumePerBar: 5700, priceBarTicks: 8 },
     "BANKNIFTY": { name: "Nifty Bank Future", volumePerBar: 2600, priceBarTicks: 7 },
