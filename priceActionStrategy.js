@@ -145,46 +145,34 @@ function findPullbackSwingIndex(candles, currentIdx, lookback, direction) {
     const start = Math.max(0, currentIdx - lookback);
     const isHigh = direction === 'high';
 
-    // Pass 1: Most EXTREME clean pivot (both neighbors confirm) with forward dominance
-    let bestIdx1 = null;
-    let bestVal1 = isHigh ? -Infinity : Infinity;
+    // Pass 1: Most recent clean pivot (both neighbors strictly higher/lower) with forward dominance
     for (let i = currentIdx - 2; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
         const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
         const rightVal = isHigh ? candles[i + 1].high : candles[i + 1].low;
-        if (isHigh ? (val <= leftVal || val <= rightVal) : (val >= leftVal || val >= rightVal)) continue;
+        if (isHigh ? (val < leftVal || val < rightVal) : (val > leftVal || val > rightVal)) continue;
 
         let isHighest = true;
         for (let j = i + 1; j < currentIdx; j++) {
             if (isHigh ? candles[j].high > val : candles[j].low < val) { isHighest = false; break; }
         }
-        if (isHighest) {
-            const isBetter = isHigh ? val > bestVal1 : val < bestVal1;
-            if (isBetter) { bestVal1 = val; bestIdx1 = i; }
-        }
+        if (isHighest) return i;
     }
-    if (bestIdx1 !== null) return bestIdx1;
 
-    // Pass 2: Most EXTREME local peak (higher/lower than left neighbor) with forward dominance
-    let bestIdx2 = null;
-    let bestVal2 = isHigh ? -Infinity : Infinity;
+    // Pass 2: Most recent local peak (strictly higher/lower than left neighbor) with forward dominance
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
         const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
-        if (isHigh ? val <= leftVal : val >= leftVal) continue;
+        if (isHigh ? val < leftVal : val > leftVal) continue;
 
         let isHighest = true;
         for (let j = i + 1; j < currentIdx; j++) {
             if (isHigh ? candles[j].high > val : candles[j].low < val) { isHighest = false; break; }
         }
-        if (isHighest) {
-            const isBetter = isHigh ? val > bestVal2 : val < bestVal2;
-            if (isBetter) { bestVal2 = val; bestIdx2 = i; }
-        }
+        if (isHighest) return i;
     }
-    if (bestIdx2 !== null) return bestIdx2;
 
     // Pass 3: Best absolute value that is unbreached forward
     let bestIdx = null;
@@ -1168,9 +1156,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         ? evaluateStrictH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, p)
                         : evaluateH2Setup(candles, adjustedSwingHighIdx, i, p.tickSize, p));
 
-                // If accumulation phase is structurally complete (secondLegStarted),
-                // mark this swing as consumed — no subsequent bar can use it for H2
-                if (setup.secondLegStarted) {
+                // Mark swing as consumed only when a previous bar already triggered H2
+                if (setup.h2TriggerIdx !== undefined && setup.h2TriggerIdx !== -1) {
                     consumedSwingHighs.add(adjustedSwingHighIdx);
                 }
 
@@ -1254,9 +1241,8 @@ function twoLeggedPullbackCore(candles, params = {}) {
                         ? evaluateStrictL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, p)
                         : evaluateL2Setup(candles, adjustedSwingLowIdx, i, p.tickSize, p));
 
-                // If accumulation phase is structurally complete (secondLegStarted),
-                // mark this swing as consumed — no subsequent bar can use it for L2
-                if (setup.secondLegStarted) {
+                // Mark swing as consumed only when a previous bar already triggered L2
+                if (setup.l2TriggerIdx !== undefined && setup.l2TriggerIdx !== -1) {
                     consumedSwingLows.add(adjustedSwingLowIdx);
                 }
 

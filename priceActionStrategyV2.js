@@ -264,32 +264,28 @@ function originalFindSwing(candles, currentIdx, lookback, direction) {
     const start = Math.max(0, currentIdx - lookback);
     const isHigh = direction === 'high';
 
-    // Pass 1: Most EXTREME clean pivot (both neighbors confirm) with forward dominance
-    let bestIdx1 = null, bestVal1 = isHigh ? -Infinity : Infinity;
+    // Pass 1: Most recent clean pivot (both neighbors strictly higher/lower) with forward dominance
     for (let i = currentIdx - 2; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
         const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
         const rightVal = isHigh ? candles[i + 1].high : candles[i + 1].low;
-        if (isHigh ? (val <= leftVal || val <= rightVal) : (val >= leftVal || val >= rightVal)) continue;
+        if (isHigh ? (val < leftVal || val < rightVal) : (val > leftVal || val > rightVal)) continue;
         let ok = true;
         for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
-        if (ok && (isHigh ? val > bestVal1 : val < bestVal1)) { bestVal1 = val; bestIdx1 = i; }
+        if (ok) return i;
     }
-    if (bestIdx1 !== null) return bestIdx1;
 
-    // Pass 2: Most EXTREME local peak (higher/lower than left neighbor) with forward dominance
-    let bestIdx2 = null, bestVal2 = isHigh ? -Infinity : Infinity;
+    // Pass 2: Most recent local peak (strictly higher/lower than left neighbor) with forward dominance
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
         const leftVal = isHigh ? candles[i - 1].high : candles[i - 1].low;
-        if (isHigh ? val <= leftVal : val >= leftVal) continue;
+        if (isHigh ? val < leftVal : val > leftVal) continue;
         let ok = true;
         for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
-        if (ok && (isHigh ? val > bestVal2 : val < bestVal2)) { bestVal2 = val; bestIdx2 = i; }
+        if (ok) return i;
     }
-    if (bestIdx2 !== null) return bestIdx2;
 
     // Pass 3: Best absolute value that is unbreached forward
     let bestIdx = null, bestVal = isHigh ? -Infinity : Infinity;
@@ -976,9 +972,8 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         : evaluateH2SetupV2(candles, adjustedSwingHighIdx, i, finalParams.tickSize, legEvalParams);
                 }
 
-                // If accumulation phase is structurally complete (secondLegStarted),
-                // mark this swing as consumed — no subsequent bar can use it for H2
-                if (setup.secondLegStarted) {
+                // Mark swing as consumed only when a previous bar already triggered H2
+                if (setup.h2TriggerIdx !== undefined && setup.h2TriggerIdx !== -1) {
                     consumedSwingHighs.add(adjustedSwingHighIdx);
                 }
 
@@ -1061,9 +1056,8 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         : evaluateL2SetupV2(candles, adjustedSwingLowIdx, i, finalParams.tickSize, legEvalParams);
                 }
 
-                // If accumulation phase is structurally complete (secondLegStarted),
-                // mark this swing as consumed — no subsequent bar can use it for L2
-                if (setup.secondLegStarted) {
+                // Mark swing as consumed only when a previous bar already triggered L2
+                if (setup.l2TriggerIdx !== undefined && setup.l2TriggerIdx !== -1) {
                     consumedSwingLows.add(adjustedSwingLowIdx);
                 }
 
@@ -1152,7 +1146,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         }
 
                         if (setupL2.isL2) {
-                            const trendAtL = assessTrend(candles, ema, L, p);
+                            const trendAtL = assessTrendV2(candles, ema, L, p);
                             if (!trendAtL.bearish) {
                                 // Original setup was not in a bearish trend —
                                 // shorts had no reason to be there, trap is not valid
@@ -1230,7 +1224,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         }
 
                         if (setupH2.isH2) {
-                            const trendAtL = assessTrend(candles, ema, L, p);
+                            const trendAtL = assessTrendV2(candles, ema, L, p);
                             if (!trendAtL.bullish) {
                                 continue; // skip to next L
                             }
