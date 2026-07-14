@@ -1084,7 +1084,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
         // 3. FAILED SECOND ENTRY TRAPS
         if (finalParams.enableTraps && (i - lastTrapSignalIdx >= finalParams.minBarsBetweenSignals) && !signalFound) {
             // --- Long Trap ---
-            if (trend.bullish) {
+            if (trend.bullish && adjustedSwingHighIdx !== null) {
                 const lookbackStart = Math.max(finalParams.emaPeriod, i - finalParams.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingLowIdx = findPullbackSwingIndexV2(candles, L, effectiveSwingLookback, 'low', finalParams);
@@ -1101,14 +1101,17 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         }
 
                         if (setupL2.isL2) {
+                            const trendAtL = assessTrend(candles, ema, L, p);
+                            if (!trendAtL.bearish) {
+                                // Original setup was not in a bearish trend —
+                                // shorts had no reason to be there, trap is not valid
+                                continue; // skip to next L
+                            }
                             const triggeredShort = candles[L + 1] && candles[L + 1].low < candles[L].low - triggerBreakDist;
                             if (triggeredShort) {
-                                let isDoubleBottom = true;
-                                if (finalParams.requireDoubleTopBottomTrap) {
-                                    const l2Low = Math.min(candles[L].low, candles[L + 1].low);
-                                    const diff = Math.abs(l2Low - candles[swingLowIdx].low);
-                                    isDoubleBottom = diff <= doubleTopBottomTolerance;
-                                }
+                                const l2Low = Math.min(candles[L].low, candles[L + 1].low);
+                                const diff = Math.abs(l2Low - candles[swingLowIdx].low);
+                                const isDoubleBottom = diff <= doubleTopBottomTolerance;
                                 const structureHigh = Math.max(candles[L].high, candles[L + 1].high);
                                 if (sBar.high >= structureHigh && isDoubleBottom) {
                                     let score = 100;
@@ -1159,7 +1162,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
             }
 
             // --- Short Trap ---
-            if (trend.bearish && !signalFound) {
+            if (trend.bearish && adjustedSwingLowIdx !== null && !signalFound) {
                 const lookbackStart = Math.max(finalParams.emaPeriod, i - finalParams.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingHighIdx = findPullbackSwingIndexV2(candles, L, effectiveSwingLookback, 'high', finalParams);
@@ -1176,14 +1179,15 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                         }
 
                         if (setupH2.isH2) {
+                            const trendAtL = assessTrend(candles, ema, L, p);
+                            if (!trendAtL.bullish) {
+                                continue; // skip to next L
+                            }
                             const triggeredLong = candles[L + 1] && candles[L + 1].high > candles[L].high + triggerBreakDist;
                             if (triggeredLong) {
-                                let isDoubleTop = true;
-                                if (finalParams.requireDoubleTopBottomTrap) {
-                                    const h2High = Math.max(candles[L].high, candles[L + 1].high);
-                                    const diff = Math.abs(h2High - candles[swingHighIdx].high);
-                                    isDoubleTop = diff <= doubleTopBottomTolerance;
-                                }
+                                const h2High = Math.max(candles[L].high, candles[L + 1].high);
+                                const diff = Math.abs(h2High - candles[swingHighIdx].high);
+                                const isDoubleTop = diff <= doubleTopBottomTolerance;
                                 const structureLow = Math.min(candles[L].low, candles[L + 1].low);
                                 if (sBar.low <= structureLow && isDoubleTop) {
                                     let score = 100;
@@ -2067,6 +2071,24 @@ for (const [key, fn] of Object.entries(BROOKS_101_114_STRATEGIES)) {
         FINAL_STRATEGIES[key] = fn;
     }
 }
+
+// ============================================================
+// V*A: WADE STRUCTURAL NO-TRAP VARIANTS
+// Auto-generate A-copies for every Wade Structural variant
+// ============================================================
+const wadeStructuralKeys = Object.keys(FINAL_STRATEGIES).filter(k =>
+    k.includes('Wade Structural') && !k.includes('No Traps')
+);
+let noTrapCount = 0;
+for (const key of wadeStructuralKeys) {
+    const originalFn = FINAL_STRATEGIES[key];
+    const aKey = key.replace(/^(V\d+):/, '$1A:') + ' (No Traps)';
+    FINAL_STRATEGIES[aKey] = (candles, params = {}) => {
+        return originalFn(candles, { ...params, enableTraps: false, useStructuralTarget: true });
+    };
+    noTrapCount++;
+}
+console.error(`Added ${noTrapCount} Wade Structural No-Trap variants (A-suffix)`);
 
 console.error(`FINAL_STRATEGIES: ${Object.keys(FINAL_STRATEGIES).length} versions selected from ${Object.keys(original.STRATEGIES).length + Object.keys(STRATEGIES_V2).length + Object.keys(INDIVIDUAL_FIX_STRATEGIES).length + Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} total`);
 

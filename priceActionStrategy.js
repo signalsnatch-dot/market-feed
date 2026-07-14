@@ -482,7 +482,7 @@ function validateTPPeakLong(candles, peakIdx, signalBarIdx) {
     // Scan forward from peakIdx to signalBarIdx; if a higher high exists
     // between them, re-anchor to the most recent higher peak
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
         if (candles[k].high > candles[tpPeakIdx].high) {
             tpPeakIdx = k;
         }
@@ -494,7 +494,7 @@ function validateTPPeakShort(candles, peakIdx, signalBarIdx) {
     // Scan forward from peakIdx to signalBarIdx; if a lower low exists
     // between them, re-anchor to the most recent lower trough
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
         if (candles[k].low < candles[tpPeakIdx].low) {
             tpPeakIdx = k;
         }
@@ -1097,6 +1097,15 @@ function twoLeggedPullbackCore(candles, params = {}) {
             adjustedSwingLowIdx = findPullbackSwingIndex(candles, i, p.swingLookback + p.minTrendBars, 'low');
         }
 
+        // Peak integrity guard: if current bar has already exceeded the detected swing extreme,
+        // there is no valid pullback from that pivot — nullify to prevent false setups
+        if (adjustedSwingHighIdx !== null && candles[i].high > candles[adjustedSwingHighIdx].high) {
+            adjustedSwingHighIdx = null;
+        }
+        if (adjustedSwingLowIdx !== null && candles[i].low < candles[adjustedSwingLowIdx].low) {
+            adjustedSwingLowIdx = null;
+        }
+
         // 1. SECOND ENTRY LONG (H2)
         if (trend.bullish && (i - lastPullbackSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             if (adjustedSwingHighIdx !== null) {
@@ -1260,7 +1269,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
         // 3. FAILED SECOND ENTRY TRAPS (DOUBLE TRAP METHOD)
         if (p.enableTraps && (i - lastTrapSignalIdx >= p.minBarsBetweenSignals) && !signalFound) {
             // --- Long Trap Setup ---
-            if (trend.bullish) {
+            if (trend.bullish && adjustedSwingHighIdx !== null) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingLowIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'low');
@@ -1274,15 +1283,18 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                 : evaluateL2Setup(candles, swingLowIdx, L, p.tickSize, p));
 
                         if (setupL2.isL2) {
+                            const trendAtL = assessTrend(candles, ema, L, p);
+                            if (!trendAtL.bearish) {
+                                // Original setup was not in a bearish trend —
+                                // shorts had no reason to be there, trap is not valid
+                                continue; // skip to next L
+                            }
                             const triggeredShort = candles[L + 1].low < candles[L].low - triggerBreakDist;
 
                             if (triggeredShort) {
-                                let isDoubleBottom = true;
-                                if (p.requireDoubleTopBottomTrap) {
-                                    const l2Low = Math.min(candles[L].low, candles[L + 1].low);
-                                    const diff = Math.abs(l2Low - candles[swingLowIdx].low);
-                                    isDoubleBottom = diff <= doubleTopBottomTolerance;
-                                }
+                                const l2Low = Math.min(candles[L].low, candles[L + 1].low);
+                                const diff = Math.abs(l2Low - candles[swingLowIdx].low);
+                                const isDoubleBottom = diff <= doubleTopBottomTolerance;
 
                                 const structureHigh = Math.max(candles[L].high, candles[L + 1].high);
                                 if (sBar.high >= structureHigh && isDoubleBottom) {
@@ -1345,7 +1357,7 @@ function twoLeggedPullbackCore(candles, params = {}) {
             }
 
             // --- Short Trap Setup ---
-            if (trend.bearish && !signalFound) {
+            if (trend.bearish && adjustedSwingLowIdx !== null && !signalFound) {
                 const lookbackStart = Math.max(p.emaPeriod, i - p.trapMaxLookback);
                 for (let L = i - 1; L >= lookbackStart; L--) {
                     const swingHighIdx = findPullbackSwingIndex(candles, L, p.swingLookback + p.minTrendBars, 'high');
@@ -1359,15 +1371,16 @@ function twoLeggedPullbackCore(candles, params = {}) {
                                 : evaluateH2Setup(candles, swingHighIdx, L, p.tickSize, p));
 
                         if (setupH2.isH2) {
+                            const trendAtL = assessTrend(candles, ema, L, p);
+                            if (!trendAtL.bullish) {
+                                 continue; // skip to next L
+                            }
                             const triggeredLong = candles[L + 1].high > candles[L].high + triggerBreakDist;
 
                             if (triggeredLong) {
-                                let isDoubleTop = true;
-                                if (p.requireDoubleTopBottomTrap) {
-                                    const h2High = Math.max(candles[L].high, candles[L + 1].high);
-                                    const diff = Math.abs(h2High - candles[swingHighIdx].high);
-                                    isDoubleTop = diff <= doubleTopBottomTolerance;
-                                }
+                                const h2High = Math.max(candles[L].high, candles[L + 1].high);
+                                const diff = Math.abs(h2High - candles[swingHighIdx].high);
+                                const isDoubleTop = diff <= doubleTopBottomTolerance;
 
                                 const structureLow = Math.min(candles[L].low, candles[L + 1].low);
                                 if (sBar.low <= structureLow && isDoubleTop) {
@@ -1590,6 +1603,40 @@ const STRATEGIES = {
     "V50: Wade Structural (Strict Structural-Calibrated Upgraded)": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, { ...params, enableTraps: true, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
     },
+    // ============================================================
+    // V5A-V50A: WADE STRUCTURAL NO-TRAP VARIANTS
+    // ============================================================
+    "V5A: Wade Structural (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, useStructuralTarget: true });
+    },
+    "V10A: Wade Structural (Strict) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
+    },
+    "V15A: Wade Structural (Calibrated) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralTarget: true });
+    },
+    "V20A: Wade Structural (Strict-Calibrated) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
+    },
+    "V25A: Wade Structural (Structural-Calibrated) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, useStructuralTarget: true });
+    },
+    "V30A: Wade Structural (Strict Structural-Calibrated) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true });
+    },
+    "V35A: Wade Structural (Upgraded) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V40A: Wade Structural (Strict Upgraded) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, useRatios: false, enableTraps: false, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V45A: Wade Structural (Structural-Calibrated Upgraded) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+    "V50A: Wade Structural (Strict Structural-Calibrated Upgraded) (No Traps)": (candles, params = {}) => {
+        return twoLeggedPullbackCore(candles, { ...params, enableTraps: false, useStructuralRules: true, requireStrictSecondLeg: true, requireDoubleTopBottomTrap: true, useStructuralTarget: true, useBrooksTrend: true, minTrendBars: 18, swingLookback: 12 });
+    },
+
     "V51: Brooks Structural Pure": (candles, params = {}) => {
         return twoLeggedPullbackCore(candles, {
             ...params,
