@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // --- User Configurations ---
-const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-07-10.json'; 
+const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-07-14.json'; 
 const OUTPUT_DIR = './live-performance-report';
 
 const startTime = '09:00'; // Session Start (HH:MM in 24h IST format)

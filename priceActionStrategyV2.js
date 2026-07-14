@@ -200,7 +200,7 @@ const getInstrumentConfig = original.getInstrumentConfig || (() => null);
 
 function validateTPPeakLong(candles, peakIdx, signalBarIdx) {
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
         if (candles[k].high > candles[tpPeakIdx].high) {
             tpPeakIdx = k;
         }
@@ -210,7 +210,7 @@ function validateTPPeakLong(candles, peakIdx, signalBarIdx) {
 
 function validateTPPeakShort(candles, peakIdx, signalBarIdx) {
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
         if (candles[k].low < candles[tpPeakIdx].low) {
             tpPeakIdx = k;
         }
@@ -910,6 +910,15 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
         } else {
             adjustedSwingHighIdx = findPullbackSwingIndexV2(candles, i, effectiveSwingLookback, 'high', finalParams);
             adjustedSwingLowIdx = findPullbackSwingIndexV2(candles, i, effectiveSwingLookback, 'low', finalParams);
+        }
+
+        // Peak integrity guard: if current bar has already exceeded the detected swing extreme,
+        // there is no valid pullback from that pivot — nullify to prevent false setups
+        if (adjustedSwingHighIdx !== null && candles[i].high > candles[adjustedSwingHighIdx].high) {
+            adjustedSwingHighIdx = null;
+        }
+        if (adjustedSwingLowIdx !== null && candles[i].low < candles[adjustedSwingLowIdx].low) {
+            adjustedSwingLowIdx = null;
         }
 
         const legEvalParams = { ...finalParams };
