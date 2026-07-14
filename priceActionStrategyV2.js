@@ -263,6 +263,9 @@ function findPullbackSwingIndexV2(candles, currentIdx, lookback, direction, para
 function originalFindSwing(candles, currentIdx, lookback, direction) {
     const start = Math.max(0, currentIdx - lookback);
     const isHigh = direction === 'high';
+
+    // Pass 1: Most EXTREME clean pivot (both neighbors confirm) with forward dominance
+    let bestIdx1 = null, bestVal1 = isHigh ? -Infinity : Infinity;
     for (let i = currentIdx - 2; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
@@ -271,8 +274,12 @@ function originalFindSwing(candles, currentIdx, lookback, direction) {
         if (isHigh ? (val <= leftVal || val <= rightVal) : (val >= leftVal || val >= rightVal)) continue;
         let ok = true;
         for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
-        if (ok) return i;
+        if (ok && (isHigh ? val > bestVal1 : val < bestVal1)) { bestVal1 = val; bestIdx1 = i; }
     }
+    if (bestIdx1 !== null) return bestIdx1;
+
+    // Pass 2: Most EXTREME local peak (higher/lower than left neighbor) with forward dominance
+    let bestIdx2 = null, bestVal2 = isHigh ? -Infinity : Infinity;
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
         const val = isHigh ? candles[i].high : candles[i].low;
@@ -280,8 +287,11 @@ function originalFindSwing(candles, currentIdx, lookback, direction) {
         if (isHigh ? val <= leftVal : val >= leftVal) continue;
         let ok = true;
         for (let j = i + 1; j < currentIdx; j++) { if (isHigh ? candles[j].high > val : candles[j].low < val) { ok = false; break; } }
-        if (ok) return i;
+        if (ok && (isHigh ? val > bestVal2 : val < bestVal2)) { bestVal2 = val; bestIdx2 = i; }
     }
+    if (bestIdx2 !== null) return bestIdx2;
+
+    // Pass 3: Best absolute value that is unbreached forward
     let bestIdx = null, bestVal = isHigh ? -Infinity : Infinity;
     for (let i = currentIdx - 1; i >= start; i--) {
         if (i <= 0 || i >= candles.length - 1) continue;
@@ -665,6 +675,18 @@ function evaluateH2SetupV2(candles, swingHighIdx, currentIdx, tickSize, p) {
         }
     }
 
+    // Non-strict: first leg must dominate second leg (weaker pullback, signals early reversal)
+    if (isValidH2Signal && p && !p.requireStrictSecondLeg) {
+        let firstLegLow = Infinity;
+        for (let k = swingHighIdx; k <= h1SignalIdx; k++) { if (candles[k].low < firstLegLow) firstLegLow = candles[k].low; }
+        let secondLegLow = Infinity;
+        for (let k = h1TriggerIdx; k <= currentIdx; k++) { if (candles[k].low < secondLegLow) secondLegLow = candles[k].low; }
+        // Non-strict: second leg must make a HIGHER low (shallower) than first leg
+        if (secondLegLow < firstLegLow) {
+            return { isH2: false, h1TriggerIdx, h1SignalIdx, secondLegStarted, swingHighIdx };
+        }
+    }
+
     return { isH2: isValidH2Signal, h1TriggerIdx, h1SignalIdx, secondLegStarted, swingHighIdx, pullbackLow: pullbackLow !== Infinity ? pullbackLow : null };
 }
 
@@ -733,6 +755,18 @@ function evaluateL2SetupV2(candles, swingLowIdx, currentIdx, tickSize, p) {
         const firstLegDepth = firstLegHigh - candles[swingLowIdx].low;
         const secondLegDepth = secondLegHigh - candles[swingLowIdx].low;
         if (firstLegDepth > 0 && (secondLegDepth / firstLegDepth) < (p.minSecondLegDepthRatio || 0.60)) {
+            return { isL2: false, l1TriggerIdx, l1SignalIdx, secondLegStarted, swingLowIdx };
+        }
+    }
+
+    // Non-strict: first leg must dominate second leg (weaker pullback, signals early reversal)
+    if (isValidL2Signal && p && !p.requireStrictSecondLeg) {
+        let firstLegHigh = -Infinity;
+        for (let k = swingLowIdx; k <= l1SignalIdx; k++) { if (candles[k].high > firstLegHigh) firstLegHigh = candles[k].high; }
+        let secondLegHigh = -Infinity;
+        for (let k = l1TriggerIdx; k <= currentIdx; k++) { if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high; }
+        // Non-strict: second leg must make a LOWER high (shallower) than first leg
+        if (secondLegHigh > firstLegHigh) {
             return { isL2: false, l1TriggerIdx, l1SignalIdx, secondLegStarted, swingLowIdx };
         }
     }
@@ -852,6 +886,11 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
     let lastPullbackSignalIdx = -Infinity;
     let lastTrapSignalIdx = -Infinity;
 
+    // Track consumed swings: once a swing pivot's accumulation phase is structurally complete,
+    // subsequent bars cannot re-evaluate L2/H2 on that same pivot
+    const consumedSwingHighs = new Set();
+    const consumedSwingLows = new Set();
+
     for (let i = finalParams.emaPeriod + finalParams.minTrendBars; i < candles.length; i++) {
         const trend = assessTrendV2(candles, ema, i, finalParams);
         const sBar = candles[i];
@@ -925,7 +964,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
 
         // 1. SECOND ENTRY LONG (H2)
         if (trend.bullish && (i - lastPullbackSignalIdx >= finalParams.minBarsBetweenSignals) && !signalFound) {
-            if (adjustedSwingHighIdx !== null) {
+            if (adjustedSwingHighIdx !== null && !consumedSwingHighs.has(adjustedSwingHighIdx)) {
                 let setup;
                 if (finalParams.useStructuralRules) {
                     setup = finalParams.requireStrictSecondLeg
@@ -935,6 +974,12 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                     setup = finalParams.requireStrictSecondLeg
                         ? (original.evaluateStrictH2Setup ? original.evaluateStrictH2Setup(candles, adjustedSwingHighIdx, i, finalParams.tickSize, finalParams) : evaluateH2SetupV2(candles, adjustedSwingHighIdx, i, finalParams.tickSize, legEvalParams))
                         : evaluateH2SetupV2(candles, adjustedSwingHighIdx, i, finalParams.tickSize, legEvalParams);
+                }
+
+                // If accumulation phase is structurally complete (secondLegStarted),
+                // mark this swing as consumed — no subsequent bar can use it for H2
+                if (setup.secondLegStarted) {
+                    consumedSwingHighs.add(adjustedSwingHighIdx);
                 }
 
                 if (setup.isH2) {
@@ -1004,7 +1049,7 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
 
         // 2. SECOND ENTRY SHORT (L2)
         if (trend.bearish && (i - lastPullbackSignalIdx >= finalParams.minBarsBetweenSignals) && !signalFound) {
-            if (adjustedSwingLowIdx !== null) {
+            if (adjustedSwingLowIdx !== null && !consumedSwingLows.has(adjustedSwingLowIdx)) {
                 let setup;
                 if (finalParams.useStructuralRules) {
                     setup = finalParams.requireStrictSecondLeg
@@ -1014,6 +1059,12 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                     setup = finalParams.requireStrictSecondLeg
                         ? (original.evaluateStrictL2Setup ? original.evaluateStrictL2Setup(candles, adjustedSwingLowIdx, i, finalParams.tickSize, finalParams) : evaluateL2SetupV2(candles, adjustedSwingLowIdx, i, finalParams.tickSize, legEvalParams))
                         : evaluateL2SetupV2(candles, adjustedSwingLowIdx, i, finalParams.tickSize, legEvalParams);
+                }
+
+                // If accumulation phase is structurally complete (secondLegStarted),
+                // mark this swing as consumed — no subsequent bar can use it for L2
+                if (setup.secondLegStarted) {
+                    consumedSwingLows.add(adjustedSwingLowIdx);
                 }
 
                 if (setup.isL2) {
