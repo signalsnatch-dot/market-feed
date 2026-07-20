@@ -19,111 +19,13 @@
 function loadBrooksConfig(instrumentConfig) {
     const defaults = {
         enabled: true,
-        active_versions: [
-            'v7-conf-only',
-            'v17-instrument-calibrated', 'v18-calibrated-volume',
-            'v19-gate-3-pb-resolve', 'v20-gate-6-steep-leg',
-            'v21-gate-4-first-type', 'v22-gate-5-state-restrict',
-            'v23-2hm-boost', 'v24-m2-boost',
-            'v25-signal-quality-filter', 'v26-chapter-full',
-            // Batch 1: TP-multiplied & confidence variants
-            'v27-tp-mult-4', 'v28-tp-mult-3',
-            'v29-conf-90', 'v30-conf-80',
-            // Batch 2: WR improvement stack
-            'v31-mid-session-trap', 'v32-measured-move',
-            'v33-wedge-boost', 'v34-barb-wire-second',
-            'v35-failed-flag-refine', 'v36-m2-ema-origin'
-        ],
-        // Version-specific gate masks (bitmask: Gate 1=1, Gate 2=2, Gate 3=4, Gate 4=8, Gate 5=16, Gate 6=32, Gate 7=64, Gate 8=128)
-        version_gate_masks: {
-            // Baseline: V964 = v7-conf-only (Gates 1,2,7)
-            'v7-conf-only':              67,  // Gates 1,2,7 (1+2+64)
-            // Instrument-calibrated versions (kept for future instrument-specific testing)
-            'v17-instrument-calibrated': 255, // All 8 gates, uses per-instrument tickSize, tolerance ratios
-            'v18-calibrated-volume':     63,  // Gates 1,2,3,4,5,6 (255-64-128=63) — no Barb Wire, no Opposition
-            // NEW: V964-variant with one additional Brooks-based gate each
-            'v19-gate-3-pb-resolve':     71,  // V964 (67) + Gate 3 Pullback Resolve (4) = 71
-            'v20-gate-6-steep-leg':      99,  // V964 (67) + Gate 6 Steep Leg (32) = 99
-            'v21-gate-4-first-type':     75,  // V964 (67) + Gate 4 First Per Type (8) = 75
-            'v22-gate-5-state-restrict': 83,  // V964 (67) + Gate 5 State Restrict (16) = 83
-            'v23-2hm-boost':             67,  // Same as V964, but +5 confidence to 2HM signals
-            'v24-m2-boost':              67,  // Same as V964, but +5 confidence to M2B/M2S signals
-            'v25-signal-quality-filter':  579, // V964 (67) + Gate 9 Signal Quality (512) = 579
-            'v26-chapter-full':           2687,  // All 11 gates MINUS Gate 10 (climax hard-reject):
-            // Batch 1: V978-V979 — TP-multiplied versions of V976 (v25)
-            'v27-tp-mult-4':             579,
-            'v28-tp-mult-3':             579,
-            // Batch 1: V980-V982 — Confidence/original variants of V964 (v7-conf-only)
-            'v29-conf-90':               67,
-            'v30-conf-80':               67,
-            // Batch 2: V983-V988 — WR improvement stack on V976 (v25)
-            'v31-mid-session-trap':      579,
-            'v32-measured-move':         579,
-            'v33-wedge-boost':           579,
-            'v34-barb-wire-second':      579,
-            'v35-failed-flag-refine':    579,
-            'v36-m2-ema-origin':         579
-        },
-        version_confidence_thresholds: {
-            'v7-conf-only':              70,
-            'v17-instrument-calibrated': 80,
-            'v18-calibrated-volume':     75,
-            'v19-gate-3-pb-resolve':     70,
-            'v20-gate-6-steep-leg':      70,
-            'v21-gate-4-first-type':     70,
-            'v22-gate-5-state-restrict': 70,
-            'v23-2hm-boost':             70,
-            'v24-m2-boost':              70,
-            'v25-signal-quality-filter':  70,
-            'v26-chapter-full':           75,
-            // Batch 1: V978-V979 — same conf as V976 (70)
-            'v27-tp-mult-4':             70,
-            'v28-tp-mult-3':             70,
-            // Batch 1: V980-V982 — higher conf thresholds
-            'v29-conf-90':               90,
-            'v30-conf-80':               80,
-            // Batch 2: V983-V988 — same conf as V976 (70)
-            'v31-mid-session-trap':      70,
-            'v32-measured-move':         70,
-            'v33-wedge-boost':           70,
-            'v34-barb-wire-second':      70,
-            'v35-failed-flag-refine':    70,
-            'v36-m2-ema-origin':         70
-        },
-        version_target_ratios: {
-            'v27-tp-mult-4':             4,
-            'v28-tp-mult-3':             3,
-        },
-        v4_pure_brooks: {
-            trigger_offset_ticks: 1,
-            stop_offset_ticks: 1,
-            target_rr_ratio: 2,
-            use_measured_move: true
-        },
-        v5_relaxed_pullback: {
-            trigger_offset_ticks: 1,
-            stop_offset_ticks: 1,
-            target_rr_ratio: 2,
-            use_measured_move: true
-        },
-        v6_no_state_restrict: {
-            trigger_offset_ticks: 1,
-            stop_offset_ticks: 1,
-            target_rr_ratio: 2,
-            use_measured_move: true
-        },
-        v7_conf_only: {
-            trigger_offset_ticks: 1,
-            stop_offset_ticks: 1,
-            target_rr_ratio: 2,
-            use_measured_move: true
-        },
-        v8_all_gates_lower_conf: {
-            trigger_offset_ticks: 1,
-            stop_offset_ticks: 1,
-            target_rr_ratio: 2,
-            use_measured_move: true
-        },
+        active_versions: ['v1-strict', 'v2-calibrated', 'v3-percentage', 'v4-pure-brooks'],
+    v4_pure_brooks: {
+        trigger_offset_ticks: 1,
+        stop_offset_ticks: 1,
+        target_rr_ratio: 2,
+        use_measured_move: true
+    },
         '2HM_bar_threshold': 24,
         mid_session_trap: {
             enabled: false,
@@ -182,19 +84,6 @@ function loadBrooksConfig(instrumentConfig) {
     cfg.v2_calibrated = { ...defaults.v2_calibrated, ...(cfg.v2_calibrated || {}) };
     cfg.v3_percentage = { ...defaults.v3_percentage, ...(cfg.v3_percentage || {}) };
     cfg.v4_pure_brooks = { ...defaults.v4_pure_brooks, ...(cfg.v4_pure_brooks || {}) };
-    cfg.v5_relaxed_pullback = { ...defaults.v5_relaxed_pullback, ...(cfg.v5_relaxed_pullback || {}) };
-    cfg.v6_no_state_restrict = { ...defaults.v6_no_state_restrict, ...(cfg.v6_no_state_restrict || {}) };
-    cfg.v7_conf_only = { ...defaults.v7_conf_only, ...(cfg.v7_conf_only || {}) };
-    cfg.v8_all_gates_lower_conf = { ...defaults.v8_all_gates_lower_conf, ...(cfg.v8_all_gates_lower_conf || {}) };
-    // --- Graduated dilution series (v9-v16) ---
-    cfg.v9_drop_barb_wire = { ...defaults.v9_drop_barb_wire, ...(cfg.v9_drop_barb_wire || {}) };
-    cfg.v10_drop_opposition = { ...defaults.v10_drop_opposition, ...(cfg.v10_drop_opposition || {}) };
-    cfg.v11_drop_hl_count = { ...defaults.v11_drop_hl_count, ...(cfg.v11_drop_hl_count || {}) };
-    cfg.v12_lower_confidence = { ...defaults.v12_lower_confidence, ...(cfg.v12_lower_confidence || {}) };
-    cfg.v13_drop_state_restrict = { ...defaults.v13_drop_state_restrict, ...(cfg.v13_drop_state_restrict || {}) };
-    cfg.v14_drop_first_type = { ...defaults.v14_drop_first_type, ...(cfg.v14_drop_first_type || {}) };
-    cfg.v15_drop_steep_leg = { ...defaults.v15_drop_steep_leg, ...(cfg.v15_drop_steep_leg || {}) };
-    cfg.v16_all_dropped = { ...defaults.v16_all_dropped, ...(cfg.v16_all_dropped || {}) };
 
     return cfg;
 }
@@ -1741,91 +1630,24 @@ function computeVersionedEntry(signal, cfg, version) {
 
     let targetRR = 2; // default RR ratio
 
-        // All versions use Brooks-compliant 1-tick offset with uniform entry/exit logic
-        // Differences are in the GATING, not the entry/exit computation
-        const tickSize = 0.05;
-        switch (version) {
-        case 'v4-pure-brooks': {
-            const vc = cfg.v4_pure_brooks || {};
+    switch (version) {
+        case 'v4-pure-brooks':
             entryPrice = direction === 'long'
-                ? bar.high + (vc.trigger_offset_ticks || 1) * tickSize
-                : bar.low - (vc.trigger_offset_ticks || 1) * tickSize;
+                ? bar.high + cfg.v4_pure_brooks.trigger_offset_ticks * 0.05
+                : bar.low - cfg.v4_pure_brooks.trigger_offset_ticks * 0.05;
             stopPrice = direction === 'long'
-                ? bar.low - (vc.stop_offset_ticks || 1) * tickSize
-                : bar.high + (vc.stop_offset_ticks || 1) * tickSize;
-            targetRR = vc.target_rr_ratio || 2;
+                ? bar.low - cfg.v4_pure_brooks.stop_offset_ticks * 0.05
+                : bar.high + cfg.v4_pure_brooks.stop_offset_ticks * 0.05;
+            targetRR = cfg.v4_pure_brooks.target_rr_ratio || 2;
             break;
-        }
-        case 'v5-relaxed-pullback': {
-            const vc = cfg.v5_relaxed_pullback || {};
-            entryPrice = direction === 'long'
-                ? bar.high + (vc.trigger_offset_ticks || 1) * tickSize
-                : bar.low - (vc.trigger_offset_ticks || 1) * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - (vc.stop_offset_ticks || 1) * tickSize
-                : bar.high + (vc.stop_offset_ticks || 1) * tickSize;
-            targetRR = vc.target_rr_ratio || 2;
-            break;
-        }
-        case 'v6-no-state-restrict': {
-            const vc = cfg.v6_no_state_restrict || {};
-            entryPrice = direction === 'long'
-                ? bar.high + (vc.trigger_offset_ticks || 1) * tickSize
-                : bar.low - (vc.trigger_offset_ticks || 1) * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - (vc.stop_offset_ticks || 1) * tickSize
-                : bar.high + (vc.stop_offset_ticks || 1) * tickSize;
-            targetRR = vc.target_rr_ratio || 2;
-            break;
-        }
-        case 'v7-conf-only': {
-            const vc = cfg.v7_conf_only || {};
-            entryPrice = direction === 'long'
-                ? bar.high + (vc.trigger_offset_ticks || 1) * tickSize
-                : bar.low - (vc.trigger_offset_ticks || 1) * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - (vc.stop_offset_ticks || 1) * tickSize
-                : bar.high + (vc.stop_offset_ticks || 1) * tickSize;
-            targetRR = vc.target_rr_ratio || 2;
-            break;
-        }
-        case 'v8-all-gates-lower-conf': {
-            const vc = cfg.v8_all_gates_lower_conf || {};
-            entryPrice = direction === 'long'
-                ? bar.high + (vc.trigger_offset_ticks || 1) * tickSize
-                : bar.low - (vc.trigger_offset_ticks || 1) * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - (vc.stop_offset_ticks || 1) * tickSize
-                : bar.high + (vc.stop_offset_ticks || 1) * tickSize;
-            targetRR = vc.target_rr_ratio || 2;
-            break;
-        }
-        // --- Graduated dilution series (v9-v16): all use 1-tick offset, 2R target ---
-        case 'v9-drop-barb-wire':
-        case 'v10-drop-opposition':
-        case 'v11-drop-hl-count':
-        case 'v12-lower-confidence':
-        case 'v13-drop-state-restrict':
-        case 'v14-drop-first-type':
-        case 'v15-drop-steep-leg':
-        case 'v16-all-dropped': {
-            // All use standard 1-tick offset with 2R target (pure Brooks)
-            entryPrice = direction === 'long'
-                ? bar.high + 1 * tickSize
-                : bar.low - 1 * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - 1 * tickSize
-                : bar.high + 1 * tickSize;
-            targetRR = 2;
-            break;
-        }
+
         case 'v1-strict':
             entryPrice = direction === 'long'
-                ? bar.high + cfg.v1_strict.trigger_offset_ticks * tickSize
-                : bar.low - cfg.v1_strict.trigger_offset_ticks * tickSize;
+                ? bar.high + cfg.v1_strict.trigger_offset_ticks * 0.05
+                : bar.low - cfg.v1_strict.trigger_offset_ticks * 0.05;
             stopPrice = direction === 'long'
-                ? bar.low - cfg.v1_strict.stop_offset_ticks * tickSize
-                : bar.high + cfg.v1_strict.stop_offset_ticks * tickSize;
+                ? bar.low - cfg.v1_strict.stop_offset_ticks * 0.05
+                : bar.high + cfg.v1_strict.stop_offset_ticks * 0.05;
             break;
 
         case 'v2-calibrated':
@@ -1847,43 +1669,6 @@ function computeVersionedEntry(signal, cfg, version) {
                 ? bar.low - rangePct * (cfg.v3_percentage.stop_percent_of_range / 100)
                 : bar.high + rangePct * (cfg.v3_percentage.stop_percent_of_range / 100);
             break;
-
-        // --- v17-v26: all use standard 1-tick offset, 2R target ---
-        case 'v17-instrument-calibrated':
-        case 'v18-calibrated-volume':
-        case 'v19-gate-3-pb-resolve':
-        case 'v20-gate-6-steep-leg':
-        case 'v21-gate-4-first-type':
-        case 'v22-gate-5-state-restrict':
-        case 'v23-2hm-boost':
-        case 'v24-m2-boost':
-        case 'v25-signal-quality-filter':
-        case 'v26-chapter-full':
-        // --- Batch 1: V978-V979 — TP-multiplied versions (v27/v28) ---
-        case 'v27-tp-mult-4':
-        case 'v28-tp-mult-3':
-        // --- Batch 1: V980-V982 — Confidence variants (v29/v30) ---
-        case 'v29-conf-90':
-        case 'v30-conf-80':
-        // --- Batch 2: V983-V988 — WR improvement stack (v31-v36) ---
-        case 'v31-mid-session-trap':
-        case 'v32-measured-move':
-        case 'v33-wedge-boost':
-        case 'v34-barb-wire-second':
-        case 'v35-failed-flag-refine':
-        case 'v36-m2-ema-origin': {
-            // All use standard 1-tick offset
-            entryPrice = direction === 'long'
-                ? bar.high + 1 * tickSize
-                : bar.low - 1 * tickSize;
-            stopPrice = direction === 'long'
-                ? bar.low - 1 * tickSize
-                : bar.high + 1 * tickSize;
-            // Check for version-specific target RR ratio
-            const targetRatios = cfg.version_target_ratios || {};
-            targetRR = targetRatios[version] || 2;
-            break;
-        }
 
         default:
             return null;
@@ -1914,21 +1699,7 @@ class BrooksChapterStrategy {
     constructor() {
         this.name = 'brooks_chapter';
         this.description = 'Brooks Chapters 1-4 Complete Price Action Strategy';
-        this.activeVersions = [
-            'v7-conf-only',
-            'v17-instrument-calibrated', 'v18-calibrated-volume',
-            'v19-gate-3-pb-resolve', 'v20-gate-6-steep-leg',
-            'v21-gate-4-first-type', 'v22-gate-5-state-restrict',
-            'v23-2hm-boost', 'v24-m2-boost',
-            'v25-signal-quality-filter', 'v26-chapter-full',
-            // Batch 1: TP-multiplied & confidence variants
-            'v27-tp-mult-4', 'v28-tp-mult-3',
-            'v29-conf-90', 'v30-conf-80',
-            // Batch 2: WR improvement stack
-            'v31-mid-session-trap', 'v32-measured-move',
-            'v33-wedge-boost', 'v34-barb-wire-second',
-            'v35-failed-flag-refine', 'v36-m2-ema-origin'
-        ];
+        this.activeVersions = ['v1-strict', 'v2-calibrated', 'v3-percentage', 'v4-pure-brooks'];
         // Per-instrument state (keyed by instrument_key)
         this.states = {};
         // Bar history per instrument
@@ -2062,347 +1833,169 @@ class BrooksChapterStrategy {
             pt.activeDoubleBottomBullFlag = false;
         }
 
-        // ===============================================================
-        // VERSION-AWARE GATING (bitmask per version)
-        // Bit layout: Gate1=1, Gate2=2, Gate3=4, Gate4=8, Gate5=16, Gate6=32, Gate7=64, Gate8=128
-        // ===============================================================
-        const GATE_BIT = {
-            CONFIDENCE: 1,      // Gate 1: Minimum confidence threshold
-            HL_COUNT: 2,        // Gate 2: High/Low count > 4 suppression
-            PULLBACK_RESOLVE: 4,// Gate 3: One signal per pullback type per extreme
-            FIRST_PER_TYPE: 8,  // Gate 4: Hierarchical pullback type suppression
-            STATE_RESTRICT: 16, // Gate 5: Trend state restriction
-            STEEP_LEG: 32,      // Gate 6: H2/L2 requires steep first leg
-            OPPOSITION: 64,     // Gate 7: Opposition pattern suppression
-            BARB_WIRE: 128,     // Gate 8: Barb Wire confidence reduction
-            SIGNAL_QUALITY: 512,// Gate 9: Signal bar quality assessment (trend bar, reversal bar, doji)
-            EMOTIONAL_SURGE: 1024, // Gate 10: Emotional surge / climax rejection (hard reject)
-            PULLBACK_QUALITY: 2048 // Gate 11: Pullback quality — must be recognized Brooks type
-        };
-
-        // Gather gate configs for all versions
-        const versionGateMasks = cfg.version_gate_masks || {};
-        const versionConfThresholds = cfg.version_confidence_thresholds || {};
-
-        // --- Run ALL pattern detectors (same for all versions) ---
+        // --- Run ALL pattern detectors ---
         const detectors = [
+            // Chapter 4: Pullback Hierarchy (in order of increasing size)
             () => detectBarPullback(bars, emaSeries, currentState, cfg),
             () => detectMinorTrendlinePullback(bars, emaSeries, currentState, cfg),
             () => detectEMAPullback(bars, emaSeries, currentState, cfg),
             () => detectEMAGapBar(bars, emaSeries, currentState, cfg),
             () => detectMajorTrendlinePullback(bars, emaSeries, currentState, cfg),
+
+            // Chapter 4: Double Top/Bottom Flags
             () => detectDoubleBottomBullFlag(bars, emaSeries, currentState, cfg),
             () => detectDoubleTopBearFlag(bars, emaSeries, currentState, cfg),
+
+            // Chapter 4: 2HM
             () => detect2HM(bars, emaSeries, currentState, cfg),
+
+            // Chapter 4: Mid-Session Trap
             () => detectMidSessionTrap(bars, emaSeries, currentState, cfg, instrumentConfig),
+
+            // Chapter 4: Three Push / Wedge
             () => detectThreePushPullback(bars, emaSeries, currentState, cfg),
+
+            // Chapter 1: Failed Reversal
             () => detectFailedReversal(bars, emaSeries, currentState, cfg),
+
+            // Chapter 1: Outside Bar Trap
             () => detectOutsideBarTrap(bars, emaSeries, currentState, cfg),
+
+            // Chapter 4: Failed Final Flag
             () => detectFailedFinalFlag(bars, emaSeries, currentState, cfg),
+
+            // Chapter 3: Spike and Channel
             () => detectSpikeAndChannelReversal(bars, emaSeries, currentState, cfg),
+
+            // Chapter 3: Trend Resumption
             () => detectTrendResumption(bars, emaSeries, currentState, cfg, priorState),
         ];
 
-        const allDetectedSignals = [];
+        const detectedSignals = [];
         for (const detector of detectors) {
             const signal = detector();
             if (!signal || !signal.detected || signal.informational) continue;
-            allDetectedSignals.push(signal);
-        }
 
-        if (allDetectedSignals.length === 0) return null;
+            // === Gate 1: Minimum Confidence ≥ 80 (Ch 4: "uncertainty makes traders hesitant") ===
+            if (signal.confidence < 80) continue;
 
-        // --- State context (shared across versions) ---
-        const isStrong = trendStateStr === TREND_STATE.BULL_TREND_STRONG || trendStateStr === TREND_STATE.BEAR_TREND_STRONG;
-        const isWeak = trendStateStr.includes('weakening');
-        const isTradingRange = trendStateStr === TREND_STATE.TRADING_RANGE || trendStateStr === TREND_STATE.UNDEFINED;
+            // === Gate 2: High/Low count > 4 — suppress (Ch 4: "beyond H4, market is countertrending") ===
+            if (signal.setupType && (signal.setupType.includes('High') || signal.setupType.includes('Low'))) {
+                const hlMatch = signal.setupType.match(/(High|Low)\s*(\d+)/);
+                if (hlMatch && parseInt(hlMatch[2]) > cfg.max_hl_count) continue;
+            }
 
-        // --- Version-aware filtering ---
-        const versionedResults = {};
+            // === Gate 3: Pullback Resolution Gate — one signal per pullback (Ch 4: p.101-102) ===
+            const pbType = signal.pullbackType || signal.setupType;
+            if (pt.pullbackTypesFired.has(pbType)) continue; // Already fired this type since last extreme
+            if (pt.highestConfidenceSinceExtreme > 0 && signal.confidence <= pt.highestConfidenceSinceExtreme) continue; // Lower confidence than already fired
 
-        for (const [version, gateMask] of Object.entries(versionGateMasks)) {
-            const confThreshold = versionConfThresholds[version] || 80;
-            const passingSignals = [];
+            // === Gate 4: First Pullback Per Type per extreme (Ch 4: "each type of first pullback...") ===
+            // Each pullback type can fire only once per trend leg
+            const pullbackFamily = pbType.split('_')[0] || pbType;
+            if (pullbackFamily === 'bar' && pt.pullbackTypesFired.has('minor_trendline')) continue; // bar_pullback already "covered" by larger type
+            if (pullbackFamily === 'minor' && pt.pullbackTypesFired.has('ema')) continue;
+            if (pullbackFamily === 'bar' && pt.pullbackTypesFired.has('ema')) continue;
 
-            for (let i = 0; i < allDetectedSignals.length; i++) {
-                const signal = { ...allDetectedSignals[i] }; // clone to avoid mutation
-                let pass = true;
+            // === Gate 5: Trend State Restriction (Ch 4: p.101) ===
+            const isStrong = trendStateStr === TREND_STATE.BULL_TREND_STRONG || trendStateStr === TREND_STATE.BEAR_TREND_STRONG;
+            const isWeak = trendStateStr.includes('weakening');
+            const isTradingRange = trendStateStr === TREND_STATE.TRADING_RANGE || trendStateStr === TREND_STATE.UNDEFINED;
+            const isCountertrend = signal.direction !== trendDirection && trendDirection !== null;
 
-                // Gate 1: Minimum Confidence (bit 1)
-                if (gateMask & GATE_BIT.CONFIDENCE) {
-                    if (signal.confidence < confThreshold) pass = false;
-                }
+            if (isStrong) {
+                // Strong trend: only micro trendline (H1/L1) and EMA Gap Bar entries
+                // Brooks: "first minor pullback... almost always followed by a new extreme"
+                if (signal.pullbackType !== 'bar_pullback' && signal.pullbackType !== 'ema_gap' && signal.pullbackType !== '2hm') continue;
+            } else if (isWeak) {
+                // Weakening trend: only EMA pullback (M2B/M2S) and double top/bottom flags
+                // Brooks: "each pullback tends to be greater as the countertrend traders become more willing"
+                if (signal.pullbackType !== 'ema' && signal.pullbackType !== 'ema_gap' &&
+                    !signal.setupType.includes('Double Top') && !signal.setupType.includes('Double Bottom') &&
+                    signal.pullbackType !== 'wedge_three_push') continue;
+            } else if (isTradingRange) {
+                // Trading range: only double top/bottom flags
+                // Brooks: (p.104) "sideways bars means both buyers and sellers are active"
+                if (!signal.setupType.includes('Double Top') && !signal.setupType.includes('Double Bottom') &&
+                    signal.pullbackType !== 'failed_final_flag') continue;
+            }
 
-                // Gate 2: High/Low count > 4 (bit 2) — shared across versions
-                if (pass && (gateMask & GATE_BIT.HL_COUNT)) {
-                    if (signal.setupType && (signal.setupType.includes('High') || signal.setupType.includes('Low'))) {
-                        const hlMatch = signal.setupType.match(/(High|Low)\s*(\d+)/);
-                        if (hlMatch && parseInt(hlMatch[2]) > cfg.max_hl_count) pass = false;
+            // === Gate 6: H2/L2 Requires Steep First Leg (Ch 4: p.121) ===
+            // "When the first leg is steep and its correction is only a couple bars... no significant trendline
+            //  will be broken so you should not be looking to buy a High 2"
+            if (signal.setupType && (signal.setupType.includes('High 2') || signal.setupType.includes('Low 2'))) {
+                if (signal.metadata && signal.metadata.legAnalysis) {
+                    const leg1 = signal.metadata.legAnalysis.leg1;
+                    const leg2 = signal.metadata.legAnalysis.leg2;
+                    if (leg1 && leg2) {
+                        const leg1Bars = leg2.index - leg1.index;
+                        if (leg1Bars <= 3) continue; // Too few bars for meaningful trendline break
                     }
-                }
-
-                // Gate 3: Pullback Resolution — one signal per type per extreme (bit 4)
-                if (pass && (gateMask & GATE_BIT.PULLBACK_RESOLVE)) {
-                    const pbType = signal.pullbackType || signal.setupType;
-                    if (pt.pullbackTypesFired.has(pbType)) pass = false;
-                    if (pt.highestConfidenceSinceExtreme > 0 && signal.confidence < pt.highestConfidenceSinceExtreme) pass = false;
-                }
-
-                // Gate 4: First Pullback Per Type hierarchy (bit 8)
-                if (pass && (gateMask & GATE_BIT.FIRST_PER_TYPE)) {
-                    const pbType = signal.pullbackType || signal.setupType;
-                    const pullbackFamily = pbType.split('_')[0] || pbType;
-                    if (pullbackFamily === 'bar' && pt.pullbackTypesFired.has('minor_trendline')) pass = false;
-                    if (pullbackFamily === 'minor' && pt.pullbackTypesFired.has('ema')) pass = false;
-                    if (pullbackFamily === 'bar' && pt.pullbackTypesFired.has('ema')) pass = false;
-                }
-
-                // Gate 5: Trend State Restriction (bit 16)
-                if (pass && (gateMask & GATE_BIT.STATE_RESTRICT)) {
-                    if (isStrong) {
-                        if (signal.pullbackType !== 'bar_pullback' && signal.pullbackType !== 'ema_gap' && signal.pullbackType !== '2hm') pass = false;
-                    } else if (isWeak) {
-                        if (signal.pullbackType !== 'ema' && signal.pullbackType !== 'ema_gap' &&
-                            !signal.setupType.includes('Double Top') && !signal.setupType.includes('Double Bottom') &&
-                            signal.pullbackType !== 'wedge_three_push') pass = false;
-                    } else if (isTradingRange) {
-                        if (!signal.setupType.includes('Double Top') && !signal.setupType.includes('Double Bottom') &&
-                            signal.pullbackType !== 'failed_final_flag') pass = false;
-                    }
-                }
-
-                // Gate 6: H2/L2 Requires Steep First Leg (bit 32)
-                if (pass && (gateMask & GATE_BIT.STEEP_LEG)) {
-                    if (signal.setupType && (signal.setupType.includes('High 2') || signal.setupType.includes('Low 2'))) {
-                        if (signal.metadata && signal.metadata.legAnalysis) {
-                            const leg1 = signal.metadata.legAnalysis.leg1;
-                            const leg2 = signal.metadata.legAnalysis.leg2;
-                            if (leg1 && leg2) {
-                                const leg1Bars = leg2.index - leg1.index;
-                                if (leg1Bars <= 3) pass = false;
-                            }
-                        }
-                    }
-                }
-
-                // Gate 7: Opposition Pattern Suppression (bit 64)
-                if (pass && (gateMask & GATE_BIT.OPPOSITION)) {
-                    if (pt.activeDoubleTopBearFlag && signal.direction === 'long') pass = false;
-                    if (pt.activeDoubleBottomBullFlag && signal.direction === 'short') pass = false;
-                }
-
-                // Gate 8: Barb Wire confidence reduction (bit 128)
-                if (pass && (gateMask & GATE_BIT.BARB_WIRE)) {
-                    if ((isTradingRange || isWeak) && signal.confidence < 90) {
-                        signal.confidence = Math.max(confThreshold - 5, signal.confidence - 5);
-                        if (signal.confidence < confThreshold) pass = false;
-                    }
-                }
-
-                // Gate 9: Signal Bar Quality (bit 512) — soft reject
-                // Al Brooks Ch 1: Signal bars must be trend bars, reversal bars, or
-                // dojis with directional close. Inside bars and ambiguous dojis are lower quality.
-                if (pass && (gateMask & GATE_BIT.SIGNAL_QUALITY)) {
-                    if (signal.signalBar) {
-                        const sigBar = signal.signalBar;
-                        const prevIdx = bars.findIndex(b => b === sigBar) - 1;
-                        const prevBar = prevIdx >= 0 ? bars[prevIdx] : null;
-                        const lookbackSlice = bars.slice(0, prevIdx >= 0 ? prevIdx + 1 : bars.length);
-                        const sigQuality = classifySignalBar(sigBar, prevBar, lookbackSlice, signal.direction);
-                        // Reject: doji bars without directional close, or very low-quality signals
-                        if (sigQuality.type === BAR_TYPE.DOJI && sigQuality.quality < 20) {
-                            pass = false;
-                        }
-                        // Directional mismatch (e.g., bear reversal bar on long signal)
-                        if (!sigQuality.direction_match && sigQuality.quality < 40) {
-                            pass = false;
-                        }
-                    }
-                }
-
-                // Gate 10: Emotional Surge / Climax Rejection (bit 1024) — HARD REJECT
-                // Al Brooks Ch 4: After a climactic thrust (large expansion bar ≥ 2.5× avg body),
-                // the counter-trend entry on the immediate next pullback is REJECTED.
-                // This prevents fading climactic capitulation.
-                if (pass && (gateMask & GATE_BIT.EMOTIONAL_SURGE)) {
-                    const emaPeriod = cfg.ema_period || 20;
-                    const hasEnoughBars = bars.length >= emaPeriod + 5;
-                    if (hasEnoughBars) {
-                        const lookback = Math.min(8, bars.length - 1 - emaPeriod);
-                        const recentStart = Math.max(0, bars.length - 1 - lookback);
-                        const recentBars = bars.slice(recentStart, bars.length);
-                        const contextStart = Math.max(0, bars.length - 1 - 20);
-                        const contextBars = bars.slice(contextStart, bars.length);
-                        const avgBody = contextBars.reduce((s, b) => s + Math.abs(b.close - b.open), 0) / contextBars.length;
-                        if (avgBody > 0) {
-                            const climaxRatio = cfg.climax_body_ratio || 2.5;
-                            // Find most recent climactic bar WITH the trend
-                            let climaxFound = false;
-                            let climaxDirection = null;
-                            let climaxIdx = -1;
-                            for (let j = recentBars.length - 1; j >= 0; j--) {
-                                const b = recentBars[j];
-                                const body = Math.abs(b.close - b.open);
-                                if (body >= avgBody * climaxRatio) {
-                                    const barDir = b.close > b.open ? 'bull' : 'bear';
-                                    if (trendStateStr.includes('bear') && barDir === 'bear') {
-                                        climaxFound = true; climaxDirection = 'bear';
-                                        climaxIdx = j; break;
-                                    }
-                                    if (trendStateStr.includes('bull') && barDir === 'bull') {
-                                        climaxFound = true; climaxDirection = 'bull';
-                                        climaxIdx = j; break;
-                                    }
-                                }
-                            }
-                            if (climaxFound) {
-                                const sigDir = signal.direction;
-                                const isCounterTrend =
-                                    (climaxDirection === 'bear' && sigDir === 'long') ||
-                                    (climaxDirection === 'bull' && sigDir === 'short');
-                                if (isCounterTrend) {
-                                    // Count corrective legs after climax
-                                    let correctiveLegs = 0;
-                                    let lastSwingDir = climaxDirection;
-                                    const realClimaxIdx = recentStart + climaxIdx;
-                                    const afterClimax = bars.slice(realClimaxIdx + 1, bars.length);
-                                    for (const ab of afterClimax) {
-                                        const abd = ab.close > ab.open ? 'bull' : 'bear';
-                                        if (abd !== lastSwingDir) {
-                                            const abBody = Math.abs(ab.close - ab.open);
-                                            const abRange = ab.high - ab.low;
-                                            if (abRange > 0 && (abBody / abRange > 0.3 || abRange > avgBody)) {
-                                                correctiveLegs++;
-                                                lastSwingDir = abd;
-                                            }
-                                        }
-                                    }
-                                    if (correctiveLegs < 2) {
-                                        pass = false; // HARD REJECT
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Gate 11: Pullback Quality — Recognized Brooks Type (bit 2048) — soft reject
-                // Al Brooks Ch 4: Pullbacks must be one of the recognized types:
-                // bar, minor trendline, EMA, EMA gap, major trendline, DT/DB flag, etc.
-                if (pass && (gateMask & GATE_BIT.PULLBACK_QUALITY)) {
-                    const pbType = signal.pullbackType || signal.metadata?.pullbackType || null;
-                    const recognized = [
-                        'bar_pullback', 'minor_trendline', 'ema', 'ema_gap',
-                        'major_trendline', '2hm', 'wedge_three_push',
-                        'double_bottom_bull_flag', 'double_top_bear_flag',
-                        'micro_trendline', 'failed_final_flag',
-                        'bar', 'minor', 'ema_gap', 'wedge'
-                    ];
-                    const setupHasLegs =
-                        signal.setupType.includes('High 2') ||
-                        signal.setupType.includes('Low 2') ||
-                        signal.setupType.includes('M2B') ||
-                        signal.setupType.includes('M2S');
-                    // If no recognized pullback type AND no H2/L2/M2 structure → reject
-                    const hasType = pbType && recognized.some(t =>
-                        pbType.toLowerCase().includes(t.toLowerCase())
-                    );
-                    if (!hasType && !setupHasLegs) {
-                        // Check barb wire context
-                        if (bars.length >= 5) {
-                            const checkBars = bars.slice(Math.max(0, bars.length - 5), bars.length);
-                            const rangeValues = checkBars.map(bb => bb.high - bb.low);
-                            const bodyValues = checkBars.map(bb => Math.abs(bb.close - bb.open));
-                            const avgR = rangeValues.reduce((s, v) => s + v, 0) / checkBars.length;
-                            const avgBd = bodyValues.reduce((s, v) => s + v, 0) / checkBars.length;
-                            if (avgR > 0) {
-                                const dojiCount = checkBars.filter((bb, idx) => {
-                                    const bd = bodyValues[idx];
-                                    const rg = rangeValues[idx];
-                                    return rg > 0 && bd / rg < 0.25;
-                                }).length;
-                                if (dojiCount >= 3 && avgBd / avgR < 0.35) {
-                                    pass = false; // Barb wire without clear pullback = reject
-                                }
-                            }
-                        }
-                        if (pass) {
-                            pass = false; // Unknown pullback type with no structural legs
-                        }
-                    }
-                }
-
-                // Boost: v23-2hm-boost — +5 confidence for 2HM signals (Brooks Ch 4: "2HM is high probability")
-                if (pass && version === 'v23-2hm-boost' && signal.pullbackType === '2hm') {
-                    signal.confidence = Math.min(100, signal.confidence + 5);
-                }
-
-                // Boost: v24-m2-boost — +5 confidence for M2B/M2S signals (Brooks Ch 4: "M2B/M2S is particularly reliable")
-                if (pass && version === 'v24-m2-boost' && signal.setupType && (signal.setupType.startsWith('M2B') || signal.setupType.startsWith('M2S'))) {
-                    signal.confidence = Math.min(100, signal.confidence + 5);
-                }
-
-                if (pass) {
-                    passingSignals.push({
-                        ...signal,
-                        timestamp: bar.timestamp || bar.time || new Date().toISOString(),
-                        _version: version,
-                        _gateMask: gateMask,
-                        _confThreshold: confThreshold
-                    });
                 }
             }
 
-            if (passingSignals.length > 0) {
-                // Pick highest confidence for this version
-                passingSignals.sort((a, b) => b.confidence - a.confidence);
-                versionedResults[version] = passingSignals[0];
+            // === Gate 7: Opposition Pattern Suppression (Ch 4: p.104-105) ===
+            // If a Double Top Bear Flag is active, don't fire long signals
+            // If a Double Bottom Bull Flag is active, don't fire short signals
+            if (pt.activeDoubleTopBearFlag && signal.direction === 'long') continue;
+            if (pt.activeDoubleBottomBullFlag && signal.direction === 'short') continue;
+
+            // === Gate 8: Barb Wire confidence reduction (Ch 4: p.122) ===
+            const isBarbWireZone = isTradingRange || isWeak;
+            if (isBarbWireZone && signal.confidence < 90) {
+                signal.confidence = Math.max(80, signal.confidence - 5);
+                if (signal.confidence < 80) continue; // Drop if below threshold after reduction
             }
+
+            detectedSignals.push({
+                ...signal,
+                timestamp: bar.timestamp || bar.time || new Date().toISOString()
+            });
         }
 
-        if (Object.keys(versionedResults).length === 0) return null;
+        if (detectedSignals.length === 0) return null;
 
-        // --- Build per-version entry/exit ---
+        // --- Signal selection: highest confidence wins ---
+        detectedSignals.sort((a, b) => b.confidence - a.confidence);
+        const bestSignal = detectedSignals[0];
+
+        // --- Update pullback tracking ---
+        const bestPbType = bestSignal.pullbackType || bestSignal.setupType;
+        pt.pullbackTypesFired.add(bestPbType);
+        pt.highestConfidenceSinceExtreme = bestSignal.confidence;
+        pt.lastSignalTimestamp = bestSignal.timestamp;
+
+        // Track double top/bottom flags for opposition suppression
+        if (bestSignal.setupType.includes('Double Top Bear Flag')) pt.activeDoubleTopBearFlag = true;
+        if (bestSignal.setupType.includes('Double Bottom Bull Flag')) pt.activeDoubleBottomBullFlag = true;
+
+        // Generate versioned entry/exit for all active versions
+        const activeVersions = cfg.active_versions || this.activeVersions;
         const versionedEntries = {};
-        let masterSignal = null; // Use the highest-confidence version's signal as master
 
-        for (const [version, signal] of Object.entries(versionedResults)) {
-            const entry = computeVersionedEntry(signal, cfg, version);
+        for (const version of activeVersions) {
+            const entry = computeVersionedEntry(bestSignal, cfg, version);
             if (entry) {
                 versionedEntries[version] = entry;
             }
-            // Master: pick the version with highest confidence
-            if (!masterSignal || signal.confidence > masterSignal.confidence) {
-                masterSignal = signal;
-            }
-        }
-
-        // --- Update pullback tracking from master (best) signal ---
-        if (masterSignal) {
-            const bestPbType = masterSignal.pullbackType || masterSignal.setupType;
-            pt.pullbackTypesFired.add(bestPbType);
-            pt.highestConfidenceSinceExtreme = masterSignal.confidence;
-            pt.lastSignalTimestamp = masterSignal.timestamp;
-            if (masterSignal.setupType.includes('Double Top Bear Flag')) pt.activeDoubleTopBearFlag = true;
-            if (masterSignal.setupType.includes('Double Bottom Bull Flag')) pt.activeDoubleBottomBullFlag = true;
         }
 
         return {
-            signal: masterSignal.setupType,
-            direction: masterSignal.direction,
-            entryPrice: masterSignal.entryPrice,
-            stopLoss: masterSignal.stopLoss,
-            takeProfit: masterSignal.takeProfit,
-            confidence: masterSignal.confidence,
-            setupType: masterSignal.setupType,
-            pullbackType: masterSignal.pullbackType || null,
-            signalBar: masterSignal.signalBar,
+            signal: bestSignal.setupType,
+            direction: bestSignal.direction,
+            entryPrice: bestSignal.entryPrice,
+            stopLoss: bestSignal.stopLoss,
+            takeProfit: bestSignal.takeProfit,
+            confidence: bestSignal.confidence,
+            setupType: bestSignal.setupType,
+            pullbackType: bestSignal.pullbackType || null,
+            signalBar: bestSignal.signalBar,
             versionedEntries,
             trendState: currentState.state,
-            timestamp: masterSignal.timestamp,
+            timestamp: bestSignal.timestamp,
             strategy: this.name,
-            metadata: masterSignal.metadata || {},
-            filters: masterSignal.filters || []
+            metadata: bestSignal.metadata || {},
+            filters: bestSignal.filters || []
         };
     }
 
