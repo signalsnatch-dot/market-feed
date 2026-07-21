@@ -966,10 +966,13 @@ function detectBarPullback(bars, emaSeries, state, cfg) {
 
 function detectMinorTrendlinePullback(bars, emaSeries, state, cfg) {
     // 3-5 bar pullback breaking minor trendline — High/Low 2 setup
+    // Brooks Ch 4: H2/L2 is the END of a two-legged correction. The
+    // signal bar is THE CURRENT BAR completing the second leg. Not a bar
+    // found by scanning back through history for the first High2/Low2.
     if (bars.length < 5) return { detected: false };
 
     const latestIdx = bars.length - 1;
-    const bar = bars[latestIdx];
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the signal bar
     const prevBar = bars[latestIdx - 1];
     const ema = emaSeries[latestIdx];
 
@@ -980,26 +983,53 @@ function detectMinorTrendlinePullback(bars, emaSeries, state, cfg) {
 
     const direction = isBullTrend ? 'long' : 'short';
 
-    // Look for a recent swing point to start the pullback
+    // --- Step 1: Verification — is the CURRENT bar a High 2 (bull) or Low 2 (bear)? ---
+    // Ch 4: "the first bar whose high is above the high of the prior bar is a High 1 …
+    // the next occurrence is a High 2"
+    const isHigh2Signal =
+        direction === 'long' &&
+        bar.high > prevBar.high;   // current bar's high breaks prior bar's high = High 2
+    const isLow2Signal =
+        direction === 'short' &&
+        bar.low < prevBar.low;     // current bar's low breaks prior bar's low = Low 2
+
+    if (!isHigh2Signal && !isLow2Signal) return { detected: false };
+
+    // --- Step 2: Confirm a real two-legged correction ENDS at this bar ---
+    // Find the most recent trend extreme (HH in bull, LL in bear) BEFORE this bar.
+    // The pullback starts from that extreme.
     const swings = state.swings || [];
     const extremeSwings = swings.filter(s =>
         (isBullTrend && s.type === 'high') || (isBearTrend && s.type === 'low')
-    ).slice(-3);
+    );
 
-    if (extremeSwings.length === 0) return { detected: false };
+    // Take the swing extreme AT or BEFORE (latestIdx - 1) — cannot be the current bar
+    const priorExtremes = extremeSwings.filter(s => s.index < latestIdx);
+    if (priorExtremes.length === 0) return { detected: false };
+    const pullbackStart = priorExtremes[priorExtremes.length - 1].index;
 
-    const pullbackStart = extremeSwings[extremeSwings.length - 1].index;
-    const legAnalysis = detectTwoLeggedCorrection(bars, pullbackStart, direction === 'long' ? 'bull' : 'bear', swings);
+    // Now check: from pullbackStart to latestIdx, does the current bar
+    // represent a High 2 / Low 2 (second attempt to end the correction)?
+    const checkDirection = direction === 'long' ? 'bull' : 'bear';
+    const counter = countHighLow(bars, pullbackStart, checkDirection);
 
-    if (!legAnalysis.hasTwoLegs) return { detected: false };
+    // The CURRENT bar must be the SECOND occurrence (High 2 / Low 2),
+    // NOT a High 1 and NOT a High 3+.
+    if (counter.totalLegs < 2) return { detected: false };
+    const lastHL = counter.results[counter.results.length - 1];
+    if (lastHL.index !== latestIdx) return { detected: false };
+    if (lastHL.count !== 2) return { detected: false };
 
-    // Critical: H2/L2 requires trendline break between legs (Ch 4)
-    if (cfg.require_trendline_break_for_H2L2 && !legAnalysis.trendlineBroken) {
-        return { detected: false };
+    // --- Step 3: Validate trendline break between leg 1 and leg 2 ---
+    const leg1 = counter.results[0];
+    const leg2 = counter.results[1];
+    if (cfg.require_trendline_break_for_H2L2) {
+        const trendlineBroken = hasTrendlineBreakBetween(bars, leg1.index, leg2.index, swings);
+        if (!trendlineBroken) return { detected: false };
     }
 
-    const leg2 = legAnalysis.leg2;
-    const signalBar = leg2.bar;
+    // --- Step 4: Signal bar = CURRENT BAR ---
+    const signalBar = bar;
     const entryPrice = direction === 'long'
         ? signalBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05
         : signalBar.low - cfg.v1_strict.trigger_offset_ticks * 0.05;
@@ -1023,16 +1053,20 @@ function detectMinorTrendlinePullback(bars, emaSeries, state, cfg) {
         confidence: setupType.startsWith('M') ? 90 : 80,
         signalBar,
         pullbackType: 'minor_trendline',
-        metadata: { legAnalysis }
+        metadata: { legAnalysis: { leg1, leg2, totalLegs: counter.totalLegs } }
     };
 }
 
 function detectEMAPullback(bars, emaSeries, state, cfg) {
     // Pullback reaches EMA — M2B/M2S (if second entry at EMA)
+    // Brooks Ch 4: The signal bar is THE CURRENT BAR, which must be both:
+    // (a) at/touching the EMA, AND (b) a High 2 (bull) or Low 2 (bear)
+    // that completes a two-legged correction.
     if (bars.length < cfg.ema_period + 5) return { detected: false };
 
     const latestIdx = bars.length - 1;
-    const bar = bars[latestIdx];
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the signal bar
+    const prevBar = bars[latestIdx - 1];
     const ema = emaSeries[latestIdx];
     if (ema === null) return { detected: false };
 
@@ -1043,28 +1077,40 @@ function detectEMAPullback(bars, emaSeries, state, cfg) {
 
     const direction = isBullTrend ? 'long' : 'short';
 
-    // Check if bar touches or is near EMA
+    // --- Step 1: EMA touch by CURRENT bar ---
     const emaTouch = Math.abs(bar.low - ema) / ema < 0.002 ||
         Math.abs(bar.high - ema) / ema < 0.002 ||
         Math.abs(bar.close - ema) / ema < 0.002;
-
     if (!emaTouch) return { detected: false };
 
-    // Look for 2-legged correction to EMA
+    // --- Step 2: Is CURRENT bar the second entry (High 2 / Low 2)? ---
+    const isHigh2Signal =
+        direction === 'long' && bar.high > prevBar.high;
+    const isLow2Signal =
+        direction === 'short' && bar.low < prevBar.low;
+    if (!isHigh2Signal && !isLow2Signal) return { detected: false };
+
+    // --- Step 3: Verify a two-legged correction from the last trend extreme ---
     const swings = state.swings || [];
     const extremeSwings = swings.filter(s =>
         (isBullTrend && s.type === 'high') || (isBearTrend && s.type === 'low')
-    ).slice(-5);
+    );
+    const priorExtremes = extremeSwings.filter(s => s.index < latestIdx);
+    if (priorExtremes.length === 0) return { detected: false };
+    const pullbackStart = priorExtremes[priorExtremes.length - 1].index;
 
-    if (extremeSwings.length === 0) return { detected: false };
+    const checkDirection = direction === 'long' ? 'bull' : 'bear';
+    const counter = countHighLow(bars, pullbackStart, checkDirection);
 
-    const pullbackStart = extremeSwings[extremeSwings.length - 1].index;
-    const legAnalysis = detectTwoLeggedCorrection(bars, pullbackStart, direction === 'long' ? 'bull' : 'bear', swings);
+    if (counter.totalLegs < 2) return { detected: false };
+    const lastHL = counter.results[counter.results.length - 1];
+    if (lastHL.index !== latestIdx) return { detected: false };
+    if (lastHL.count !== 2) return { detected: false };
 
-    if (!legAnalysis.hasTwoLegs) return { detected: false };
-
-    const leg2 = legAnalysis.leg2;
-    const signalBar = leg2.bar;
+    // --- Step 4: Signal bar = CURRENT BAR ---
+    const signalBar = bar;
+    const leg1 = counter.results[0];
+    const leg2 = counter.results[1];
 
     const entryPrice = direction === 'long'
         ? signalBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05
@@ -1083,7 +1129,7 @@ function detectEMAPullback(bars, emaSeries, state, cfg) {
         confidence: 90,
         signalBar,
         pullbackType: 'ema',
-        metadata: { legAnalysis, emaTouch }
+        metadata: { legAnalysis: { leg1, leg2, totalLegs: counter.totalLegs }, emaTouch }
     };
 }
 
@@ -1201,7 +1247,14 @@ function detectMajorTrendlinePullback(bars, emaSeries, state, cfg) {
 
 function detectDoubleBottomBullFlag(bars, emaSeries, state, cfg) {
     // Two near-equal lows in a bull pullback
+    // Brooks Ch 4: Double Bottom Bull Flag — the second bottom is found
+    // via swing detection, but the SIGNAL is the CURRENT BAR confirming
+    // the flag resolution by breaking above the intermediate swing high
+    // between the two bottoms.
     if (bars.length < 8) return { detected: false };
+
+    const latestIdx = bars.length - 1;
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the confirmation bar
 
     const trendState = state.state;
     if (!trendState.includes('bull') && trendState !== TREND_STATE.TRADING_RANGE) {
@@ -1225,9 +1278,29 @@ function detectDoubleBottomBullFlag(bars, emaSeries, state, cfg) {
     // Second low must be after a rally attempt (bull flag)
     if (low2.index - low1.index < 3) return { detected: false };
 
-    const signalBar = low2.bar;
+    // --- Step 1: Find the intermediate swing high between low1 and low2 ---
+    // Double Bottom Bull Flag: market rallies from low1 to a swing high,
+    // then sells off again to low2 (near low1). The signal bar is the CURRENT
+    // BAR which must BREAK ABOVE that intermediate swing high.
+    const barsBetween = bars.slice(low1.index + 1, low2.index);
+    if (barsBetween.length < 1) return { detected: false };
+    
+    // Find the highest high between the two lows (the flag's high)
+    const highBetween = Math.max(...barsBetween.map(b => b.high));
+    const highBarIndex = low1.index + 1 + barsBetween.findIndex(b => b.high === highBetween);
+
+    // --- Step 2: Current bar must break above the intermediate high ---
+    // The flag is confirmed when price breaks above the rally high between
+    // the two bottoms. The current bar must close above this level.
+    if (bar.high <= highBetween) return { detected: false };
+    if (bar.close <= highBetween) return { detected: false };
+
+    // --- Step 3: Signal bar = CURRENT BAR ---
+    // Entry = 1 tick above current bar's high (fresh signal)
+    // Stop = 1 tick below low2 (the support level)
+    const signalBar = bar;
     const entryPrice = signalBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05;
-    const stopPrice = signalBar.low - cfg.v1_strict.stop_offset_ticks * 0.05;
+    const stopPrice = low2.bar.low - cfg.v1_strict.stop_offset_ticks * 0.05;
 
     return {
         detected: true,
@@ -1238,13 +1311,20 @@ function detectDoubleBottomBullFlag(bars, emaSeries, state, cfg) {
         takeProfit: null,
         confidence: 85,
         signalBar,
-        metadata: { low1, low2, tolerance, priceDiff }
+        metadata: { low1, low2, tolerance, priceDiff, highBetween, highBarIndex }
     };
 }
 
 function detectDoubleTopBearFlag(bars, emaSeries, state, cfg) {
     // Two near-equal highs in a bear pullback
+    // Brooks Ch 4: Double Top Bear Flag — the second top is found
+    // via swing detection, but the SIGNAL is the CURRENT BAR confirming
+    // the flag resolution by breaking below the intermediate swing low
+    // between the two tops.
     if (bars.length < 8) return { detected: false };
+
+    const latestIdx = bars.length - 1;
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the confirmation bar
 
     const trendState = state.state;
     if (!trendState.includes('bear') && trendState !== TREND_STATE.TRADING_RANGE) {
@@ -1267,9 +1347,29 @@ function detectDoubleTopBearFlag(bars, emaSeries, state, cfg) {
 
     if (high2.index - high1.index < 3) return { detected: false };
 
-    const signalBar = high2.bar;
+    // --- Step 1: Find the intermediate swing low between high1 and high2 ---
+    // Double Top Bear Flag: market sells off from high1 to a swing low,
+    // then rallies again to high2 (near high1). The signal bar is the CURRENT
+    // BAR which must BREAK BELOW that intermediate swing low.
+    const barsBetween = bars.slice(high1.index + 1, high2.index);
+    if (barsBetween.length < 1) return { detected: false };
+    
+    // Find the lowest low between the two highs (the flag's low)
+    const lowBetween = Math.min(...barsBetween.map(b => b.low));
+    const lowBarIndex = high1.index + 1 + barsBetween.findIndex(b => b.low === lowBetween);
+
+    // --- Step 2: Current bar must break below the intermediate low ---
+    // The flag is confirmed when price breaks below the selloff low between
+    // the two tops. The current bar must close below this level.
+    if (bar.low >= lowBetween) return { detected: false };
+    if (bar.close >= lowBetween) return { detected: false };
+
+    // --- Step 3: Signal bar = CURRENT BAR ---
+    // Entry = 1 tick below current bar's low (fresh signal)
+    // Stop = 1 tick above high2 (the resistance level)
+    const signalBar = bar;
     const entryPrice = signalBar.low - cfg.v1_strict.trigger_offset_ticks * 0.05;
-    const stopPrice = signalBar.high + cfg.v1_strict.stop_offset_ticks * 0.05;
+    const stopPrice = high2.bar.high + cfg.v1_strict.stop_offset_ticks * 0.05;
 
     return {
         detected: true,
@@ -1280,7 +1380,7 @@ function detectDoubleTopBearFlag(bars, emaSeries, state, cfg) {
         takeProfit: null,
         confidence: 85,
         signalBar,
-        metadata: { high1, high2, tolerance, priceDiff }
+        metadata: { high1, high2, tolerance, priceDiff, lowBetween, lowBarIndex }
     };
 }
 
@@ -1436,7 +1536,13 @@ function detectMidSessionTrap(bars, emaSeries, state, cfg, instrumentConfig) {
 // ---- Chapter 4: Three Push / Wedge Pullback ----
 
 function detectThreePushPullback(bars, emaSeries, state, cfg) {
+    // Brooks Ch 4: Three Push / Wedge — the third push completes at the CURRENT BAR
+    // Signal bar = CURRENT BAR (High 3 or Low 3)
     if (bars.length < 8) return { detected: false };
+
+    const latestIdx = bars.length - 1;
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the signal bar
+    const prevBar = bars[latestIdx - 1];
 
     const trendState = state.state;
     const isBullTrend = trendState.includes('bull');
@@ -1445,22 +1551,32 @@ function detectThreePushPullback(bars, emaSeries, state, cfg) {
 
     const direction = isBullTrend ? 'long' : 'short';
 
+    // --- Step 1: Is CURRENT bar the THIRD push (High 3 / Low 3)? ---
     const swings = state.swings || [];
     const extremeSwings = swings.filter(s =>
         (isBullTrend && s.type === 'high') || (isBearTrend && s.type === 'low')
-    ).slice(-5);
+    );
+    const priorExtremes = extremeSwings.filter(s => s.index < latestIdx);
+    if (priorExtremes.length === 0) return { detected: false };
+    const pullbackStart = priorExtremes[priorExtremes.length - 1].index;
 
-    if (extremeSwings.length === 0) return { detected: false };
+    const checkDirection = direction === 'long' ? 'bull' : 'bear';
+    const counter = countHighLow(bars, pullbackStart, checkDirection);
 
-    const pullbackStart = extremeSwings[extremeSwings.length - 1].index;
+    if (counter.totalLegs < 3) return { detected: false };
+    const lastHL = counter.results[counter.results.length - 1];
+    if (lastHL.index !== latestIdx) return { detected: false };
+    if (lastHL.count !== 3) return { detected: false };
 
-    // Use bar counting direction opposite to trend
-    const threePush = detectThreePush(bars, pullbackStart, direction === 'long' ? 'bull' : 'bear');
+    // --- Step 2: Check if third push is shrinking (wedge) ---
+    const push1 = counter.results[0];
+    const push3 = counter.results[2];
+    const range1 = Math.abs(push1.bar.high - push1.bar.low);
+    const range3 = Math.abs(push3.bar.high - push3.bar.low);
+    const isShrinking = range3 < range1 * 0.8;
 
-    if (!threePush.isThreePush) return { detected: false };
-
-    const leg3 = threePush.pushes[2];
-    const signalBar = leg3.bar;
+    // --- Step 3: Signal bar = CURRENT BAR ---
+    const signalBar = bar;
 
     const entryPrice = direction === 'long'
         ? signalBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05
@@ -1476,21 +1592,25 @@ function detectThreePushPullback(bars, emaSeries, state, cfg) {
         entryPrice,
         stopLoss: stopPrice,
         takeProfit: null,
-        confidence: threePush.isShrinking ? 88 : 78,
+        confidence: isShrinking ? 88 : 78,
         signalBar,
         pullbackType: 'wedge_three_push',
-        metadata: { threePush }
+        metadata: { threePush: { pushes: [push1, counter.results[1], push3], isShrinking } }
     };
 }
 
 // ---- Chapter 1: Failed Reversal = Opposite Setup ----
 
 function detectFailedReversal(bars, emaSeries, state, cfg) {
+    // Brooks Ch 1: "Failed Bear Reversal in Strong Bull → Long"
+    // A bear reversal bar is attempted but fails; the NEXT bar confirms the failure.
+    // Signal bar = CURRENT BAR that confirms the failure.
+    // Entry = above the failed reversal bar's high (not above current bar's high).
     if (bars.length < 4) return { detected: false };
 
     const latestIdx = bars.length - 1;
-    const prevBar = bars[latestIdx - 1];
-    const bar = bars[latestIdx];
+    const bar = bars[latestIdx];       // CURRENT BAR — confirms failure
+    const prevBar = bars[latestIdx - 1]; // Attempted reversal bar
     const barBeforePrev = bars[latestIdx - 2];
 
     const trendState = state.state;
@@ -1498,12 +1618,14 @@ function detectFailedReversal(bars, emaSeries, state, cfg) {
     const isStrongBear = trendState === TREND_STATE.BEAR_TREND_STRONG;
     if (!isStrongBull && !isStrongBear) return { detected: false };
 
-    // Failed reversal: a reversal bar forms but doesn't trigger
-    // In strong bull: bear reversal bar that fails → long above it
-    // In strong bear: bull reversal bar that fails → short below it
+    // The PREVIOUS bar is the attempted reversal bar; CURRENT bar confirms failure
     const prevType = classifyBar(prevBar, medianBody(bars.slice(0, latestIdx), 10));
 
+    // FAILED BEAR REVERSAL IN STRONG BULL → LONG
+    // prevBar was bear reversal or doji attempt, current bar closes above prevBar's close
     if (isStrongBull && (prevType === BAR_TYPE.REVERSAL_BEAR || prevType === BAR_TYPE.DOJI) && bar.close > prevBar.close) {
+        // Entry = 1 tick above the FAILED reversal bar's high (not current bar's high)
+        // Stop = 1 tick below the failed reversal bar's low
         const entryPrice = prevBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05;
         return {
             detected: true,
@@ -1513,11 +1635,12 @@ function detectFailedReversal(bars, emaSeries, state, cfg) {
             stopLoss: prevBar.low - cfg.v1_strict.stop_offset_ticks * 0.05,
             takeProfit: null,
             confidence: 82,
-            signalBar: prevBar,
-            metadata: { prevType, reason: 'failed_reversal_bear_in_bull' }
+            signalBar: bar,             // CURRENT BAR is the signal bar
+            metadata: { prevType, reason: 'failed_reversal_bear_in_bull', failedBar: prevBar }
         };
     }
 
+    // FAILED BULL REVERSAL IN STRONG BEAR → SHORT
     if (isStrongBear && (prevType === BAR_TYPE.REVERSAL_BULL || prevType === BAR_TYPE.DOJI) && bar.close < prevBar.close) {
         const entryPrice = prevBar.low - cfg.v1_strict.trigger_offset_ticks * 0.05;
         return {
@@ -1528,8 +1651,8 @@ function detectFailedReversal(bars, emaSeries, state, cfg) {
             stopLoss: prevBar.high + cfg.v1_strict.stop_offset_ticks * 0.05,
             takeProfit: null,
             confidence: 82,
-            signalBar: prevBar,
-            metadata: { prevType, reason: 'failed_reversal_bull_in_bear' }
+            signalBar: bar,             // CURRENT BAR is the signal bar
+            metadata: { prevType, reason: 'failed_reversal_bull_in_bear', failedBar: prevBar }
         };
     }
 
@@ -1714,6 +1837,10 @@ function detectSpikeAndChannelReversal(bars, emaSeries, state, cfg) {
 // ---- Chapter 3: Trend Resumption Detection ----
 
 function detectTrendResumption(bars, emaSeries, state, cfg, prevState) {
+    // Brooks Ch 3: Trend Resumption Day — sideways midday action,
+    // then breakout in original trend direction.
+    // Entry = CURRENT BAR completing a High 2 / Low 2 pullback after
+    // the trend resumption state is triggered.
     if (bars.length < 15) return { detected: false };
 
     const trendState = state.state;
@@ -1721,26 +1848,40 @@ function detectTrendResumption(bars, emaSeries, state, cfg, prevState) {
     const isBearResumption = trendState === TREND_STATE.TREND_RESUMPTION_BEAR;
     if (!isBullResumption && !isBearResumption) return { detected: false };
 
-    // In trend resumption: market goes sideways for hours, then breaks out
-    // in original trend direction. Look for pullback entry after breakout.
     const latestIdx = bars.length - 1;
-    const bar = bars[latestIdx];
+    const bar = bars[latestIdx];       // CURRENT BAR — must be the signal bar
+    const prevBar = bars[latestIdx - 1];
     const ema = emaSeries[latestIdx];
     const direction = isBullResumption ? 'long' : 'short';
 
-    // Look for High/Low 2 near EMA
+    // --- Step 1: Is CURRENT bar a High 2 / Low 2? ---
+    const isHigh2Signal =
+        direction === 'long' && bar.high > prevBar.high;
+    const isLow2Signal =
+        direction === 'short' && bar.low < prevBar.low;
+    if (!isHigh2Signal && !isLow2Signal) return { detected: false };
+
+    // --- Step 2: Verify a two-legged correction from a recent extreme ---
     const swings = state.swings || [];
-    const legAnalysisData = detectTwoLeggedCorrection(
-        bars,
-        Math.max(0, latestIdx - 20),
-        direction === 'long' ? 'bull' : 'bear',
-        swings
+    const extremeSwings = swings.filter(s =>
+        (isBullResumption && s.type === 'high') || (isBearResumption && s.type === 'low')
     );
+    const priorExtremes = extremeSwings.filter(s => s.index < latestIdx);
+    if (priorExtremes.length === 0) return { detected: false };
+    const pullbackStart = priorExtremes[priorExtremes.length - 1].index;
 
-    if (!legAnalysisData.hasTwoLegs) return { detected: false };
+    const checkDirection = direction === 'long' ? 'bull' : 'bear';
+    const counter = countHighLow(bars, pullbackStart, checkDirection);
 
-    const leg2 = legAnalysisData.leg2;
-    const signalBar = leg2.bar;
+    if (counter.totalLegs < 2) return { detected: false };
+    const lastHL = counter.results[counter.results.length - 1];
+    if (lastHL.index !== latestIdx) return { detected: false };
+    if (lastHL.count !== 2) return { detected: false };
+
+    // --- Step 3: Signal bar = CURRENT BAR ---
+    const signalBar = bar;
+    const leg1 = counter.results[0];
+    const leg2 = counter.results[1];
 
     const entryPrice = direction === 'long'
         ? signalBar.high + cfg.v1_strict.trigger_offset_ticks * 0.05
@@ -1758,7 +1899,7 @@ function detectTrendResumption(bars, emaSeries, state, cfg, prevState) {
         takeProfit: null,
         confidence: 82,
         signalBar,
-        metadata: { legAnalysis: legAnalysisData }
+        metadata: { legAnalysis: { leg1, leg2, totalLegs: counter.totalLegs } }
     };
 }
 
@@ -1766,7 +1907,7 @@ function detectTrendResumption(bars, emaSeries, state, cfg, prevState) {
 // MODULE 9: VERSIONED ENTRY/EXIT CALCULATORS
 // ============================================================================
 
-function computeVersionedEntry(signal, cfg, version) {
+function computeVersionedEntry(signal, cfg, version, tickSize) {
     if (!signal || !signal.detected || !signal.signalBar) return null;
 
     const bar = signal.signalBar;
@@ -1778,7 +1919,6 @@ function computeVersionedEntry(signal, cfg, version) {
 
         // All versions use Brooks-compliant 1-tick offset with uniform entry/exit logic
         // Differences are in the GATING, not the entry/exit computation
-        const tickSize = 0.05;
         switch (version) {
         case 'v4-pure-brooks': {
             const vc = cfg.v4_pure_brooks || {};
@@ -1942,12 +2082,23 @@ function computeVersionedEntry(signal, cfg, version) {
             return null;
     }
 
-    // Take profit: computed from risk and target RR
+    // Take profit: computed from risk; targetRR is 2 by default
     const risk = Math.abs(entryPrice - stopPrice);
+    
+    // Guard: If risk is zero (e.g., identical entry and stop due to 0 range),
+    // cap it at a minimum risk (1 tick) — Brooks Ch 1: "always have a stop in the market"
+    if (risk <= 0) {
+        // Synthetic minimum risk: 1 tick
+        const minRisk = 1 * tickSize;
+        // Re-derive stop from entry using min risk
+        // NOTE: This is a fallback; in practice range-zero bars should be skipped
+        // but this prevents NaN/Infinity takeProfit.
+    }
+    const effectiveRisk = risk > 0 ? risk : (1 * tickSize);
     
     // v34/v37: Override target to measured move projection from spike-and-channel
     // Brooks Ch 4: "Measured Move" projects spike height from channel breakout
-    if ((version === 'v34-measured-move-target' || version === 'v37-wr-stack-all' || version === 'v37-wr-stack-all-conf-85') && risk > 0) {
+    if ((version === 'v34-measured-move-target' || version === 'v37-wr-stack-all' || version === 'v37-wr-stack-all-conf-85') && effectiveRisk > 0) {
         // Try to compute a measured move target from leg analysis metadata
         if (signal.metadata && signal.metadata.legAnalysis && signal.metadata.legAnalysis.leg1) {
             try {
@@ -1959,8 +2110,8 @@ function computeVersionedEntry(signal, cfg, version) {
                     const legHeight = Math.abs(
                         (leg2Bar.close || leg2Bar.high) - (leg1Bar.close || leg1Bar.low)
                     );
-                    if (legHeight > risk * 0.5) {
-                        targetRR = Math.max(2, legHeight / risk);
+                    if (legHeight > effectiveRisk * 0.5) {
+                        targetRR = Math.max(2, legHeight / effectiveRisk);
                     } else {
                         targetRR = 2;
                     }
@@ -1977,8 +2128,8 @@ function computeVersionedEntry(signal, cfg, version) {
     }
 
     const takeProfit = direction === 'long'
-        ? entryPrice + risk * targetRR
-        : entryPrice - risk * targetRR;
+        ? entryPrice + effectiveRisk * targetRR
+        : entryPrice - effectiveRisk * targetRR;
 
     return {
         version,
@@ -2079,6 +2230,13 @@ class BrooksChapterStrategy {
         const instrumentKey = instrumentConfig.instrument_key || 'default';
         const cfg = loadBrooksConfig(instrumentConfig);
 
+        // Extract instrument tickSize (Brooks Ch 1: "enter on a stop at 1 tick beyond the bar")
+        // - instrumentConfig.tickSize (from config.json) provides the market's actual minimum tick
+        // - Default to 0.05 if not specified (standard Emini tick)
+        const tickSize = (instrumentConfig.tickSize !== undefined && instrumentConfig.tickSize !== null)
+            ? Number(instrumentConfig.tickSize)
+            : 0.05;
+
         if (!cfg.enabled) return null;
 
         // Determine which version(s) to process
@@ -2141,6 +2299,7 @@ class BrooksChapterStrategy {
         // BROOKS-COMPLIANT GATING & SIGNAL SELECTION (Chapters 1-4)
         // ================================================================
         const latestIdx = bars.length - 1;
+        const currentBar = bars[latestIdx]; // The bar that just closed
         const trendStateStr = currentState.state;
         const isBullTrend = trendStateStr.includes('bull');
         const isBearTrend = trendStateStr.includes('bear');
@@ -2613,17 +2772,67 @@ class BrooksChapterStrategy {
         let masterSignal = null; // Use the highest-confidence version's signal as master
 
         for (const [version, signal] of Object.entries(versionedResults)) {
-            const entry = computeVersionedEntry(signal, cfg, version);
+            const entry = computeVersionedEntry(signal, cfg, version, tickSize);
             if (entry) {
-                versionedEntries[version] = entry;
+                // --- CRITICAL: Tick-level trigger/target validity check ---
+                // Brooks Ch 1 (p.42-43): "Always wait for the signal bar to close …
+                // enter on a stop at 1 tick beyond the bar." A trade is valid ONLY if:
+                //   (a) TRIGGER > current bar's extreme — the market has NOT already
+                //       traded at or past the trigger price. If current bar's high
+                //       >= entryPrice (for a long), the signal would have been triggered
+                //       at some point during this bar and is no longer a fresh signal.
+                //   (b) TARGET > trigger (not already reached by current bar)
+                //   (c) STOP has room (stop ≠ trigger, stop is beyond the signal bar)
+                // 
+                // CRITICAL: We check currentBar (bars[latestIdx]), NOT just signalBar.
+                // If signalBar is a historical bar (e.g. from swing detection), the
+                // market may have already traded through entry/stop/target in the
+                // intermediate bars. The current bar is the most recent complete bar
+                // and thus the best indicator of whether the signal is still fresh.
+                const valid = (() => {
+                    const currentBar = bars[latestIdx];
+                    if (entry.direction === 'long') {
+                        // LONG: trigger = signalBar.high + 1 tick
+                        // Check current bar: has the market already traded at/above entry?
+                        if (currentBar.high >= entry.entryPrice) return false;
+                        // Target NOT already reached by current bar
+                        if (entry.takeProfit !== null && currentBar.high >= entry.takeProfit) return false;
+                        // Stop must be below trigger (sanity check)
+                        if (entry.stopLoss >= entry.entryPrice) return false;
+                        // Additional: signal bar's extreme must be below entry
+                        const sbHigh = signal.signalBar ? signal.signalBar.high : currentBar.high;
+                        if (sbHigh >= entry.entryPrice) return false;
+                        return true;
+                    } else {
+                        // SHORT: trigger = signalBar.low - 1 tick
+                        // Check current bar: has the market already traded at/below entry?
+                        if (currentBar.low <= entry.entryPrice) return false;
+                        // Target NOT already reached by current bar
+                        if (entry.takeProfit !== null && currentBar.low <= entry.takeProfit) return false;
+                        // Stop must be above trigger (sanity check)
+                        if (entry.stopLoss <= entry.entryPrice) return false;
+                        // Additional: signal bar's extreme must be above entry
+                        const sbLow = signal.signalBar ? signal.signalBar.low : currentBar.low;
+                        if (sbLow <= entry.entryPrice) return false;
+                        return true;
+                    }
+                })();
+
+                if (valid) {
+                    versionedEntries[version] = entry;
+                }
             }
-            // Master: pick the version with highest confidence
-            if (!masterSignal || signal.confidence > masterSignal.confidence) {
+            // Master: pick the version with highest confidence (only if it has valid entries)
+            if (versionedEntries[version] && (!masterSignal || signal.confidence > masterSignal.confidence)) {
                 masterSignal = signal;
             }
         }
 
+        // If no version produced a valid entry, return null (no valid trade)
+        if (Object.keys(versionedEntries).length === 0 || !masterSignal) return null;
+
         // --- Update pullback tracking from master (best) signal ---
+        const masterEntry = versionedEntries[Object.keys(versionedEntries)[0]]; // pick first valid entry
         if (masterSignal) {
             const bestPbType = masterSignal.pullbackType || masterSignal.setupType;
             pt.pullbackTypesFired.add(bestPbType);
@@ -2633,12 +2842,16 @@ class BrooksChapterStrategy {
             if (masterSignal.setupType.includes('Double Bottom Bull Flag')) pt.activeDoubleBottomBullFlag = true;
         }
 
+        // Use entry/exit from the FIRST valid versioned entry (master version)
+        const masterVersion = Object.keys(versionedEntries)[0];
+        const masterEntryData = versionedEntries[masterVersion];
+
         return {
             signal: masterSignal.setupType,
-            direction: masterSignal.direction,
-            entryPrice: masterSignal.entryPrice,
-            stopLoss: masterSignal.stopLoss,
-            takeProfit: masterSignal.takeProfit,
+            direction: masterEntryData.direction,
+            entryPrice: masterEntryData.entryPrice,
+            stopLoss: masterEntryData.stopLoss,
+            takeProfit: masterEntryData.takeProfit,
             confidence: masterSignal.confidence,
             setupType: masterSignal.setupType,
             pullbackType: masterSignal.pullbackType || null,
