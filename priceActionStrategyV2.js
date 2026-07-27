@@ -18,6 +18,8 @@
  */
 
 const original = require('./priceActionStrategy');
+const brooksChapterStrategy = require('./brooksChapterStrategy');
+
 
 // ============================================================
 // V2 DEFAULT PARAMS (with fixes applied)
@@ -1936,6 +1938,121 @@ const COMBINATORIAL_FIX_STRATEGIES = generateCombinatorialFixStrategies();
 console.error(`Generated ${Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} combinatorial fix strategies (V901-V${901 + COMBINATORIAL_COMBOS.length * 10})`);
 
 // ============================================================
+// BROOKS CHAPTER STRATEGY WRAPPER — V960-V967
+// Wraps brooksChapterStrategy into standard (candles, params) => signals[] format
+// ============================================================
+
+function createBrooksChapterWrapper(versionName) {
+    return (candles, params = {}) => {
+        const signals = [];
+        if (!candles || candles.length < 20) return signals;
+
+        // Build instrument config from params
+        const instrumentConfig = {
+            instrument_key: params.instrument_key || 'default',
+            tickSize: params.tickSize || 0.05,
+            ...params.brooksConfig,
+        };
+
+        // Determine which version to use
+        const version = versionName;
+
+        // RESET singleton state for this (instrument×threshold×date×version) session
+        // This prevents cross-session state bleed from previous backtest runs
+        const sessionStateKey = `${params.instrument_key || 'default'}::${version}`;
+        const engine = brooksChapterStrategy;
+        delete engine.states[sessionStateKey];
+        delete engine.barHistories[sessionStateKey];
+        delete engine.pullbackTracking[sessionStateKey];
+
+        for (let i = 0; i < candles.length; i++) {
+            const bar = candles[i];
+            if (!bar) continue;
+
+            // Run signal detection with version isolation
+            // Passing version as requestedVersion ensures this wrapper ONLY processes
+            // its own version with its OWN state, bar history, and pullback tracking
+            const results = engine.evaluateSignalForBacktest(bar, instrumentConfig, null, version);
+            if (!results || results.length === 0) continue;
+
+            for (const result of results) {
+                // Only emit signals for our version
+                if (result.version !== version && version !== 'all') continue;
+
+                if (!result.entryPrice || !result.stopLoss || !result.takeProfit) continue;
+                // Confidence filter handled by brooksChapterStrategy gate logic per version
+                // Only skip if confidence is unreasonably low (< 50)
+                if (result.confidence < 50) continue;
+
+                const direction = result.direction || result.signal;
+                const type = direction === 'long' ? 'BUY_STOP' : 'SELL_STOP';
+
+                const triggerPrice = direction === 'long'
+                    ? (result.entryPrice)
+                    : (result.entryPrice);
+                const risk = Math.abs(triggerPrice - result.stopLoss);
+                if (risk <= 0) continue;
+                const reward = Math.abs(result.takeProfit - triggerPrice);
+                const rewardRatio = risk > 0 ? reward / risk : 1.5;
+
+                signals.push({
+                    index: i,
+                    type,
+                    triggerPrice,
+                    stopLoss: result.stopLoss,
+                    takeProfit: result.takeProfit,
+                    rewardRatio: Math.max(rewardRatio, 1.0),
+                    confidence: result.confidence,
+                    timestamp: bar.timestamp || bar.time || new Date().toISOString(),
+                    reason: `BrooksCh4:${result.setupType || result.pullbackType || 'unknown'} (v:${result.version})`,
+                    fixes_applied: ['BROOKS_CHAPTER_STRICT'],
+                    metadata: {
+                        setupType: result.setupType,
+                        pullbackType: result.pullbackType,
+                        trendState: result.trendState,
+                        version: result.version,
+                        filters: result.filters,
+                    },
+                });
+            }
+        }
+
+        // Deduplicate by index (keep first signal per bar)
+        const seen = new Set();
+        const deduped = [];
+        for (const s of signals) {
+            if (!seen.has(s.index)) {
+                seen.add(s.index);
+                deduped.push(s);
+            }
+        }
+
+        return deduped;
+    };
+}
+
+// Create the 10 high-probability Brooks Chapter strategy wrappers
+// Each targets a distinct Brooks Ch 1-4 concept with unique gate mask or boost
+const BROOKS_CHAPTER_WRAPPERS = {
+    // 1. Baseline: confidence + HL count + opposition (mask 67, conf 70)
+    "V998: Brooks Chapter (Original 964) (v7-Conf-Only)": createBrooksChapterWrapper('v7-conf-only'),
+    // 2. Adds signal quality + climax rejection + pullback type validation (mask 579, conf 70)
+    "V976: Brooks Chapter (v25-Signal-Quality-Filter)": createBrooksChapterWrapper('v25-signal-quality-filter'),
+    // 3. All 11 gates — strictest possible (mask 2687, conf 75)
+    "V977: Brooks Chapter (v26-Chapter-Full)": createBrooksChapterWrapper('v26-chapter-full'),
+    // 4. V25 + mid-session trap boost +10 (mask 579, conf 80)
+    "V983: Brooks Chapter (v31-Mid-Session-Trap-Boost)": createBrooksChapterWrapper('v31-mid-session-trap-boost'),
+    // 5. V25 + wedge/three-push boost +15 (mask 579, conf 80)
+    /*"V984: Brooks Chapter (v32-Wedge-Three-Push-Boost)": createBrooksChapterWrapper('v32-wedge-boost'),
+    // 6. V25 + M2 at EMA boost +8 (mask 579, conf 80)
+    "V988: Brooks Chapter (v36-M2-EMA-Origin-Boost)": createBrooksChapterWrapper('v36-m2-ema-origin-boost'),
+    // 7. V25 + ALL 6 boosts + measured move TP (mask 579, conf 80)
+    "V997: Brooks Chapter (v37-WR-Stack-All-Conf-85)": createBrooksChapterWrapper('v37-wr-stack-all-conf-85'),
+    */// 8. V38 TIERED ENTRY: context-dependent stops/targets + per-version signal selection (mask 579, conf 70-95)
+    "V999: Brooks Chapter (v38-Tiered-Entry)": createBrooksChapterWrapper('v38-tiered-entry'),
+};
+
+// ============================================================
 // INSTRUMENT-PINDEX ANNOTATIONS for top-performing versions
 // Appended to version name for live-trading reference
 // ============================================================
@@ -2117,6 +2234,12 @@ for (const [key, fn] of Object.entries(BROOKS_101_114_STRATEGIES)) {
     }
 }
 
+// Step 7b: Brooks Chapter strategies (V964, V968-V988) — Book-based pure implementation
+for (const [key, fn] of Object.entries(BROOKS_CHAPTER_WRAPPERS)) {
+    FINAL_STRATEGIES[key] = fn;
+}
+console.error('Added ' + Object.keys(BROOKS_CHAPTER_WRAPPERS).length + ' Brooks Chapter strategies (V964, V968-V988)');
+
 // ============================================================
 // V*A: WADE STRUCTURAL NO-TRAP VARIANTS
 // Auto-generate A-copies for every Wade Structural variant
@@ -2133,9 +2256,11 @@ for (const key of wadeStructuralKeys) {
     };
     noTrapCount++;
 }
+
 console.error(`Added ${noTrapCount} Wade Structural No-Trap variants (A-suffix)`);
 
-console.error(`FINAL_STRATEGIES: ${Object.keys(FINAL_STRATEGIES).length} versions selected from ${Object.keys(original.STRATEGIES).length + Object.keys(STRATEGIES_V2).length + Object.keys(INDIVIDUAL_FIX_STRATEGIES).length + Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} total`);
+console.error(`FINAL_STRATEGIES: ${Object.keys(FINAL_STRATEGIES).length} versions selected from ${Object.keys(original.STRATEGIES).length + Object.keys(STRATEGIES_V2).length + Object.keys(INDIVIDUAL_FIX_STRATEGIES).length + Object.keys(COMBINATORIAL_FIX_STRATEGIES).length} total`)
+
 
 // Step 8: Apply useRatios/useStructuralRules flags for V1-V50 in FINAL_STRATEGIES
 Object.keys(FINAL_STRATEGIES).forEach(key => {

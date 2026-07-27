@@ -169,7 +169,9 @@ class Trade {
         this.pnlAmount = null;
         this.pnlPercent = null;
         // 1% risk-based position sizing (matches priceActionStrategy.js runPriceActionBacktest)
-        this.risk = Math.abs(this.entryPrice - this.stopLoss);
+        //this.risk = Math.abs(this.entryPrice - this.stopLoss);
+
+        this.risk = Math.abs(signal.triggerPrice - signal.stopLoss);
         this.reward = Math.abs(this.takeProfit - this.entryPrice);
         this.quantity = this.risk > 0 ? (initialCapital * 0.01 * (confidenceScale || 1)) / this.risk : 0;
         this.holdingPeriod = null;
@@ -178,7 +180,8 @@ class Trade {
         this.highestPrice = this.entryPrice;
         this.lowestPrice = this.entryPrice;
         this.createdAtBarIndex = entryIndex; // Tracks which bar index this trade was created at, to prevent same-tick exit
-        this.triggered = false; // Trade starts un-triggered; only monitors TP/SL after LPT crosses entry price
+        this.filled = false; // Trade starts unfilled (stop-entry order); set to true when LTP crosses entry price
+        this.triggered = false; // Kept for backward compat, but no longer used for TP/SL gating
     }
 }
 
@@ -193,57 +196,106 @@ function processThresholdBarClose(s, closedBar, currentTime, ltp, exIso, barInde
         volume: b.volume, timestamp: b.endTime
     }));
 
+    // ================================================================
+    // FIX #5: CONFIRMATION BAR LOGIC
+    //
+    // Brooks principle: A setup signal on bar N must be confirmed by
+    // bar N+1 closing beyond the trigger price (bar N's high for buys,
+    // bar N's low for sells). Only then is the stop-entry order placed.
+    // If bar N+1 closes inside the signal bar's range, the breakout
+    // failed and the pending signal is discarded.
+    //
+    // This replaces the old "immediate entry on signal bar" approach
+    // which caused many false breakouts to become losing trades.
+    // ================================================================
+
+    // STEP 1: Check pending signals from the PREVIOUS bar.
+    // The signal was stored when it appeared on bar N. Now bar N+1 has
+    // just closed (closedBar = bar N+1). If it confirmed, create the trade.
+    /*
+    for (const [versionName, pending] of s.pendingSignals) {
+        const signalDirection = pending.type && pending.type.startsWith('BUY') ? 'BUY' : 'SELL';
+        let confirmed = false;
+        if (signalDirection === 'BUY') {
+            // Buy stop: signal bar is pending.barIndex-1 (or simply the bar that generated it)
+            // Confirmation: this closed bar closes ABOVE signal bar's high
+            // Use pending.triggerPrice which is signal bar's high + 1 tick
+            confirmed = closedBar.close > pending.triggerPrice;
+        } else {
+            // Sell stop: confirmation = this closed bar closes BELOW signal bar's low
+            confirmed = closedBar.close < pending.triggerPrice;
+        }
+
+        if (confirmed && !s.activeTrades.has(versionName)) {
+            const confidenceScale = (pending.confidence || 50) / 100;
+            //const trade = new Trade(versionName, pending, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
+                        
+            //Fix to execution bias
+            const confirmedSignal = { ...pending, triggerPrice: ltp }; // Set entry to the actual market price (Close of N+1)
+            const trade = new Trade(versionName, confirmedSignal, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
+            trade.triggered = true; // Mark as triggered immediately since we are entering "At Market" on the close
+
+            s.activeTrades.set(versionName, trade);
+        }
+        // Remove pending signal regardless of outcome (one shot)
+        s.pendingSignals.delete(versionName);
+    }
+        */
+    for (const [versionName, pending] of s.pendingSignals) {
+        const signalDirection = pending.type && pending.type.startsWith('BUY') ? 'BUY' : 'SELL';
+        const closePrice = closedBar.close; // This is the close of N+1
+        
+        let isConfirmed = false;
+        let alreadyHitTP = false;
+
+        if (signalDirection === 'BUY') {
+            // Confirm: Bar N+1 closed above Signal Bar Trigger
+            isConfirmed = closePrice > pending.triggerPrice;
+            // Filter: If Close is already at or above TP, we are too late
+            alreadyHitTP = closePrice >= pending.takeProfit;
+        } else {
+            // Confirm: Bar N+1 closed below Signal Bar Trigger
+            isConfirmed = closePrice < pending.triggerPrice;
+            // Filter: If Close is already at or below TP, we are too late
+            alreadyHitTP = closePrice <= pending.takeProfit;
+        }
+
+        // Only enter if confirmed and the target hasn't been hit yet
+        if (isConfirmed && !alreadyHitTP && !s.activeTrades.has(versionName)) {
+            const confidenceScale = (pending.confidence || 50) / 100;
+            
+            // Create Trade using Signal Bar (N) parameters (SL and TP stay original)
+            const trade = new Trade(versionName, pending, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
+            
+            // UPDATE: Override entry price to Bar N+1 Close, but leave SL/TP as they were
+            trade.entryPrice = closePrice; 
+            trade.filled = true;    // Market entry at close
+            trade.triggered = true; 
+            
+            s.activeTrades.set(versionName, trade);
+        }
+        // One-shot: Remove pending signal regardless of outcome
+        s.pendingSignals.delete(versionName);
+    }
+
+    // ================================================================
+    // KEEP: SCAN FOR NEW SIGNALS (FOR BAR N)
+    // ================================================================
     if (strategyCandles.length >= 32) {
         for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
-            const signals = strategyFn(strategyCandles, { tickSize: s.tickSize });
+            const params = {
+                tickSize: s.tickSize,
+                instrument_key: s.instrument_key || 'default',
+                lotSize: s.lotSize || 1
+            };
+            const signals = strategyFn(strategyCandles, params);
             if (signals && signals.length > 0) {
                 const latestSignal = signals[signals.length - 1];
+                // If signal was generated on the bar that just closed (Bar N)
                 if (latestSignal.index === strategyCandles.length - 1) {
-                    // Normalize signal type: BUY_STOP/SELL_STOP → BUY/SELL for direction comparison
-                    const signalDirection = latestSignal.type && latestSignal.type.startsWith('BUY') ? 'BUY' : 'SELL';
-
-                    // If there's an active trade, check for opposite signal
-                    let wasOppositeClose = false;
-                    if (s.activeTrades.has(versionName)) {
-                        const existingTrade = s.activeTrades.get(versionName);
-                        if (existingTrade.exitPrice === null && existingTrade.direction !== signalDirection) {
-                            // Opposite signal means the original setup is failing.
-                            // Close existing trade, but do NOT open a new opposite trade.
-                            existingTrade.exitPrice = latestSignal.triggerPrice;
-                            existingTrade.exitReason = 'opposite_signal';
-                            existingTrade.exitIndex = barIndex;
-                            existingTrade.exitTime = currentTime;
-                            existingTrade.pnlAmount = existingTrade.quantity * (
-                                existingTrade.direction === 'BUY'
-                                    ? existingTrade.exitPrice - existingTrade.entryPrice
-                                    : existingTrade.entryPrice - existingTrade.exitPrice
-                            );
-                            existingTrade.pnl = existingTrade.direction === 'BUY'
-                                ? ((existingTrade.exitPrice - existingTrade.entryPrice) / existingTrade.entryPrice) * 100
-                                : ((existingTrade.entryPrice - existingTrade.exitPrice) / existingTrade.entryPrice) * 100;
-                            existingTrade.holdingPeriod = barIndex - existingTrade.entryIndex;
-                            const tpDist0 = Math.abs(existingTrade.takeProfit - existingTrade.entryPrice) || 1;
-                            const risk0 = existingTrade.risk || 1;
-                            if (existingTrade.direction === 'BUY') {
-                                existingTrade.mafePercent = Math.max(0, ((existingTrade.highestPrice - existingTrade.entryPrice) / tpDist0) * 100);
-                                existingTrade.maePercent = Math.max(0, ((existingTrade.entryPrice - existingTrade.lowestPrice) / risk0) * 100);
-                            } else {
-                                existingTrade.mafePercent = Math.max(0, ((existingTrade.entryPrice - existingTrade.lowestPrice) / tpDist0) * 100);
-                                existingTrade.maePercent = Math.max(0, ((existingTrade.highestPrice - existingTrade.entryPrice) / risk0) * 100);
-                            }
-                            s.tradeHistory.push(existingTrade);
-                            s.activeTrades.delete(versionName);
-                            wasOppositeClose = true;
-                        }
-                    }
-
-                    // Only open a new trade if:
-                    // 1. No active trade exists for this strategy AND
-                    // 2. We did NOT just close one due to opposite signal (don't chase)
-                    if (!s.activeTrades.has(versionName) && !wasOppositeClose) {
-                        const confidenceScale = (latestSignal.confidence || 50) / 100;
-                        const trade = new Trade(versionName, latestSignal, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
-                        s.activeTrades.set(versionName, trade);
+                    if (!s.activeTrades.has(versionName)) {
+                        // Store as pending to check confirmation at end of Bar N+1
+                        s.pendingSignals.set(versionName, { ...latestSignal });
                     }
                 }
             }
@@ -287,9 +339,13 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
     // Build per-threshold state
     const states = t.map(th => ({
         threshold: th,
+        instrument_key: instrumentKey,
+        instrumentKey: instrumentKey,
+        lotSize: lotMul,
         candle: new VolumeCandle(th, instrumentKey, buildInst.name),
         completedBars: [],
         activeTrades: new Map(),
+        pendingSignals: new Map(), // FIX #5: Deferred signals awaiting confirmation bar
         tradeHistory: [],
         totalBars: 0,
         barIndex: 0,
@@ -456,20 +512,47 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
 
                     // Save candle to CSV for visualization
                     saveCandleToCSV(closedBar, s, instrumentKey, tickFile);
+/*
+                    // === TEST: IMMEDIATE STOP ENTRY (N+1 Wick Entry) ===
+                    if (s.pendingSignals.size > 0) {
+                        for (const [versionName, pending] of s.pendingSignals) {
+                            const isBuy = pending.type && pending.type.startsWith('BUY');
+                            let triggeredNow = false;
 
+                            // Check if this tick hits the trigger price from the previous bar
+                            if (isBuy && ltp >= pending.triggerPrice) triggeredNow = true;
+                            if (!isBuy && ltp <= pending.triggerPrice) triggeredNow = true;
+
+                            if (triggeredNow && !s.activeTrades.has(versionName)) {
+                                const confidenceScale = (pending.confidence || 50) / 100;
+                                // Create the trade at the EXACT trigger price (simulating a stop order fill)
+                                const trade = new Trade(versionName, pending, s.totalBars + 1, currentTime, s.barIndex, s.initialCapital, confidenceScale);
+                                trade.triggered = true; 
+                                trade.filled = true;
+                                s.activeTrades.set(versionName, trade);
+                                
+                                // Remove from pending so we don't create multiple trades
+                                s.pendingSignals.delete(versionName);
+                            }
+                        }
+                    }
+*/
                     // Check active trades for TP/SL on bar close (direction is normalized to BUY/SELL)
-                    for (const [stratName, trade] of s.activeTrades) {
+                     for (const [stratName, trade] of s.activeTrades) {
                         if (trade.exitPrice !== null) continue;
                         
-                        // FIX: Skip newly created trades that were just created by processThresholdBarClose
-                        // at this same bar index. These trades should not be evaluated for exit yet because
-                        // they haven't had a chance to be tested against real tick data.
-                        if (trade.createdAtBarIndex === s.barIndex) continue;
+                        // Track extremes for MAE/MAFE
+                        trade.highestPrice = Math.max(trade.highestPrice, ltp);
+                        trade.lowestPrice = Math.min(trade.lowestPrice, ltp);
 
-                        // FIX: Update trade extremes with the just-closed candle's high/low
-                        // This ensures MAFE/MAE include the full candle range before exit check
-                        trade.highestPrice = Math.max(trade.highestPrice, closedBar.high);
-                        trade.lowestPrice = Math.min(trade.lowestPrice, closedBar.low);
+                        // Check for Fill (for STOP orders only, Confirmed orders are already filled)
+                        if (!trade.filled) {
+                            if (trade.direction === 'BUY' && ltp >= trade.entryPrice) trade.filled = true;
+                            else if (trade.direction === 'SELL' && ltp <= trade.entryPrice) trade.filled = true;
+                            
+                            if (trade.filled) trade.triggered = true;
+                            else continue; // Still waiting for fill
+                        }
 
                         // Only check TP/SL if trade is triggered (LTP crossed entry price)
                         if (!trade.triggered) continue;
@@ -543,8 +626,35 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
                     }
                 }
 
-                // Only check TP/SL if trade is triggered
-                if (!trade.triggered) continue;
+    // CRITICAL FIX: For stop-entry orders (BUY_STOP/SELL_STOP), the stop loss must be
+    // checked even before the trade is "triggered" (LTP crossed entry price).
+    // If market hits the stop before reaching the entry, the order never filled in reality.
+    // We close it here as "never_filled" to prevent unlimited phantom losses (MAE 200%+).
+    if (!trade.triggered) {
+        // Check if stop loss was hit before entry (market moved against the stop-entry direction)
+        let stopHit = false;
+        if (trade.direction === 'BUY' && ltp <= trade.stopLoss) {
+            stopHit = true;
+        } else if (trade.direction === 'SELL' && ltp >= trade.stopLoss) {
+            stopHit = true;
+        }
+        if (stopHit) {
+            // Order never filled in reality - close with minimal loss (slippage on stop)
+            trade.exitPrice = ltp; // Exit at current price (stop was hit)
+            trade.exitReason = 'never_filled';
+            trade.exitIndex = s.barIndex;
+            trade.exitTime = currentTime;
+            trade.pnlAmount = 0; // No real profit/loss - order was never filled
+            trade.pnl = 0;
+            trade.holdingPeriod = 0;
+            trade.mafePercent = 0;
+            trade.maePercent = 100;
+            s.tradeHistory.push(trade);
+            s.activeTrades.delete(stratName);
+            continue;
+        }
+        continue; // Still not triggered, but stop was not hit, so keep waiting
+    }
 
                 // Check for intra-bar TP/SL hit
                 let hit = false;
@@ -783,6 +893,14 @@ async function cmdRun(instrumentKey, opts = {}) {
     const buildConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     const liveConfig = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 
+    if (process.argv.includes('--brooks-only')) {
+        Object.keys(STRATEGIES).forEach(k => {
+            const num = parseInt(k.substring(1), 10);
+            if (!k.startsWith('V') || !k.includes("Brooks") || isNaN(num) || num < 976 || num > 999 ) {
+                delete STRATEGIES[k];
+            }     
+        });
+    }
     const buildInst = buildConfig.find(x => x.instrument_key === instrumentKey);
     const liveInst = liveConfig.instruments?.find(x => x.key === instrumentKey);
     if (!buildInst) {
@@ -1015,6 +1133,35 @@ async function cmdRunAllParallel() {
     console.log(`\n✅ Done! ${instKeys.length} instruments in ${totalSec}s`);
 }
 
+async function cmdRunBrooksParallel() {
+    const { spawn } = require('child_process');
+    const os = require('os');
+    const numWorkers = Math.max(1, os.cpus().length - 1);
+    const buildConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    const allTickFiles = fs.readdirSync(EXTRACTED_DIR).filter(f => f.toLowerCase().endsWith('.csv'));
+
+    // Unique instrument keys from files
+    const instKeys = [...new Set(allTickFiles.map(f => {
+        const safe = f.split('_raw_ticks_')[0];
+        const lastU = safe.lastIndexOf('_');
+        return safe.substring(0, lastU) + '|' + safe.substring(lastU + 1);
+    }))].filter(k => buildConfig.find(x => x.instrument_key === k));
+
+    console.log(`🚀 Parallel Brooks Run: ${instKeys.length} instruments.`);
+    const scriptPath = path.resolve(__dirname, 'backtesterAsLive.js');
+
+    for (let i = 0; i < instKeys.length; i += numWorkers) {
+        const batch = instKeys.slice(i, i + numWorkers);
+        await Promise.all(batch.map(instKey => {
+            return new Promise((resolve) => {
+                const child = spawn('node', [scriptPath, 'run', instKey, '--brooks-only'], { stdio: 'inherit' });
+                child.on('close', resolve);
+            });
+        }));
+    }
+}
+
+
 function cmdCompare(instrumentKey) {
     if (!instrumentKey) {
         console.error('Usage: node backtesterAsLive.js compare <instrument_key>');
@@ -1134,6 +1281,11 @@ Examples:
         case 'run-all-parallel':
             await cmdRunAllParallel();
             break;
+
+        case 'run-brooks-all-parallel':
+            await cmdRunBrooksParallel();
+            break;
+
         case 'compare':
             cmdCompare(args[1]);
             break;

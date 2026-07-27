@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const versionRegex = /^V(\d+):/;
+const versionRegex = /^V(\d+[A-Z]?):/;
 
 // ── Helper functions (copied from generateReport.js to keep worker self-contained) ──
 
