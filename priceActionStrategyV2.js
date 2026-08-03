@@ -202,7 +202,7 @@ const getInstrumentConfig = original.getInstrumentConfig || (() => null);
 
 function validateTPPeakLong(candles, peakIdx, signalBarIdx) {
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
         if (candles[k].high > candles[tpPeakIdx].high) {
             tpPeakIdx = k;
         }
@@ -212,7 +212,7 @@ function validateTPPeakLong(candles, peakIdx, signalBarIdx) {
 
 function validateTPPeakShort(candles, peakIdx, signalBarIdx) {
     let tpPeakIdx = peakIdx;
-    for (let k = peakIdx + 1; k <= signalBarIdx; k++) {
+    for (let k = peakIdx + 1; k < signalBarIdx; k++) {
         if (candles[k].low < candles[tpPeakIdx].low) {
             tpPeakIdx = k;
         }
@@ -618,8 +618,13 @@ function evaluateH2SetupV2(candles, swingHighIdx, currentIdx, tickSize, p) {
     const minLeg1Bars = skipSpacing ? 1 : (p.minLeg1Bars || 3);
     const minH1Bars = skipSpacing ? 1 : (p.minH1BounceBars || 2);
     const minLeg2Bars = skipSpacing ? 1 : (p.minLeg2Bars || 2);
+    const minBLegBars = skipSpacing ? 0 : (p.minBLegBars || 1); // FIX 4: Micro B-leg (with-trend) between legs
 
-    let leg1BarCount = 0, h1BarCount = 0, leg2BarCount = 0;
+    let leg1BarCount = 0, h1BarCount = 0, leg2BarCount = 0, bLegBarCount = 0; // FIX 4: B-leg counter
+    let bLegStarted = false; // FIX 4: B-leg state
+
+    // FIX 3: Track the lowest low reached in leg 1 (countertrend) to verify structural break
+    let leg1LowestLow = Infinity;
 
     for (let j = swingHighIdx + 1; j <= currentIdx; j++) {
         // Track lowest low across entire pullback for SL anchoring
@@ -633,7 +638,7 @@ function evaluateH2SetupV2(candles, swingHighIdx, currentIdx, tickSize, p) {
         const isBearish = candles[j].close < candles[j].open;
 
         if (useStrict && !firstLegStarted) {
-            if (isBearish && currentLow < prevLow) { leg1BarCount++; if (leg1BarCount >= minLeg1Bars) firstLegStarted = true; }
+            if (isBearish && currentLow < prevLow) { leg1BarCount++; if (candles[j].low < leg1LowestLow) leg1LowestLow = candles[j].low; if (leg1BarCount >= minLeg1Bars) firstLegStarted = true; }
             else leg1BarCount = 0;
             continue;
         }
@@ -645,7 +650,22 @@ function evaluateH2SetupV2(candles, swingHighIdx, currentIdx, tickSize, p) {
                 if (currentHigh > prevHigh) { h1BarCount++; if (h1BarCount >= minH1Bars) { h1TriggerIdx = j; h1SignalIdx = j - (minH1Bars - 1); } }
                 else h1BarCount = 0;
             }
+            // Track the lowest low in the first bearish leg (pre-H1) for structural break check
+            if (j <= h1SignalIdx) {
+                leg1LowestLow = Math.min(leg1LowestLow, candles[j].low);
+            }
+        // FIX 4: After H1 trigger, look for B-leg (micro with-trend bounce) before leg 2 can start
+        } else if (!bLegStarted) {
+            // B-leg: micro bullish bounce (with-trend in bull trend)
+            if (useStrict) {
+                if (isBullish && currentHigh > prevHigh) { bLegBarCount++; if (bLegBarCount >= minBLegBars) bLegStarted = true; }
+                else bLegBarCount = 0;
+            } else {
+                if (currentHigh > prevHigh) { bLegBarCount++; if (bLegBarCount >= minBLegBars) bLegStarted = true; }
+                else bLegBarCount = 0;
+            }
         } else if (!secondLegStarted) {
+            // FIX 4: Now look for leg 2 (second countertrend leg - C wave)
             if (useStrict) {
                 if (isBearish && currentLow < prevLow) { leg2BarCount++; if (leg2BarCount >= minLeg2Bars) secondLegStarted = true; }
                 else leg2BarCount = 0;
@@ -661,26 +681,30 @@ function evaluateH2SetupV2(candles, swingHighIdx, currentIdx, tickSize, p) {
     const leg1Valid = useStrict ? firstLegStarted : true;
     const isValidH2Signal = leg1Valid && (h1TriggerIdx !== -1) && secondLegStarted && (h2TriggerIdx === -1);
 
-    if (isValidH2Signal && !p.requireStrictSecondLeg && (p.minSecondLegDepthRatio || 0.60) > 0) {
+    // FIX 3: Verify the first leg (countertrend) broke a structural level
+    // For H2 in a bull trend, the first bearish leg should break below the swing high bar's low
+    // or break below a prior minor swing low. At minimum, it must break the low of the bar
+    // that formed the swing high, otherwise it's not a genuine countertrend move.
+    if (isValidH2Signal && !p.skipStructuralLegCheck) {
+        const swingHighBarLow = candles[swingHighIdx].low;
+        if (leg1LowestLow >= swingHighBarLow - (tickSize * 2)) {
+            return { isH2: false, h1TriggerIdx, h1SignalIdx, secondLegStarted, swingHighIdx };
+        }
+    }
+
+    // FIX 1+2 (Brooks pages 99-100): Validate second leg depth vs first leg depth
+    if (isValidH2Signal && !p.requireStrictSecondLeg) {
         let firstLegLow = Infinity;
         for (let k = swingHighIdx; k <= h1SignalIdx; k++) { if (candles[k].low < firstLegLow) firstLegLow = candles[k].low; }
         let secondLegLow = Infinity;
         for (let k = h1TriggerIdx; k <= currentIdx; k++) { if (candles[k].low < secondLegLow) secondLegLow = candles[k].low; }
         const firstLegDepth = candles[swingHighIdx].high - firstLegLow;
         const secondLegDepth = candles[swingHighIdx].high - secondLegLow;
-        if (firstLegDepth > 0 && (secondLegDepth / firstLegDepth) < (p.minSecondLegDepthRatio || 0.60)) {
+        const maxDepthRatio = p.maxSecondLegDepthRatio || 1.30;
+        if (firstLegDepth > 0 && secondLegDepth > 0 && (secondLegDepth / firstLegDepth) > maxDepthRatio) {
             return { isH2: false, h1TriggerIdx, h1SignalIdx, secondLegStarted, swingHighIdx };
         }
-    }
-
-    // Non-strict: first leg must dominate second leg (weaker pullback, signals early reversal)
-    if (isValidH2Signal && p && !p.requireStrictSecondLeg) {
-        let firstLegLow = Infinity;
-        for (let k = swingHighIdx; k <= h1SignalIdx; k++) { if (candles[k].low < firstLegLow) firstLegLow = candles[k].low; }
-        let secondLegLow = Infinity;
-        for (let k = h1TriggerIdx; k <= currentIdx; k++) { if (candles[k].low < secondLegLow) secondLegLow = candles[k].low; }
-        // Non-strict: second leg must make a HIGHER low (shallower) than first leg
-        if (secondLegLow < firstLegLow) {
+        if (secondLegLow <= firstLegLow && secondLegDepth > 0 && firstLegDepth > 0 && (secondLegDepth / firstLegDepth) >= 0.85) {
             return { isH2: false, h1TriggerIdx, h1SignalIdx, secondLegStarted, swingHighIdx };
         }
     }
@@ -702,8 +726,13 @@ function evaluateL2SetupV2(candles, swingLowIdx, currentIdx, tickSize, p) {
     const minLeg1Bars = skipSpacing ? 1 : (p.minLeg1Bars || 3);
     const minL1Bars = skipSpacing ? 1 : (p.minH1BounceBars || 2);
     const minLeg2Bars = skipSpacing ? 1 : (p.minLeg2Bars || 2);
+    const minBLegBars = skipSpacing ? 0 : (p.minBLegBars || 1); // FIX 4: Micro B-leg (with-trend) between legs
 
-    let leg1BarCount = 0, l1BarCount = 0, leg2BarCount = 0;
+    let leg1BarCount = 0, l1BarCount = 0, leg2BarCount = 0, bLegBarCount = 0; // FIX 4: B-leg counter
+    let bLegStarted = false; // FIX 4: B-leg state
+
+    // FIX 3: Track the highest high reached in leg 1 (countertrend) to verify structural break
+    let leg1HighestHigh = -Infinity;
 
     for (let j = swingLowIdx + 1; j <= currentIdx; j++) {
         // Track highest high across entire pullback for SL anchoring
@@ -717,7 +746,7 @@ function evaluateL2SetupV2(candles, swingLowIdx, currentIdx, tickSize, p) {
         const isBearish = candles[j].close < candles[j].open;
 
         if (useStrict && !firstLegStarted) {
-            if (isBullish && currentHigh > prevHigh) { leg1BarCount++; if (leg1BarCount >= minLeg1Bars) firstLegStarted = true; }
+            if (isBullish && currentHigh > prevHigh) { leg1BarCount++; if (candles[j].high > leg1HighestHigh) leg1HighestHigh = candles[j].high; if (leg1BarCount >= minLeg1Bars) firstLegStarted = true; }
             else leg1BarCount = 0;
             continue;
         }
@@ -729,7 +758,22 @@ function evaluateL2SetupV2(candles, swingLowIdx, currentIdx, tickSize, p) {
                 if (candles[j].low < prevLow) { l1BarCount++; if (l1BarCount >= minL1Bars) { l1TriggerIdx = j; l1SignalIdx = j - (minL1Bars - 1); } }
                 else l1BarCount = 0;
             }
+            // Track the highest high in the first bullish leg (pre-L1) for structural break check
+            if (j <= l1SignalIdx) {
+                leg1HighestHigh = Math.max(leg1HighestHigh, candles[j].high);
+            }
+        // FIX 4: After L1 trigger, look for B-leg (micro with-trend move) before leg 2 can start
+        } else if (!bLegStarted) {
+            // B-leg: micro bearish pullback (with-trend in bear trend)
+            if (useStrict) {
+                if (isBearish && currentLow < prevLow) { bLegBarCount++; if (bLegBarCount >= minBLegBars) bLegStarted = true; }
+                else bLegBarCount = 0;
+            } else {
+                if (currentLow < prevLow) { bLegBarCount++; if (bLegBarCount >= minBLegBars) bLegStarted = true; }
+                else bLegBarCount = 0;
+            }
         } else if (!secondLegStarted) {
+            // FIX 4: Now look for leg 2 (second countertrend leg - C wave)
             if (useStrict) {
                 if (isBullish && currentHigh > prevHigh) { leg2BarCount++; if (leg2BarCount >= minLeg2Bars) secondLegStarted = true; }
                 else leg2BarCount = 0;
@@ -745,26 +789,30 @@ function evaluateL2SetupV2(candles, swingLowIdx, currentIdx, tickSize, p) {
     const leg1Valid = useStrict ? firstLegStarted : true;
     const isValidL2Signal = leg1Valid && (l1TriggerIdx !== -1) && secondLegStarted && (l2TriggerIdx === -1);
 
-    if (isValidL2Signal && !p.requireStrictSecondLeg && (p.minSecondLegDepthRatio || 0.60) > 0) {
+    // FIX 3: Verify the first leg (countertrend) broke a structural level
+    // For L2 in a bear trend, the first bullish leg should break above the swing low bar's high
+    // or break above a prior minor swing high. At minimum, it must break the high of the bar
+    // that formed the swing low, otherwise it's not a genuine countertrend move.
+    if (isValidL2Signal && !p.skipStructuralLegCheck) {
+        const swingLowBarHigh = candles[swingLowIdx].high;
+        if (leg1HighestHigh <= swingLowBarHigh + (tickSize * 2)) {
+            return { isL2: false, l1TriggerIdx, l1SignalIdx, secondLegStarted, swingLowIdx };
+        }
+    }
+
+    // FIX 1+2 (Brooks pages 99-100): Validate second leg depth vs first leg depth
+    if (isValidL2Signal && !p.requireStrictSecondLeg) {
         let firstLegHigh = -Infinity;
         for (let k = swingLowIdx; k <= l1SignalIdx; k++) { if (candles[k].high > firstLegHigh) firstLegHigh = candles[k].high; }
         let secondLegHigh = -Infinity;
         for (let k = l1TriggerIdx; k <= currentIdx; k++) { if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high; }
         const firstLegDepth = firstLegHigh - candles[swingLowIdx].low;
         const secondLegDepth = secondLegHigh - candles[swingLowIdx].low;
-        if (firstLegDepth > 0 && (secondLegDepth / firstLegDepth) < (p.minSecondLegDepthRatio || 0.60)) {
+        const maxDepthRatio = p.maxSecondLegDepthRatio || 1.30;
+        if (firstLegDepth > 0 && secondLegDepth > 0 && (secondLegDepth / firstLegDepth) > maxDepthRatio) {
             return { isL2: false, l1TriggerIdx, l1SignalIdx, secondLegStarted, swingLowIdx };
         }
-    }
-
-    // Non-strict: first leg must dominate second leg (weaker pullback, signals early reversal)
-    if (isValidL2Signal && p && !p.requireStrictSecondLeg) {
-        let firstLegHigh = -Infinity;
-        for (let k = swingLowIdx; k <= l1SignalIdx; k++) { if (candles[k].high > firstLegHigh) firstLegHigh = candles[k].high; }
-        let secondLegHigh = -Infinity;
-        for (let k = l1TriggerIdx; k <= currentIdx; k++) { if (candles[k].high > secondLegHigh) secondLegHigh = candles[k].high; }
-        // Non-strict: second leg must make a LOWER high (shallower) than first leg
-        if (secondLegHigh > firstLegHigh) {
+        if (secondLegHigh >= firstLegHigh && secondLegDepth > 0 && firstLegDepth > 0 && (secondLegDepth / firstLegDepth) >= 0.85) {
             return { isL2: false, l1TriggerIdx, l1SignalIdx, secondLegStarted, swingLowIdx };
         }
     }
@@ -1025,7 +1073,14 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                             const reward = Math.abs(takeProfit - triggerPrice);
                             const rrr = risk > 0 ? reward / risk : 0;
 
-                            if (risk > 0 && rrr >= 0.8) {
+                            // Minimum stop loss check: at least 0.09% (target at least 0.18%)
+                            const stopLossPct = triggerPrice > 0 ? risk / triggerPrice : 0;
+                            const minStopPct = 0.09 / 100;
+                            // Minimum target floor: at least 0.12% from entry (structural targets can be micro-sized)
+                            const targetPct = triggerPrice > 0 ? Math.abs(takeProfit - triggerPrice) / triggerPrice : 0;
+                            const minTargetPct = 0.13 / 100;
+
+                            if (risk > 0 && rrr >= 1.0 && stopLossPct >= minStopPct && targetPct >= minTargetPct) {
                                 signals.push({
                                     index: i, type: 'BUY_STOP', triggerPrice, stopLoss, takeProfit,
                                     rewardRatio: finalParams.rewardRatio, useStructuralTarget: finalParams.useStructuralTarget,
@@ -1109,7 +1164,14 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                             const reward = Math.abs(triggerPrice - takeProfit);
                             const rrr = risk > 0 ? reward / risk : 0;
 
-                            if (risk > 0 && rrr >= 0.8) {
+                            // Minimum stop loss check: at least 0.09% (target at least 0.18%)
+                            const stopLossPct = triggerPrice > 0 ? risk / triggerPrice : 0;
+                            const minStopPct = 0.09 / 100;
+                            // Minimum target floor: at least 0.12% from entry (structural targets can be micro-sized)
+                            const targetPct = triggerPrice > 0 ? Math.abs(takeProfit - triggerPrice) / triggerPrice : 0;
+                            const minTargetPct = 0.13 / 100;
+
+                            if (risk > 0 && rrr >= 1 && stopLossPct >= minStopPct && targetPct >= minTargetPct) {
                                 signals.push({
                                     index: i, type: 'SELL_STOP', triggerPrice, stopLoss, takeProfit,
                                     rewardRatio: finalParams.rewardRatio, useStructuralTarget: finalParams.useStructuralTarget,
@@ -1186,7 +1248,14 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                                         const reward = Math.abs(takeProfit - triggerPrice);
                                         const rrr = risk > 0 ? reward / risk : 0;
 
-                                        if (risk > 0 && rrr >= 0.8) {
+                                        // Minimum stop loss check: at least 0.09% (target at least 0.18%)
+                                        const stopLossPct = triggerPrice > 0 ? risk / triggerPrice : 0;
+                                        const minStopPct = 0.09 / 100;
+                                        // Minimum target floor: at least 0.12% from entry (structural targets can be micro-sized)
+                                        const targetPct = triggerPrice > 0 ? Math.abs(takeProfit - triggerPrice) / triggerPrice : 0;
+                                        const minTargetPct = 0.13 / 100;
+
+                                        if (risk > 0 && rrr >= 1.0 && stopLossPct >= minStopPct && targetPct >= minTargetPct) {
                                             signals.push({
                                                 index: i, type: 'BUY_STOP', triggerPrice, stopLoss, takeProfit,
                                                 rewardRatio: finalParams.rewardRatio, useStructuralTarget: finalParams.useStructuralTarget,
@@ -1262,7 +1331,14 @@ function twoLeggedPullbackCoreV2(candles, params = {}) {
                                         const reward = Math.abs(triggerPrice - takeProfit);
                                         const rrr = risk > 0 ? reward / risk : 0;
 
-                                        if (risk > 0 && rrr >= 0.8) {
+                                        // Minimum stop loss check: at least 0.09% (target at least 0.18%)
+                                        const stopLossPct = triggerPrice > 0 ? risk / triggerPrice : 0;
+                                        const minStopPct = 0.09 / 100;
+                                        // Minimum target floor: at least 0.12% from entry (structural targets can be micro-sized)
+                                        const targetPct = triggerPrice > 0 ? Math.abs(takeProfit - triggerPrice) / triggerPrice : 0;
+                                        const minTargetPct = 0.13 / 100;
+
+                                        if (risk > 0 && rrr >= 1.0 && stopLossPct >= minStopPct && targetPct >= minTargetPct) {
                                             signals.push({
                                                 index: i, type: 'SELL_STOP', triggerPrice, stopLoss, takeProfit,
                                                 rewardRatio: finalParams.rewardRatio, useStructuralTarget: finalParams.useStructuralTarget,
@@ -1401,12 +1477,14 @@ function runPriceActionBacktestV2(candles, signals = [], initialCapital = 100000
                 const mafePct = initialTpDist > 0 ? Math.min(100, Math.max(0, (Math.abs(position.bestPrice - position.entry) / initialTpDist) * 100)) : 0;
                 const initialSlDist = Math.abs(position.entry - position.stopLoss_initial || position.stopLoss);
                 const maePct = initialSlDist > 0 ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100) : 0;
+                const rrr = initialSlDist > 0 ? parseFloat((initialTpDist / initialSlDist).toFixed(2)) : 0;
                 trades.push({
                     entryIndex: position.entryIndex, exitIndex: i, entryPrice: position.entry, exitPrice,
                     stopLoss: position.stopLoss_initial || position.stopLoss, takeProfit: position.takeProfit,
                     pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100, pnlAmount, exitReason, direction: position.direction,
                     confidence: position.confidence, mafePrice: position.bestPrice, mafePercentage: parseFloat(mafePct.toFixed(2)),
                     maePrice: position.worstPrice, maePercentage: parseFloat(maePct.toFixed(2)), wasTrailed: position.stopMovedToBE || false,
+                    rrr,
                     metadata: position.metadata, fixes_applied: position.fixes_applied || [],
                 });
                 position = null;
@@ -1462,12 +1540,14 @@ function runPriceActionBacktestV2(candles, signals = [], initialCapital = 100000
                         const mafePct = initialTpDist > 0 ? Math.min(100, Math.max(0, (Math.abs(position.bestPrice - position.entry) / initialTpDist) * 100)) : 0;
                         const initialSlDist = Math.abs(position.entry - position.stopLoss_initial || position.stopLoss);
                         const maePct = initialSlDist > 0 ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100) : 0;
+                        const rrr = initialSlDist > 0 ? parseFloat((initialTpDist / initialSlDist).toFixed(2)) : 0;
                         trades.push({
                             entryIndex: position.entryIndex, exitIndex: i, entryPrice: position.entry, exitPrice,
                             stopLoss: position.stopLoss_initial || position.stopLoss, takeProfit: position.takeProfit,
                             pnlPercentage: (pnlAmount / (equity - pnlAmount)) * 100, pnlAmount, exitReason, direction: position.direction,
                             confidence: position.confidence, mafePrice: position.bestPrice, mafePercentage: parseFloat(mafePct.toFixed(2)),
                             maePrice: position.worstPrice, maePercentage: parseFloat(maePct.toFixed(2)), wasTrailed: false,
+                            rrr,
                             metadata: position.metadata, fixes_applied: position.fixes_applied || [],
                         });
                         position = null;
@@ -1995,13 +2075,22 @@ function createBrooksChapterWrapper(versionName) {
                 const reward = Math.abs(result.takeProfit - triggerPrice);
                 const rewardRatio = risk > 0 ? reward / risk : 1.5;
 
+                // Minimum stop loss check: at least 0.09% (target at least 0.18%)
+                const stopLossPct = triggerPrice > 0 ? risk / triggerPrice : 0;
+                const minStopPct = 0.09 / 100;
+                if (stopLossPct < minStopPct) continue;
+                // Minimum target floor: at least 0.12% from entry (structural targets can be micro-sized)
+                const targetPct = triggerPrice > 0 ? Math.abs(result.takeProfit - triggerPrice) / triggerPrice : 0;
+                const minTargetPct = 0.15 / 100;
+                if (targetPct < minTargetPct) continue;
+
                 signals.push({
                     index: i,
                     type,
                     triggerPrice,
                     stopLoss: result.stopLoss,
                     takeProfit: result.takeProfit,
-                    rewardRatio: Math.max(rewardRatio, 1.0),
+                    rewardRatio: Math.max(rewardRatio, 1.3),
                     confidence: result.confidence,
                     timestamp: bar.timestamp || bar.time || new Date().toISOString(),
                     reason: `BrooksCh4:${result.setupType || result.pullbackType || 'unknown'} (v:${result.version})`,
@@ -2288,6 +2377,16 @@ Object.keys(FINAL_STRATEGIES).forEach(key => {
     };
 });
 
+WADE_PRODUCTION_STRATEGIES = {};
+Object.keys(FINAL_STRATEGIES).forEach(key => {
+    if (key.includes("Wade Structural")) {
+        WADE_PRODUCTION_STRATEGIES[key] = (candles, params = {}) => {
+            return FINAL_STRATEGIES[key](candles, { 
+                ...params, 
+            });
+        };
+    }
+});
 // ============================================================
 // EXPORTS
 // ============================================================
@@ -2315,7 +2414,7 @@ module.exports = {
     getActiveFixes,
 
     // All strategies (V1–V50 original, V51–V250 batch fix clones, V251–V850 individual fix clones, V851+ Brooks)
-    STRATEGIES: FINAL_STRATEGIES,
+    STRATEGIES: WADE_PRODUCTION_STRATEGIES,  //FINAL_STRATEGIES,
 
     // Convenience exports for backward compatibility
     twoLeggedPullback: FINAL_STRATEGIES["V51: Fixed Double Traps"] || FINAL_STRATEGIES["V1: Double Traps"],
