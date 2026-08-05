@@ -2387,6 +2387,108 @@ Object.keys(FINAL_STRATEGIES).forEach(key => {
         };
     }
 });
+
+// 1. Define the Component Boosters
+const COMPONENTS = {
+    "P1": { pivotConfirmationBars: 1 },                             // Speed: 1-bar pivot
+    "TS": { enableTrailingStop: true, breakevenRR: 0.8 },           // Protection: Breakeven at 80% 
+    "T-Low": { adxThreshold: 15, normalizedSlope: 0.018 },         // Trend: Earlier entry
+    "S-Ultra": { atrStopMultiplier: 0.35 },                        // Stop: Tight stop (Easier RRR)
+    "N-Loose": { emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25 } // Near-Miss: Lenient
+};
+
+// 2. Define the Combined Tiers
+const TIERS = {
+    "Tier-Mid": { 
+        adxThreshold: 17, 
+        atrStopMultiplier: 0.40, 
+        emaTouchRatioV2: 0.20 
+    },
+    "Tier-High": { 
+        adxThreshold: 14, 
+        atrStopMultiplier: 0.35, 
+        emaTouchRatioV2: 0.25,
+        doubleTopBottomToleranceRatioV2: 0.25,
+        normalizedSlope: 0.015
+    }
+};
+
+const FLEX_STRATEGIES = {};
+const PROD_BASES = ["V945A", "V935A", "V125A", "V925A"];
+
+Object.keys(FINAL_STRATEGIES).forEach(baseKey => {
+    const isTarget = PROD_BASES.some(t => baseKey.startsWith(t));
+    if (!isTarget) return;
+
+    // --- A. ADD BASELINE ---
+    FLEX_STRATEGIES[baseKey] = FINAL_STRATEGIES[baseKey];
+
+    // --- B. ADD STANDALONE COMPONENTS (P1, TS, T-Low, etc.) ---
+    Object.entries(COMPONENTS).forEach(([name, config]) => {
+        FLEX_STRATEGIES[`${baseKey} [${name}]`] = (c, p) => FINAL_STRATEGIES[baseKey](c, { ...p, ...config });
+    });
+
+    // --- C. ADD TIERS ---
+    Object.entries(TIERS).forEach(([tName, tConfig]) => {
+        FLEX_STRATEGIES[`${baseKey} [${tName}]`] = (c, p) => FINAL_STRATEGIES[baseKey](c, { ...p, ...tConfig });
+
+        // --- D. ADD CROSS-COMBINATIONS (Tier + P1, Tier + TS, Tier + P1 + TS) ---
+        // Combination: Tier + Pivot
+        FLEX_STRATEGIES[`${baseKey} [${tName}+P1]`] = (c, p) => 
+            FINAL_STRATEGIES[baseKey](c, { ...p, ...tConfig, ...COMPONENTS.P1 });
+
+        // Combination: Tier + Trailing
+        FLEX_STRATEGIES[`${baseKey} [${tName}+TS]`] = (c, p) => 
+            FINAL_STRATEGIES[baseKey](c, { ...p, ...tConfig, ...COMPONENTS.TS });
+
+        // Combination: Tier + Pivot + Trailing
+        FLEX_STRATEGIES[`${baseKey} [${tName}+P1+TS]`] = (c, p) => 
+            FINAL_STRATEGIES[baseKey](c, { ...p, ...tConfig, ...COMPONENTS.P1, ...COMPONENTS.TS });
+    });
+});
+
+
+// Standard Production Guardrails
+const PROD_GUARDRAILS = {
+    minRRR: 1.15,          // Ensures 1:1 net profit after slippage
+    minTargetPct: 0.0020,  // 0.20% minimum structural profit move
+    enableTraps: false,    // Strictly A-variants
+    enableTrailingStop: false // Let structural probability hit the TP
+};
+
+const TOP_10_ELITE_STRATEGIES = {
+    // 1. Quality King: V955A [N-Loose] (76.4% WR)
+    "ELITE_V955A_N_LOOSE": (c, p) => FINAL_STRATEGIES["V955A: Wade Structural (Structural-Calibrated) (ATR Floor + ABR Slope + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25 }),
+
+    // 2. High Precision: V935A [N-Med] (74.4% WR)
+    "ELITE_V935A_N_MED": (c, p) => FINAL_STRATEGIES["V935A: Wade Structural (Structural-Calibrated) (ATR Floor + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, emaTouchRatioV2: 0.20, doubleTopBottomToleranceRatioV2: 0.20 }),
+
+    // 3. Trend Starter: V935A [T-Med] (73.9% WR)
+    "ELITE_V935A_T_MED": (c, p) => FINAL_STRATEGIES["V935A: Wade Structural (Structural-Calibrated) (ATR Floor + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, adxThreshold: 18, normalizedSlope: 0.025 }),
+
+    // 4. Scalp Master: V125A [T-Med] (71.6% WR)
+    "ELITE_V125A_T_MED": (c, p) => FINAL_STRATEGIES["V125A: Wade Structural (Structural-Calibrated) (Entry/Stop + Exit Mgmt) [ZincFut-p3, CrudeOilMini-p4, BajajFin-p1] (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, adxThreshold: 18, normalizedSlope: 0.025 }),
+
+    // 5. Volume Stability: V125A [Tier-Low] (72.0% WR)
+    "ELITE_V125A_TIER_LOW": (c, p) => FINAL_STRATEGIES["V125A: Wade Structural (Structural-Calibrated) (Entry/Stop + Exit Mgmt) [ZincFut-p3, CrudeOilMini-p4, BajajFin-p1] (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, pivotConfirmationBars: 1, atrStopMultiplier: 0.45, emaTouchRatioV2: 0.18 }),
+
+    // 6. Opportunity King: V945A [S-Ultra] (70.1% WR)
+    "ELITE_V945A_S_ULTRA": (c, p) => FINAL_STRATEGIES["V945A: Wade Structural (Structural-Calibrated) (ATR Floor + ABR Slope) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, atrStopMultiplier: 0.35 }),
+
+    // 7. Strict Trend: V955A [Tier-High] (70.8% WR)
+    "ELITE_V955A_TIER_HIGH": (c, p) => FINAL_STRATEGIES["V955A: Wade Structural (Structural-Calibrated) (ATR Floor + ABR Slope + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, pivotConfirmationBars: 1, adxThreshold: 14, atrStopMultiplier: 0.35, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25, normalizedSlope: 0.015 }),
+
+    // 8. Momentum Champ: V945A [T-Med] (72.5% WR)
+    "ELITE_V945A_T_MED": (c, p) => FINAL_STRATEGIES["V945A: Wade Structural (Structural-Calibrated) (ATR Floor + ABR Slope) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, adxThreshold: 18, normalizedSlope: 0.025 }),
+
+    // 9. Volatility Resilient: V125A [N-Loose] (70.4% WR)
+    "ELITE_V125A_N_LOOSE": (c, p) => FINAL_STRATEGIES["V125A: Wade Structural (Structural-Calibrated) (Entry/Stop + Exit Mgmt) [ZincFut-p3, CrudeOilMini-p4, BajajFin-p1] (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25 }),
+
+    // 10. Max Coverage: V935A [Tier-High] (66.4% WR)
+    "ELITE_V935A_TIER_HIGH": (c, p) => FINAL_STRATEGIES["V935A: Wade Structural (Structural-Calibrated) (ATR Floor + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, pivotConfirmationBars: 1, adxThreshold: 14, atrStopMultiplier: 0.35, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25, normalizedSlope: 0.015 })
+};
+
+
 // ============================================================
 // EXPORTS
 // ============================================================
@@ -2414,7 +2516,7 @@ module.exports = {
     getActiveFixes,
 
     // All strategies (V1–V50 original, V51–V250 batch fix clones, V251–V850 individual fix clones, V851+ Brooks)
-    STRATEGIES: WADE_PRODUCTION_STRATEGIES,  //FINAL_STRATEGIES,
+    STRATEGIES: TOP_10_ELITE_STRATEGIES,  //FINAL_STRATEGIES,
 
     // Convenience exports for backward compatibility
     twoLeggedPullback: FINAL_STRATEGIES["V51: Fixed Double Traps"] || FINAL_STRATEGIES["V1: Double Traps"],
