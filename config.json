@@ -379,39 +379,6 @@
             "notes": "August expiry Silver Micro Future contract"
         },
         {
-            "key": "MCX_FO|568831",
-            "name": "Copper Future",
-            "priceBarTicks": [
-                35,
-                60
-            ],
-            "volumePerBar": [
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10
-            ],
-            "lotSize": 1,
-            "tickSize": 0.05,
-            "exchange": "MCX_FO",
-            "emaTouchRatio": 0.12,
-            "triggerOffsetRatio": 0.08,
-            "stopOffsetRatio": 0.28,
-            "doubleTopBottomToleranceRatio": 0.25,
-            "emaTouchRatioV2": 0.09,
-            "triggerOffsetRatioV2": 0.08,
-            "stopOffsetRatioV2": 0.33,
-            "doubleTopBottomToleranceRatioV2": 0.15,
-            "structureOffsetRatio": 0.12,
-            "notes": "August expiry Copper Future contract"
-        },
-        {
             "key": "MCX_FO|568836",
             "name": "Zinc Future",
             "priceBarTicks": [
