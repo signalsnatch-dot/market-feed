@@ -2414,7 +2414,7 @@ const TIERS = {
 };
 
 const FLEX_STRATEGIES = {};
-const PROD_BASES = ["V945A", "V935A", "V125A", "V925A"];
+const PROD_BASES = ["V945A", "V935A", "V125A", "V925A", "V955A", "V130A"];
 
 Object.keys(FINAL_STRATEGIES).forEach(baseKey => {
     const isTarget = PROD_BASES.some(t => baseKey.startsWith(t));
@@ -2519,6 +2519,7 @@ module.exports = {
     computeSlopePercentiles,
     computeATR,
     getActiveFixes,
+    FLEX_STRATEGIES,
 
     // All strategies (V1–V50 original, V51–V250 batch fix clones, V251–V850 individual fix clones, V851+ Brooks)
     STRATEGIES: ALL_STRATEGIES,  //FINAL_STRATEGIES,

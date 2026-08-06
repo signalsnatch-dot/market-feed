@@ -128,7 +128,7 @@ class VolumeBarBuilder extends EventEmitter {
                         });
                     }
 
-                    bar.bars = parsedBars.slice(-500);
+                    bar.bars = parsedBars.slice(-50);
                     this.stats.barsByInstrument.set(mapKey, parsedBars.length);
                     console.log(`   ✅ Loaded ${bar.bars.length} historical bars for ${bar.name} (Threshold: ${bar.targetVolume})`);
                 } catch (err) {
@@ -206,28 +206,40 @@ class VolumeBarBuilder extends EventEmitter {
             }
         } catch (e) { /* config not available, skip dedup */ }
         
+
+        if (!this.lastExchangeVolumeToday.has(instrument_key)) {
+            if (!isNaN(currentVolToday) && currentVolToday > 0) {
+                this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
+                console.log(`📍 [VOLUME BAR] Baseline set for ${instrument_key} at ${currentVolToday}. Ignoring catch-up.`);
+            }
+            return; 
+        }
+
         let tickVolume = 0;
         const lotMultiplier = this.instrumentLotSizeMap.get(instrument_key) || 1;
+        const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
 
-        if (!isNaN(currentVolToday) && currentVolToday > 0) {
-            const prevVolToday = this.lastExchangeVolumeToday.get(instrument_key);
-            
-            if (prevVolToday !== undefined && prevVolToday !== null) {
-                if (currentVolToday >= prevVolToday) {
-                    // Divide volume_today deltas by lot size configuration parameter
-                    tickVolume = (currentVolToday - prevVolToday) / lotMultiplier;
-                } else {
-                    tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
-                }
-            } else {
-                tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
-            }
-            this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
+        // Calculate volume delta safely
+        if (!isNaN(currentVolToday) && currentVolToday >= prevVolToday) {
+            tickVolume = (currentVolToday - prevVolToday) / lotMultiplier;
         } else {
             tickVolume = (parseInt(last_traded_quantity, 10) || 0) / lotMultiplier;
         }
 
+        // Update baseline for next tick
+        this.lastExchangeVolumeToday.set(instrument_key, currentVolToday);
+
         if (tickVolume <= 0) return;
+
+        // 3. SANITY CAPPING
+        // If tickVolume is somehow massive (e.g. data error), cap it to prevent CPU freeze.
+        // We shouldn't generate more than 5 bars from a single network packet.
+        const targets = this.instrumentTargetsMap.get(instrument_key) || [];
+        const minTarget = Math.min(...targets);
+        if (tickVolume > (minTarget * 5)) {
+            console.warn(`⚠️ [VOLUME BAR] Excessive volume detected (${tickVolume}). Capping to prevent freeze.`);
+            tickVolume = minTarget * 5; 
+        }
 
         let exchangeTimeMs = Number(exchange_timestamp);
         if (isNaN(exchangeTimeMs) || exchangeTimeMs <= 0) {
