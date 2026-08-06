@@ -103,8 +103,8 @@ class ChartServer {
         this.recentCandles = { price_bars: {}, volume_bars: {} };
         this.tradeSignals = [];
         this.instrumentsData = [];
-        this.maxRecentCandlesPerInstrument = 1200; 
-        this.maxSignalHistory = 1200;
+        this.maxRecentCandlesPerInstrument = 200; 
+        this.maxSignalHistory = 200;
         this.maxClientSignals = 200;
         this.saveInProgress = false;
         this.lastSignalSave = 0;
