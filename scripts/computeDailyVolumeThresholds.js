@@ -22,12 +22,12 @@
  *   node scripts/computeDailyVolumeThresholds.js --profile [--lookback 10]
  *   node scripts/computeDailyVolumeThresholds.js --update-day [DD/MM/YY]
  */
+
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
-// ─── Constants ──────────────────────────────────────────────
 const BUILD_CONFIG_PATH = path.resolve(__dirname, '..', 'build-version-config.json');
 const LIVE_CONFIG_PATH = path.resolve(__dirname, '..', 'config.json');
 const VOLUME_PROFILE_PATH = path.resolve(__dirname, '..', 'volume-profiles.json');
@@ -50,25 +50,25 @@ const UPDATE_DAY = updateDayIdx !== -1 && args[updateDayIdx + 1] && !args[update
 
 // ─── UPDATED LOT MULTIPLIERS (August 2026 Expiry) ───────────
 const LOT_MULTIPLIERS = {
-    // MCX August IDs
-    '538685': 1250, '538686': 250,  // Natural Gas & Mini
-    '520702': 100,  '520703': 10,   // Crude Oil & Mini
-    '464150': 30,   '471726': 5,    '488788': 1,    // Silver, Mini, Micro
-    '568831': 2500, '568836': 5000, '568833': 5000, '568830': 5000, // Metals
-    '466583': 100,  '510764': 10,   '552721': 1,    // Gold, Mini, Petal
+    // MCX August Keys
+    '561496': 1250, '561497': 250,  // Natural Gas & Mini
+    '555922': 100,  '560977': 10,   // Crude Oil & Mini (Note: 555922 shared in paste)
+    '471725': 30,   '471726': 5,    '488788': 1,    // Silver, Mini, Micro
+    '568831': 1,    '568836': 1,    '568833': 1,    '568830': 1, // Copper, Zinc, Lead, Alu (Forced to 1)
+    '466583': 100,  '562056': 1,    // Gold & Gold Petal
     
-    // NSE Index August IDs
-    '61093': 75,    '61088': 30,    '61091': 40,    '61092': 120, // Nifty, Bank, Fin, Midcap
+    // NSE Index August Keys
+    '58072': 75,    '58067': 30,    '58070': 40,    '58071': 120, // Nifty, Bank, Fin, Mid
     
-    // NSE Stock August IDs
-    '61284': 500,   '61189': 650,   '61197': 700,   '61289': 750, // Reliance, HDFC, ICICI, SBI
-    '61304': 225,   '61209': 400,   '61216': 1725,  '61127': 475, // TCS, Infy, ITC, Airtel
-    '61114': 625,   '61232': 175,   '61303': 2750,  '61235': 300, // Axis, L&T, TataSteel, TataMot
-    '61118': 750,   '61226': 2000,  '61296': 350,   '61220': 675, // BajFin, Kotak, Sun, JSW
-    '61143': 1350,  '61099': 309,   '61101': 475,   '61192': 700, // Coal, AdaniEnt, AdaniPort, Hindalco
-    '61108': 125,   '61274': 8000,  '61286': 4700,  '61298': 12700, // Apollo, PNB, SAIL, Suzlon
-    '61265': 725,   '61285': 1925,  '61215': 5425,  '61214': 4525, // Paytm, RVNL, IRFC, IREDA
-    '61128': 2625,  '61170': 3550,  '61310': 225                   // BHEL, GAIL, Trent
+    // NSE Stock August Keys
+    '58371': 500,   '58216': 650,   '58232': 700,   '58382': 750, // Reliance, HDFC, ICICI, SBI
+    '58399': 225,   '58245': 400,   '58250': 1725,  '58132': 475, // TCS, Infy, ITC, Airtel
+    '58117': 625,   '58298': 175,   '58398': 2750,  '58403': 300, // Axis, L&T, TataSteel, TataMot
+    '58121': 750,   '58277': 2000,  '58391': 350,   '58258': 675, // BajFin, Kotak, Sun, JSW
+    '58148': 1350,  '58088': 309,   '58090': 475,   '58225': 700, // Coal, AdaniEnt, AdaniPort, Hindalco
+    '58105': 125,   '58350': 8000,  '58375': 4700,  '58393': 12700, // Apollo, PNB, SAIL, Suzlon
+    '58342': 725,   '58374': 1925,  '58249': 5425,  '58248': 4525, // Paytm, RVNL, IRFC, IREDA
+    '58133': 2625,  '58189': 3550,  '58405': 225                   // BHEL, GAIL, Trent
 };
 
 const NSE_EQ_INSTRUMENTS = new Set([
@@ -96,8 +96,15 @@ function getLotMultiplier(instKey) {
     } catch (e) { /* fallback */ }
 
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
+
+    // COPPER FIX: Force base metals to 1. 
+    // This uses absolute units (KG) for threshold calculation, preventing too many bars.
+    const forceUnitInstruments = ['568831', '568836', '568833', '568830']; 
+    if (forceUnitInstruments.includes(id)) return 1;
+
     return LOT_MULTIPLIERS[id] || 1;
 }
+
 
 function getVolumeDivisor(instKey) {
     if (NSE_EQ_INSTRUMENTS.has(instKey)) return 1000;
@@ -111,21 +118,21 @@ function getLiquidityTier(avgDailyVolumeLots) {
 }
 
 function classifyInstrument(instKey) {
-    // UPDATED IDs for August classification logic
-    const highVolMCX = ['538685', '538686', '520702', '520703'];
-    const metalsMCX = ['464150', '471726', '488788', '568831', '466583', '510764', '552721'];
-    const baseMetalsMCX = ['568836', '568833', '568830'];
-    const nseIndices = ['61093', '61088', '61091', '61092'];
-    const nseLowVol = ['61304', '61209', '61108', '61274', '61286', '61298', '61265', '61285', '61215', '61214', '61128', '61170', '61310'];
-    
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
+
+    const highVolMCX = ['561496', '561497', '555922', '560977'];
+    const metalsMCX = ['471725', '471726', '488788', '568831', '466583', '562056'];
+    const baseMetalsMCX = ['568836', '568833', '568830'];
+    const nseIndices = ['58072', '58067', '58070', '58071'];
+    const nseLowVol = ['58374', '58249', '58248', '58133', '58189', '58405'];
+
     if (highVolMCX.includes(id)) return 'mCX_high_vol';
     if (metalsMCX.includes(id)) return 'mCX_metal';
     if (baseMetalsMCX.includes(id)) return 'mCX_base_metal';
     if (nseIndices.includes(id)) return 'nse_index';
     if (nseLowVol.includes(id)) return 'nse_low_vol';
-    if (instKey.includes('NSE_FO') || instKey.includes('NSE_EQ')) return 'nse_stock';
-    return 'mCX_metal';
+    
+    return (instKey.includes('NSE_FO') || instKey.includes('NSE_EQ')) ? 'nse_stock' : 'mCX_metal';
 }
 
 function recommendRatios(instrumentType) {

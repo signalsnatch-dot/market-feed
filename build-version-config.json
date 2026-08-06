@@ -749,7 +749,7 @@
       }
     ],
     "projected_vol_lots": 88969,
-    "last_updated": "2026-08-06T17:19:25.518Z",
+    "last_updated": "2026-08-06T17:54:04.086Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -1555,7 +1555,7 @@
       }
     ],
     "projected_vol_lots": 121040,
-    "last_updated": "2026-08-06T17:19:25.539Z",
+    "last_updated": "2026-08-06T17:54:04.115Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -3155,7 +3155,7 @@
       }
     ],
     "projected_vol_lots": 86908,
-    "last_updated": "2026-08-06T17:19:26.054Z",
+    "last_updated": "2026-08-06T17:54:04.516Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -3961,7 +3961,7 @@
       }
     ],
     "projected_vol_lots": 6188,
-    "last_updated": "2026-08-06T17:19:26.132Z",
+    "last_updated": "2026-08-06T17:54:04.721Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -5007,7 +5007,7 @@
       }
     ],
     "projected_vol_lots": 5440,
-    "last_updated": "2026-08-06T17:19:26.235Z",
+    "last_updated": "2026-08-06T17:54:04.821Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -6053,7 +6053,7 @@
       }
     ],
     "projected_vol_lots": 90523,
-    "last_updated": "2026-08-06T17:19:26.441Z",
+    "last_updated": "2026-08-06T17:54:05.129Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -7099,7 +7099,7 @@
       }
     ],
     "projected_vol_lots": 2,
-    "last_updated": "2026-08-06T17:19:26.748Z",
+    "last_updated": "2026-08-06T17:54:05.442Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -7725,7 +7725,7 @@
       }
     ],
     "projected_vol_lots": 0,
-    "last_updated": "2026-08-06T17:19:27.215Z",
+    "last_updated": "2026-08-06T17:54:05.538Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.4,
       "triggerOffsetRatio": 0.1,
@@ -8123,7 +8123,7 @@
       }
     ],
     "projected_vol_lots": 0,
-    "last_updated": "2026-08-06T17:19:27.238Z",
+    "last_updated": "2026-08-06T17:54:05.558Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.4,
       "triggerOffsetRatio": 0.1,
@@ -8773,7 +8773,7 @@
       }
     ],
     "projected_vol_lots": 0,
-    "last_updated": "2026-08-06T17:19:27.360Z",
+    "last_updated": "2026-08-06T17:54:05.638Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.4,
       "triggerOffsetRatio": 0.1,
@@ -11431,7 +11431,7 @@
       }
     ],
     "projected_vol_lots": 119066,
-    "last_updated": "2026-08-06T17:19:28.298Z",
+    "last_updated": "2026-08-06T17:54:06.725Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -12021,7 +12021,7 @@
       }
     ],
     "projected_vol_lots": 40584,
-    "last_updated": "2026-08-06T17:19:28.594Z",
+    "last_updated": "2026-08-06T17:54:06.868Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -12595,7 +12595,7 @@
       }
     ],
     "projected_vol_lots": 17061,
-    "last_updated": "2026-08-06T17:19:28.793Z",
+    "last_updated": "2026-08-06T17:54:06.971Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -13169,7 +13169,7 @@
       }
     ],
     "projected_vol_lots": 2578,
-    "last_updated": "2026-08-06T17:19:28.911Z",
+    "last_updated": "2026-08-06T17:54:07.175Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -13743,7 +13743,7 @@
       }
     ],
     "projected_vol_lots": 27522,
-    "last_updated": "2026-08-06T17:19:28.932Z",
+    "last_updated": "2026-08-06T17:54:07.277Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -14725,7 +14725,7 @@
       }
     ],
     "projected_vol_lots": 11851800,
-    "last_updated": "2026-08-06T17:19:28.952Z",
+    "last_updated": "2026-08-06T17:54:07.587Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -15299,7 +15299,7 @@
       }
     ],
     "projected_vol_lots": 42100,
-    "last_updated": "2026-08-06T17:19:28.975Z",
+    "last_updated": "2026-08-06T17:54:07.607Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -16281,7 +16281,7 @@
       }
     ],
     "projected_vol_lots": 28936978,
-    "last_updated": "2026-08-06T17:19:28.993Z",
+    "last_updated": "2026-08-06T17:54:07.687Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -16855,7 +16855,7 @@
       }
     ],
     "projected_vol_lots": 15411,
-    "last_updated": "2026-08-06T17:19:29.202Z",
+    "last_updated": "2026-08-06T17:54:07.789Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -17837,7 +17837,7 @@
       }
     ],
     "projected_vol_lots": 9806719,
-    "last_updated": "2026-08-06T17:19:29.518Z",
+    "last_updated": "2026-08-06T17:54:07.929Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -18411,7 +18411,7 @@
       }
     ],
     "projected_vol_lots": 10599,
-    "last_updated": "2026-08-06T17:19:29.614Z",
+    "last_updated": "2026-08-06T17:54:07.993Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -19393,7 +19393,7 @@
       }
     ],
     "projected_vol_lots": 11033556,
-    "last_updated": "2026-08-06T17:19:29.672Z",
+    "last_updated": "2026-08-06T17:54:08.306Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -19967,7 +19967,7 @@
       }
     ],
     "projected_vol_lots": 30153,
-    "last_updated": "2026-08-06T17:19:29.716Z",
+    "last_updated": "2026-08-06T17:54:08.323Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -20949,7 +20949,7 @@
       }
     ],
     "projected_vol_lots": 4020884,
-    "last_updated": "2026-08-06T17:19:30.029Z",
+    "last_updated": "2026-08-06T17:54:08.505Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -21523,7 +21523,7 @@
       }
     ],
     "projected_vol_lots": 58611,
-    "last_updated": "2026-08-06T17:19:30.228Z",
+    "last_updated": "2026-08-06T17:54:08.710Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -22505,7 +22505,7 @@
       }
     ],
     "projected_vol_lots": 19296195,
-    "last_updated": "2026-08-06T17:19:30.540Z",
+    "last_updated": "2026-08-06T17:54:08.813Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -23079,7 +23079,7 @@
       }
     ],
     "projected_vol_lots": 11325,
-    "last_updated": "2026-08-06T17:19:30.944Z",
+    "last_updated": "2026-08-06T17:54:09.122Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -24061,7 +24061,7 @@
       }
     ],
     "projected_vol_lots": 18660577,
-    "last_updated": "2026-08-06T17:19:31.182Z",
+    "last_updated": "2026-08-06T17:54:09.144Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -24635,7 +24635,7 @@
       }
     ],
     "projected_vol_lots": 6498,
-    "last_updated": "2026-08-06T17:19:31.258Z",
+    "last_updated": "2026-08-06T17:54:09.161Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -25617,7 +25617,7 @@
       }
     ],
     "projected_vol_lots": 8056382,
-    "last_updated": "2026-08-06T17:19:31.361Z",
+    "last_updated": "2026-08-06T17:54:09.224Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -26191,7 +26191,7 @@
       }
     ],
     "projected_vol_lots": 16212,
-    "last_updated": "2026-08-06T17:19:31.560Z",
+    "last_updated": "2026-08-06T17:54:09.535Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -27173,7 +27173,7 @@
       }
     ],
     "projected_vol_lots": 7579393,
-    "last_updated": "2026-08-06T17:19:31.722Z",
+    "last_updated": "2026-08-06T17:54:09.676Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -27747,7 +27747,7 @@
       }
     ],
     "projected_vol_lots": 4438,
-    "last_updated": "2026-08-06T17:19:31.744Z",
+    "last_updated": "2026-08-06T17:54:09.700Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -28729,7 +28729,7 @@
       }
     ],
     "projected_vol_lots": 1747838,
-    "last_updated": "2026-08-06T17:19:31.766Z",
+    "last_updated": "2026-08-06T17:54:09.718Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -29303,7 +29303,7 @@
       }
     ],
     "projected_vol_lots": 12872,
-    "last_updated": "2026-08-06T17:19:31.790Z",
+    "last_updated": "2026-08-06T17:54:09.836Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -30285,7 +30285,7 @@
       }
     ],
     "projected_vol_lots": 21868767,
-    "last_updated": "2026-08-06T17:19:31.814Z",
+    "last_updated": "2026-08-06T17:54:09.937Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -30859,7 +30859,7 @@
       }
     ],
     "projected_vol_lots": 41550,
-    "last_updated": "2026-08-06T17:19:31.836Z",
+    "last_updated": "2026-08-06T17:54:10.039Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -31841,7 +31841,7 @@
       }
     ],
     "projected_vol_lots": 8018553,
-    "last_updated": "2026-08-06T17:19:31.856Z",
+    "last_updated": "2026-08-06T17:54:10.056Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -32415,7 +32415,7 @@
       }
     ],
     "projected_vol_lots": 26650,
-    "last_updated": "2026-08-06T17:19:31.877Z",
+    "last_updated": "2026-08-06T17:54:10.075Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -33397,7 +33397,7 @@
       }
     ],
     "projected_vol_lots": 16255762,
-    "last_updated": "2026-08-06T17:19:31.903Z",
+    "last_updated": "2026-08-06T17:54:10.094Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -33971,7 +33971,7 @@
       }
     ],
     "projected_vol_lots": 7226,
-    "last_updated": "2026-08-06T17:19:31.929Z",
+    "last_updated": "2026-08-06T17:54:10.142Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -34953,7 +34953,7 @@
       }
     ],
     "projected_vol_lots": 12728025,
-    "last_updated": "2026-08-06T17:19:31.949Z",
+    "last_updated": "2026-08-06T17:54:10.454Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -35515,7 +35515,7 @@
       }
     ],
     "projected_vol_lots": 9539,
-    "last_updated": "2026-08-06T17:19:31.971Z",
+    "last_updated": "2026-08-06T17:54:10.472Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -36497,7 +36497,7 @@
       }
     ],
     "projected_vol_lots": 3133539,
-    "last_updated": "2026-08-06T17:19:32.001Z",
+    "last_updated": "2026-08-06T17:54:10.552Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -37071,7 +37071,7 @@
       }
     ],
     "projected_vol_lots": 5597,
-    "last_updated": "2026-08-06T17:19:32.175Z",
+    "last_updated": "2026-08-06T17:54:10.756Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -38053,7 +38053,7 @@
       }
     ],
     "projected_vol_lots": 1727815,
-    "last_updated": "2026-08-06T17:19:32.276Z",
+    "last_updated": "2026-08-06T17:54:10.775Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -38627,7 +38627,7 @@
       }
     ],
     "projected_vol_lots": 5673,
-    "last_updated": "2026-08-06T17:19:32.295Z",
+    "last_updated": "2026-08-06T17:54:11.068Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -39609,7 +39609,7 @@
       }
     ],
     "projected_vol_lots": 8184958,
-    "last_updated": "2026-08-06T17:19:32.310Z",
+    "last_updated": "2026-08-06T17:54:11.170Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -40183,7 +40183,7 @@
       }
     ],
     "projected_vol_lots": 5583,
-    "last_updated": "2026-08-06T17:19:32.360Z",
+    "last_updated": "2026-08-06T17:54:11.370Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -41165,7 +41165,7 @@
       }
     ],
     "projected_vol_lots": 1301802,
-    "last_updated": "2026-08-06T17:19:32.379Z",
+    "last_updated": "2026-08-06T17:54:11.386Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -41739,7 +41739,7 @@
       }
     ],
     "projected_vol_lots": 8039,
-    "last_updated": "2026-08-06T17:19:32.393Z",
+    "last_updated": "2026-08-06T17:54:11.405Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -42721,7 +42721,7 @@
       }
     ],
     "projected_vol_lots": 2623871,
-    "last_updated": "2026-08-06T17:19:32.673Z",
+    "last_updated": "2026-08-06T17:54:11.474Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -43295,7 +43295,7 @@
       }
     ],
     "projected_vol_lots": 11174,
-    "last_updated": "2026-08-06T17:19:32.690Z",
+    "last_updated": "2026-08-06T17:54:11.489Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -44277,7 +44277,7 @@
       }
     ],
     "projected_vol_lots": 4512585,
-    "last_updated": "2026-08-06T17:19:32.707Z",
+    "last_updated": "2026-08-06T17:54:11.503Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -44851,7 +44851,7 @@
       }
     ],
     "projected_vol_lots": 2328,
-    "last_updated": "2026-08-06T17:19:32.724Z",
+    "last_updated": "2026-08-06T17:54:11.575Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -45833,7 +45833,7 @@
       }
     ],
     "projected_vol_lots": 229479,
-    "last_updated": "2026-08-06T17:19:32.744Z",
+    "last_updated": "2026-08-06T17:54:11.721Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -46407,7 +46407,7 @@
       }
     ],
     "projected_vol_lots": 3885,
-    "last_updated": "2026-08-06T17:19:32.759Z",
+    "last_updated": "2026-08-06T17:54:11.741Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -47389,7 +47389,7 @@
       }
     ],
     "projected_vol_lots": 13955173,
-    "last_updated": "2026-08-06T17:19:32.890Z",
+    "last_updated": "2026-08-06T17:54:11.762Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -47963,7 +47963,7 @@
       }
     ],
     "projected_vol_lots": 3016,
-    "last_updated": "2026-08-06T17:19:32.907Z",
+    "last_updated": "2026-08-06T17:54:11.785Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -48945,7 +48945,7 @@
       }
     ],
     "projected_vol_lots": 11285066,
-    "last_updated": "2026-08-06T17:19:32.927Z",
+    "last_updated": "2026-08-06T17:54:11.807Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -49519,7 +49519,7 @@
       }
     ],
     "projected_vol_lots": 3713,
-    "last_updated": "2026-08-06T17:19:32.945Z",
+    "last_updated": "2026-08-06T17:54:11.827Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -50501,7 +50501,7 @@
       }
     ],
     "projected_vol_lots": 66312164,
-    "last_updated": "2026-08-06T17:19:32.959Z",
+    "last_updated": "2026-08-06T17:54:11.847Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -51063,7 +51063,7 @@
       }
     ],
     "projected_vol_lots": 6359,
-    "last_updated": "2026-08-06T17:19:32.992Z",
+    "last_updated": "2026-08-06T17:54:11.868Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -51658,7 +51658,7 @@
       }
     ],
     "projected_vol_lots": 3673,
-    "last_updated": "2026-08-06T17:19:33.609Z",
+    "last_updated": "2026-08-06T17:54:12.070Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -52640,7 +52640,7 @@
       }
     ],
     "projected_vol_lots": 6088610,
-    "last_updated": "2026-08-06T17:19:33.713Z",
+    "last_updated": "2026-08-06T17:54:12.089Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -53214,7 +53214,7 @@
       }
     ],
     "projected_vol_lots": 2632,
-    "last_updated": "2026-08-06T17:19:33.733Z",
+    "last_updated": "2026-08-06T17:54:12.106Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -54196,7 +54196,7 @@
       }
     ],
     "projected_vol_lots": 5986426,
-    "last_updated": "2026-08-06T17:19:33.751Z",
+    "last_updated": "2026-08-06T17:54:12.125Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -54770,7 +54770,7 @@
       }
     ],
     "projected_vol_lots": 2638,
-    "last_updated": "2026-08-06T17:19:33.771Z",
+    "last_updated": "2026-08-06T17:54:12.144Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -55752,7 +55752,7 @@
       }
     ],
     "projected_vol_lots": 5466645,
-    "last_updated": "2026-08-06T17:19:33.792Z",
+    "last_updated": "2026-08-06T17:54:12.163Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -56326,7 +56326,7 @@
       }
     ],
     "projected_vol_lots": 3785,
-    "last_updated": "2026-08-06T17:19:33.810Z",
+    "last_updated": "2026-08-06T17:54:12.182Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -57308,7 +57308,7 @@
       }
     ],
     "projected_vol_lots": 10035399,
-    "last_updated": "2026-08-06T17:19:33.832Z",
+    "last_updated": "2026-08-06T17:54:12.201Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -57882,7 +57882,7 @@
       }
     ],
     "projected_vol_lots": 8715,
-    "last_updated": "2026-08-06T17:19:33.852Z",
+    "last_updated": "2026-08-06T17:54:12.218Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -58477,7 +58477,7 @@
       }
     ],
     "projected_vol_lots": 5706,
-    "last_updated": "2026-08-06T17:19:33.990Z",
+    "last_updated": "2026-08-06T17:54:12.339Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -59459,7 +59459,7 @@
       }
     ],
     "projected_vol_lots": 683744,
-    "last_updated": "2026-08-06T17:19:34.010Z",
+    "last_updated": "2026-08-06T17:54:12.358Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
