@@ -51,14 +51,14 @@ const UPDATE_DAY = updateDayIdx !== -1 && args[updateDayIdx + 1] && !args[update
 // ─── UPDATED LOT MULTIPLIERS (August 2026 Expiry) ───────────
 const LOT_MULTIPLIERS = {
     // MCX August Keys
-    '561496': 1250, '561497': 250,  // Natural Gas & Mini
-    '555922': 100,  '560977': 10,   // Crude Oil & Mini (Note: 555922 shared in paste)
-    '471725': 30,   '471726': 5,    '488788': 1,    // Silver, Mini, Micro
-    '568831': 1,    '568836': 1,    '568833': 1,    '568830': 1, // Copper, Zinc, Lead, Alu (Forced to 1)
-    '466583': 100,  '562056': 1,    // Gold & Gold Petal
+    '561496': 1250, '561497': 250,  // Natural Gas, Natural Gas Mini
+    '555922': 100,  '560977': 10,   // Crude Oil, Crude Oil Mini
+    '471725': 30,   '471726': 5,    '488788': 1,    // Silver, Silver Mini, Silver Micro
+    '568831': 1,    '568836': 1,    '568833': 1,    '568830': 1, // Copper, Zinc, Lead, Alu (FORCED TO 1 for Unit-based threshold)
+    '466583': 100,  '562056': 1,    // Gold, Gold Petal
     
     // NSE Index August Keys
-    '58072': 75,    '58067': 30,    '58070': 40,    '58071': 120, // Nifty, Bank, Fin, Mid
+    '58072': 75,    '58067': 30,    '58070': 40,    '58071': 120, // Nifty, Bank, Fin, Midcap
     
     // NSE Stock August Keys
     '58371': 500,   '58216': 650,   '58232': 700,   '58382': 750, // Reliance, HDFC, ICICI, SBI
@@ -92,15 +92,10 @@ function getLotMultiplier(instKey) {
         const cfg = JSON.parse(fs.readFileSync(LIVE_CONFIG_PATH, 'utf8'));
         const i = cfg.instruments?.find(x => x.key === instKey);
         // Important: Use lotSize if it's explicitly defined in config
-        if (i && i.lotSize > 1) return i.lotSize; 
+         if (i && i.lotSize !== undefined) return i.lotSize;
     } catch (e) { /* fallback */ }
 
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
-
-    // COPPER FIX: Force base metals to 1. 
-    // This uses absolute units (KG) for threshold calculation, preventing too many bars.
-    const forceUnitInstruments = ['568831', '568836', '568833', '568830']; 
-    if (forceUnitInstruments.includes(id)) return 1;
 
     return LOT_MULTIPLIERS[id] || 1;
 }
@@ -124,7 +119,7 @@ function classifyInstrument(instKey) {
     const metalsMCX = ['471725', '471726', '488788', '568831', '466583', '562056'];
     const baseMetalsMCX = ['568836', '568833', '568830'];
     const nseIndices = ['58072', '58067', '58070', '58071'];
-    const nseLowVol = ['58374', '58249', '58248', '58133', '58189', '58405'];
+    const nseLowVol = ['58350', '58375', '58393', '58342', '58374', '58249', '58248', '58133', '58189', '58405'];
 
     if (highVolMCX.includes(id)) return 'mCX_high_vol';
     if (metalsMCX.includes(id)) return 'mCX_metal';
