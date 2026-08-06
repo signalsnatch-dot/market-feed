@@ -11,12 +11,16 @@
  *                   Accepts --time HH:MM (default: now).
  *   --profile      Build volume-profile.json (firstHourPct, time-of-day curve, DOW factors)
  *                   from last N days of intraday data. Run once, refresh weekly.
+ *   --update-day   Update a specific completed day's volume threshold in build-version-config
+ *                   based on actual completed data for that day. Accepts date DD/MM/YY.
+ *                   Defaults to yesterday if no date provided.
  *
  * Usage:
  *   node scripts/computeDailyVolumeThresholds.js --premarket [--lookback 14]
  *   node scripts/computeDailyVolumeThresholds.js --adjust-10am
  *   node scripts/computeDailyVolumeThresholds.js --check [--time 14:30]
  *   node scripts/computeDailyVolumeThresholds.js --profile [--lookback 10]
+ *   node scripts/computeDailyVolumeThresholds.js --update-day [DD/MM/YY]
  */
 
 const fs = require('fs');
@@ -37,27 +41,34 @@ const ADJUSTMENT_CAP = 0.30;        // Cap adjustment at ±30% of premarket esti
 const args = process.argv.slice(2);
 const MODE = args.includes('--adjust-10am') ? 'adjust-10am' :
              args.includes('--check') ? 'check' :
-             args.includes('--profile') ? 'profile' : 'premarket';
+             args.includes('--profile') ? 'profile' :
+             args.includes('--update-day') ? 'update-day' : 'premarket';
 const lookbackIdx = args.indexOf('--lookback');
 const LOOKBACK = lookbackIdx !== -1 && args[lookbackIdx + 1] ? parseInt(args[lookbackIdx + 1], 10) : DEFAULT_LOOKBACK;
 const timeIdx = args.indexOf('--time');
 const CHECK_TIME = timeIdx !== -1 && args[timeIdx + 1] ? args[timeIdx + 1] : null;
+const updateDayIdx = args.indexOf('--update-day');
+const UPDATE_DAY = updateDayIdx !== -1 && args[updateDayIdx + 1] && !args[updateDayIdx + 1].startsWith('--') ? args[updateDayIdx + 1] : null;
 
 // ─── Lot multipliers & helpers ──────────────────────────────
 const LOT_MULTIPLIERS = {
-    '538685': 1250, '538686': 250, '520702': 100, '520703': 10,
-    '464150': 30, '471726': 5, '488788': 1, '568831': 2500,
-    '568836': 5000, '568833': 5000, '568830': 5000, '466583': 100,
-    '510764': 10, '552721': 1, '61093': 75, '61088': 30,
-    '61091': 40, '61092': 120, '61284': 500, '61189': 650,
-    '61197': 700, '61289': 750, '61304': 225, '61209': 400,
-    '61216': 1725, '61127': 475, '61114': 625, '61232': 175,
-    '61303': 2750, '61235': 300, '61118': 750, '61226': 2000,
-    '61296': 350, '61220': 675, '61143': 1350, '61099': 309,
-    '61101': 475, '61192': 700, '61108': 125, '61274': 8000,
-    '61286': 4700, '61298': 12700, '61265': 725, '61285': 1925,
-    '61215': 5425, '61214': 4525, '61128': 2625, '61170': 3550,
-    '61310': 225
+    // MCX
+    '561496': 1250, '561497': 250,  // Natural Gas
+    '555922': 100,  '560977': 10,   // Crude Oil
+    '471725': 30,   '471726': 5,    '488788': 1, // Silver
+    '568831': 2500, '568836': 5000, '568833': 5000, '568830': 5000, // Base Metals
+    '466583': 100,  '562056': 1,    // Gold
+    // NSE Indices
+    '58072': 75,    '58067': 30,    '58070': 40,    '58071': 120, // Nifty, Bank, Fin, Mid
+    // NSE Stocks (August Futures)
+    '58371': 500,   '58216': 650,   '58232': 700,   '58382': 750, // Reliance, HDFC, ICICI, SBI
+    '58399': 225,   '58245': 400,   '58250': 1725,  '58132': 475, // TCS, Infy, ITC, Airtel
+    '58117': 625,   '58298': 175,   '58398': 2750,  '58403': 300, // Axis, L&T, TataSteel, TataMot
+    '58121': 750,   '58277': 2000,  '58391': 350,   '58258': 675, // BajFin, Kotak, Sun, JSW
+    '58148': 1350,  '58088': 309,   '58090': 475,   '58225': 700, // Coal, AdaniEnt, AdaniPort, Hindalco
+    '58105': 125,   '58350': 8000,  '58375': 4700,  '58393': 12700, // Apollo, PNB, SAIL, Suzlon
+    '58342': 725,   '58374': 1925,  '58249': 5425,  '58248': 4525, // Paytm, RVNL, IRFC, IREDA
+    '58133': 2625,  '58189': 3550,  '58405': 225                  // BHEL, GAIL, Trent
 };
 
 const NSE_EQ_INSTRUMENTS = new Set([
@@ -76,11 +87,14 @@ const NSE_EQ_INSTRUMENTS = new Set([
 
 function getLotMultiplier(instKey) {
     if (!instKey) return 1;
+    // 1. Try to get lotSize from live config file first
     try {
         const cfg = JSON.parse(fs.readFileSync(LIVE_CONFIG_PATH, 'utf8'));
         const i = cfg.instruments?.find(x => x.key === instKey);
-        if (i && i.lotSize !== undefined) return i.lotSize;
-    } catch (e) { /* fall through */ }
+        if (i && i.lotSize > 1) return i.lotSize; 
+    } catch (e) { /* fallback */ }
+    
+    // 2. Fallback to hardcoded mapping
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
     return LOT_MULTIPLIERS[id] || 1;
 }
@@ -97,11 +111,12 @@ function getLiquidityTier(avgDailyVolumeLots) {
 }
 
 function classifyInstrument(instKey) {
-    const highVolMCX = ['538685', '538686', '520702', '520703'];
-    const metalsMCX = ['464150', '471726', '488788', '568831', '466583', '510764', '552721'];
+    const highVolMCX = ['561496', '561497', '555922', '560977'];
+    const metalsMCX = ['471725', '471726', '488788', '568831', '466583'];
     const baseMetalsMCX = ['568836', '568833', '568830'];
-    const nseIndices = ['61093', '61088', '61091', '61092'];
-    const nseLowVol = ['61304', '61209', '61108', '61274', '61286', '61298', '61265', '61285', '61215', '61214', '61128', '61170', '61310'];
+    const nseIndices = ['58072', '58067', '58070', '58071'];
+    const nseLowVol = ['58374', '58249', '58248', '58133', '58189', '58405'];
+    
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
     if (highVolMCX.includes(id)) return 'mCX_high_vol';
     if (metalsMCX.includes(id)) return 'mCX_metal';
@@ -147,13 +162,14 @@ function formatDateISO(dateVal) {
     return d.toISOString().split('T')[0];
 }
 
-function getTodayKey() {
-    const today = new Date();
+function getTodayKey(dateVal) {
+    const today = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : dateVal) : new Date();
     return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getFullYear()).slice(-2)}`;
 }
 
-function getTodayISO() {
-    return new Date().toISOString().split('T')[0];
+function getTodayISO(dateVal) {
+    const today = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : dateVal) : new Date();
+    return today.toISOString().split('T')[0];
 }
 
 // ─── Auth ────────────────────────────────────────────────────
@@ -617,6 +633,105 @@ async function checkInstrumentOnDemand(instKey, instName, accessToken, existingE
     return { noChange: true };
 }
 
+// ─── Per-instrument processing (update specific past day) ────
+/**
+ * Compute and update thresholds for a completed past day using actual data.
+ * The day's actual volume is extracted from the fetched daily candles (which now
+ * include the completed day). Thresholds are then generated from the actual
+ * observed data, not from a projection made before the day.
+ */
+async function updateInstrumentDay(instKey, instName, accessToken, existingEntry, targetDateObj, volumeProfiles) {
+    const lotMul = getLotMultiplier(instKey);
+    const targetDateIso = getTodayISO(targetDateObj);
+
+    // Fetch daily candles (90 days back) to get actual data for the target day
+    let candlesRaw;
+    try { candlesRaw = await fetchDailyCandles(instKey, accessToken); }
+    catch (e) { console.log(`  ❌ ${instName}: API error: ${e.message}`); return null; }
+
+    if (!candlesRaw || candlesRaw.length < LOOKBACK + 5) {
+        console.log(`  ⚠️ ${instName}: Insufficient data (${candlesRaw?.length || 0} candles)`);
+        return null;
+    }
+
+    // Reverse so oldest-first becomes newest-first
+    const candles = [...candlesRaw].reverse();
+
+    // Find the index of the target day in candle data
+    const targetDayStr = targetDateIso;
+    let targetIdx = -1;
+    let targetActualVolumeLots = 0;
+    for (let idx = 0; idx < candles.length; idx++) {
+        const cDateIso = formatDateISO(candles[idx][0]);
+        if (cDateIso === targetDayStr) {
+            targetIdx = idx;
+            targetActualVolumeLots = Number(candles[idx][5]) / lotMul;
+            break;
+        }
+    }
+
+    if (targetIdx === -1) {
+        console.log(`  ⚠️ ${instName}: Target date ${targetDateIso} not found in candle data`);
+        return null;
+    }
+
+    console.log(`  📊 ${instName}: Target=${targetDateIso} idx=${targetIdx}, actual vol=${Math.round(targetActualVolumeLots).toLocaleString()} lots`);
+
+    // Only process if we have enough lookback data (need LOOKBACK data points before target)
+    if (targetIdx < LOOKBACK) {
+        console.log(`  ⚠️ ${instName}: Not enough data before target (idx=${targetIdx}, need ${LOOKBACK})`);
+        return null;
+    }
+
+    const dailyVolumesLots = candles.map(c => Number(c[5]) / lotMul);
+    const dates = candles.map(c => formatDateISO(c[0])).filter(d => d);
+
+    // Use data up to (and including) the target day. The lookback window uses
+    // the LOOKBACK days immediately before the target day to compute the projection,
+    // but for an already-completed day, we use the actual observed volume as the
+    // "projected" value since we know what actually happened. The thresholds are
+    // then generated from the actual volume.
+
+    const windowVolumes = dailyVolumesLots.slice(targetIdx - LOOKBACK, targetIdx);
+    const windowDates = dates.slice(targetIdx - LOOKBACK, targetIdx);
+
+    // For a completed day, use the actual observed volume directly
+    const actualVolLots = targetActualVolumeLots;
+
+    // Use the actual volume to compute thresholds (since the day is complete,
+    // we know exactly what happened)
+    const avgWindowVol = windowVolumes.reduce((a, b) => a + b, 0) / windowVolumes.length;
+    const tier = getLiquidityTier(Math.max(avgWindowVol, actualVolLots));
+    const thresholds = generateThresholds(actualVolLots, tier);
+    const dailyBarEstimates = computeDailyBarEstimates(actualVolLots, thresholds);
+
+    // Build volume history: last LOOKBACK days up to the target
+    const volumeHistory = [];
+    for (let i = Math.max(0, targetIdx - LOOKBACK); i < targetIdx; i++) {
+        volumeHistory.push({
+            date: dates[i],
+            volume: Math.round(dailyVolumesLots[i]),
+            dayOfWeek: getDayOfWeek(dates[i]),
+        });
+    }
+
+    const ratios = recommendRatios(classifyInstrument(instKey));
+    const targetKey = getTodayKey(targetDateObj);
+
+    console.log(`  ✅ ${instName} @ ${targetKey}: Tier=${tier.name}, thresholds=[${thresholds.join(', ')}]`);
+
+    return {
+        dateKey: targetKey,
+        dateIso: targetDateIso,
+        thresholds,
+        dailyBarEstimates,
+        static_thresholds: thresholds,
+        projected_vol_lots: actualVolLots,
+        volume_history: volumeHistory,
+        recommended_ratios: ratios,
+    };
+}
+
 // ─── Main ────────────────────────────────────────────────────
 async function main() {
     console.log('═'.repeat(65));
@@ -801,6 +916,97 @@ async function main() {
             fs.writeFileSync(LIVE_CONFIG_PATH, JSON.stringify(liveConfig, null, 4));
         }
         console.log(`\n✅ On-demand check: ${adjustedCount} instruments updated`);
+        return;
+    }
+
+    // ─── MODE: update-day ────────────────────────────────────
+    if (MODE === 'update-day') {
+        // Parse target date
+        let targetDateObj;
+        if (UPDATE_DAY) {
+            // UPDATE_DAY is in DD/MM/YY format — parse it
+            const parts = UPDATE_DAY.split('/');
+            if (parts.length === 3) {
+                const d = parseInt(parts[0], 10);
+                const m = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                const y = parseInt(parts[2], 10) + 2000;
+                targetDateObj = new Date(y, m, d);
+            } else {
+                console.error('❌ Invalid date format. Use DD/MM/YY (e.g., 05/08/26)');
+                process.exit(1);
+            }
+        } else {
+            // Default to yesterday
+            targetDateObj = new Date();
+            targetDateObj.setDate(targetDateObj.getDate() - 1);
+        }
+
+        if (isNaN(targetDateObj.getTime())) {
+            console.error('❌ Invalid date provided. Use DD/MM/YY format (e.g., 05/08/26)');
+            process.exit(1);
+        }
+
+        const targetKey = getTodayKey(targetDateObj);
+        const targetIso = getTodayISO(targetDateObj);
+
+        // Validate: target *must* be a completed day (not today, not in the future)
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (targetDateObj >= todayStart) {
+            console.error('❌ Target day must be a completed past day (today or future not allowed)');
+            process.exit(1);
+        }
+
+        console.log(`\n📅 Updating thresholds for completed day: ${targetKey} (${targetIso})`);
+        console.log(`   (Using actual completed candle data, not projections)\n`);
+
+        let updatedCount = 0;
+        let skippedCount = 0;
+
+        for (const inst of instruments) {
+            const existing = buildConfig.find(c => c.instrument_key === inst.key);
+            if (!existing) {
+                console.log(`  ⚠️ ${inst.name}: No existing entry in build-version-config, skipping`);
+                skippedCount++;
+                continue;
+            }
+
+            const result = await updateInstrumentDay(
+                inst.key, inst.name, accessToken, existing, targetDateObj, volumeProfiles[inst.key]
+            );
+
+            if (!result) {
+                skippedCount++;
+                continue;
+            }
+
+            // Update the specific day entry in the thresholds map
+            if (!existing.thresholds || typeof existing.thresholds !== 'object') {
+                existing.thresholds = {};
+            }
+
+            // CRITICAL: Replace the entry for this day with the actual computed thresholds
+            existing.thresholds[targetKey] = result.thresholds;
+
+            // Also update static_thresholds if this was the most recent completed day
+            // (we generally keep static as today's, but record the actual in history)
+            // We also update the volume_history and other metadata
+            existing.projected_vol_lots = result.projected_vol_lots;
+            existing.daily_bar_estimates = result.dailyBarEstimates;
+            if (result.volume_history) {
+                existing.volume_history = result.volume_history;
+            }
+            existing.last_updated = new Date().toISOString();
+            existing.recommended_ratios = result.recommended_ratios;
+
+            updatedCount++;
+        }
+
+        // Write updated configs
+        fs.writeFileSync(BUILD_CONFIG_PATH, JSON.stringify(buildConfig, null, 2));
+        console.log(`\n📄 Updated build-version-config.json`);
+
+        console.log(`\n✅ Update-day completed: ${updatedCount} instruments updated, ${skippedCount} skipped`);
         return;
     }
 }
