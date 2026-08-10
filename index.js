@@ -92,7 +92,7 @@ feed.on('tick', (tickData) => {
                 : (dmConfig.max_staleness_ms || 30000);
             if (latency > maxLatency) {
                 console.warn("⚠️ Stale tick dropped: " + latency + "ms > " + maxLatency + "ms for " + tickData.instrument_key);
-                return;
+            //    return;
             }
         }
     } catch (e) {

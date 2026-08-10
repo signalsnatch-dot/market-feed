@@ -2499,6 +2499,7 @@ const ALL_STRATEGIES = {
 // ============================================================
 
 module.exports = {
+    FLEX_STRATEGIES,
     // Original utilities
     DEFAULT_PARAMS: original.DEFAULT_PARAMS,
     calculateEMA: original.calculateEMA,

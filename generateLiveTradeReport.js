@@ -1,15 +1,41 @@
 const fs = require('fs');
 const path = require('path');
 
+// Import strategy version sets from the main strategy engine
+const { FLEX_STRATEGIES, STRATEGIES: TOP_10_ELITE_STRATEGIES } = require('./priceActionStrategyV2.js');
+
 // --- User Configurations ---
-const DATA_URL = 'http://13.201.36.159:8000/candles_data/signals_today_2026-07-14.json'; 
+const DATA_URL = 'http://3.110.195.197:8000/candles_data/signals_today_2026-08-10.json'; 
 const OUTPUT_DIR = './live-performance-report';
 
 const startTime = '09:00'; // Session Start (HH:MM in 24h IST format)
 const endTime = '23:35';   // Session End (HH:MM in 24h IST format). Set to null to use current time.
 
-// Matches any V1 to V106 strategy
-const versionRegex = /^V(\d+):/;
+// Derive strategy version lists from imported maps
+const flexStrategyVersions = Object.keys(FLEX_STRATEGIES).filter(k => typeof FLEX_STRATEGIES[k] === 'function');
+const eliteStrategyVersions = Object.keys(TOP_10_ELITE_STRATEGIES).filter(k => typeof TOP_10_ELITE_STRATEGIES[k] === 'function');
+
+// Matches any V1 to V904 strategy (including V5A-V50A letter suffix variants, ELITE_ prefixed variants, and bracketed flex variants)
+function parseVersionNum(v) {
+    // Try standard V-prefix format first
+    let m = v.match(/^V(\d+[A-Z]?):/);
+    if (m) {
+        const cap = m[1];
+        const num = parseInt(cap, 10);
+        const suffix = cap.replace(/^\d+/, '');
+        return { num, suffix };
+    }
+    // Try ELITE_ prefixed format: ELITE_V123A_N_LOOSE → map to base num + high offset
+    m = v.match(/^ELITE_V(\d+[A-Z]?)/);
+    if (m) {
+        const cap = m[1];
+        const num = 1000 + parseInt(cap, 10);
+        const suffix = 'E';
+        return { num, suffix };
+    }
+    return { num: 0, suffix: '' };
+}
+const versionRegex = /^(V(\d+[A-Z]?):|ELITE_V(\d+[A-Z]?))/;
 
 // All active High Confidence versions (original + fixed) producing confidence metric outputs
 const confidenceVersions = [
@@ -39,7 +65,7 @@ const confidenceVersions = [
 
 const INSTRUMENT_NAMES = {
     // Standard ISINs
-    'INE002A01018': 'Reliance Industries',
+     'INE002A01018': 'Reliance Industries',
     'INE040A01034': 'HDFC Bank',
     'INE090A01021': 'ICICI Bank',
     'INE062A01020': 'SBI',
@@ -50,7 +76,6 @@ const INSTRUMENT_NAMES = {
     'INE238A01034': 'Axis Bank',
     'INE018A01030': 'L&T',
     'INE081A01020': 'Tata Steel',
-    'INE155A01022': 'Tata Motors',
     'INE1TAE01010': 'Tata Motors (Cash)',
     'INE296A01032': 'Bajaj Finance',
     'INE237A01036': 'Kotak Bank',
@@ -72,12 +97,12 @@ const INSTRUMENT_NAMES = {
     'INE129A01025': 'GAIL',
     'INE849A01020': 'TRENT',
 
-    // Standard F&O Segment Tokens
-    '538685': 'Natural Gas Future',
-    '538686': 'Natural Gas Mini Future',
-    '520702': 'Crude Oil Future',
-    '520703': 'Crude Oil Mini Future',
-    '464150': 'Silver Future',
+    // Standard August F&O Segment Tokens
+    '561496': 'Natural Gas Future',
+    '561497': 'Natural Gas Mini Future',
+    '555922': 'Crude Oil Future',
+    '560977': 'Crude Oil Mini Future',
+    '471725': 'Silver Future',
     '471726': 'Silver Mini Future',
     '488788': 'Silver Micro Future',
     '568831': 'Copper Future',
@@ -86,55 +111,48 @@ const INSTRUMENT_NAMES = {
     '568830': 'Aluminium Future',
     '466583': 'Gold Future',
     '510764': 'Gold Mini Future',
-    '552721': 'Gold Petal Future',
-    '61093': 'Nifty 50 Future',
-    '61088': 'Nifty Bank Future',
-    '61091': 'Fin Nifty Future',
-    '61092': 'Midcap Nifty Future',
-    '61284': 'Reliance Future',
-    '61189': 'HDFC Bank Future',
-    '61197': 'ICICI Bank Future',
-    '61289': 'SBI Future',
-    '61304': 'TCS Future',
-    '61209': 'Infosys Future',
-    '61216': 'ITC Future',
-    '61127': 'Bharti Airtel Future',
-    '61114': 'Axis Bank Future',
-    '61232': 'L&T Future',
-    '61303': 'Tata Steel Future',
-    '61235': 'Tata Motors Future',
-    '61118': 'Bajaj Finance Future',
-    '61226': 'Kotak Bank Future',
-    '61296': 'Sun Pharma Future',
-    '61220': 'JSW Steel Future',
-    '61143': 'Coal India Future',
-    '61099': 'Adani Enterprises Future',
-    '61101': 'Adani Ports Future',
-    '61192': 'Hindalco Future',
-    '61108': 'Apollo Hospitals Future',
-    '61274': 'PNB Future',
-    '61286': 'SAIL Future',
-    '61298': 'SUZLON Future',
-    '61265': 'PAYTM Future',
-    '61285': 'RVNL Future',
-    '61215': 'IRFC Future',
-    '61214': 'IREDA Future',
-    '61128': 'BHEL Future',
-    '61170': 'GAIL Future',
-    '61310': 'TRENT Future',
+    '562056': 'Gold Petal Future',
+    '58072': 'Nifty 50 Future',
+    '58067': 'Nifty Bank Future',
+    '58070': 'Fin Nifty Future',
+    '58071': 'Midcap Nifty Future',
+    '58371': 'Reliance Future',
+    '58216': 'HDFC Bank Future',
+    '58232': 'ICICI Bank Future',
+    '58382': 'SBI Future',
+    '58399': 'TCS Future',
+    '58245': 'Infosys Future',
+    '58250': 'ITC Future',
+    '58132': 'Bharti Airtel Future',
+    '58117': 'Axis Bank Future',
+    '58298': 'L&T Future',
+    '58398': 'Tata Steel Future',
+    '58403': 'Tata Motors Future',
+    '58121': 'Bajaj Finance Future',
+    '58277': 'Kotak Bank Future',
+    '58391': 'Sun Pharma Future',
+    '58258': 'JSW Steel Future',
+    '58148': 'Coal India Future',
+    '58088': 'Adani Enterprises Future',
+    '58090': 'Adani Ports Future',
+    '58225': 'Hindalco Future',
+    '58105': 'Apollo Hospitals Future',
+    '58350': 'PNB Future',
+    '58375': 'SAIL Future',
+    '58393': 'SUZLON Future',
+    '58342': 'PAYTM Future',
+    '58374': 'RVNL Future',
+    '58249': 'IRFC Future',
+    '58248': 'IREDA Future',
+    '58133': 'BHEL Future',
+    '58189': 'GAIL Future',
+    '58405': 'TRENT Future',
     
-    // Legacy support keys
-    '552706': 'Aluminium (MCX)',
-    '552709': 'Lead (MCX)',
-    '552708': 'Copper (MCX)',
-    '552711': 'Zinc (MCX)',
-    '464151': 'Silver Mini (MCX)',
-    '477177': 'Silver Micro (MCX)',
-    '510464': 'Gold Petal (MCX)',
-    '62329': 'Nifty 50',
-    '62326': 'Bank Nifty',
-    '62327': 'Fin Nifty',
-    '62328': 'Midcap Nifty'
+    // Support keys (Updated for August)
+    '58072': 'Nifty 50',
+    '58067': 'Bank Nifty',
+    '58070': 'Fin Nifty',
+    '58071': 'Midcap Nifty'
 };
 
 // Strict non-overlapping confidence buckets
@@ -312,27 +330,58 @@ function parseSignalToTrade(signal) {
     };
 }
 
+// generateLiveReport.js 
+// generateLiveReport.js 
+
 function computeMetrics(tradesList) {
-    const totalTrades = tradesList.length;
+    // 1. FILTER: Be flexible with status naming and casing
+    const executedTrades = tradesList.filter(t => {
+        const status = (t.status || '').toLowerCase();
+        const reason = (t.exitReason || '').toLowerCase();
+        
+        // Include trades that are completed/closed, 
+        // but exclude those that never filled or were manually cancelled before trigger
+        return (status === 'completed' || status === 'closed' || status === 'filled') && 
+               reason !== 'never_filled' && 
+               reason !== 'cancelled';
+    });
+
+    const totalTrades = executedTrades.length;
+    
+    // If the filter is too strict, fallback to total list to prevent 0% error
+    // but this ensures we don't divide by zero
     if (totalTrades === 0) {
-        return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0 };
+        return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0, avgRRR: 0 };
     }
-    const wins = tradesList.filter(t => t.pnlPercentage > 0).length;
+
+    // 2. WINS: Use a very small epsilon to count anything positive as a win
+    // Some platforms return PnL as 0.00001 for break-even, we count > 0.
+    const wins = executedTrades.filter(t => {
+        const pnl = parseFloat(t.pnlPercentage);
+        return pnl > 0; 
+    }).length;
+
     const winRate = (wins / totalTrades) * 100;
-    const totalReturn = tradesList.reduce((sum, t) => sum + (t.pnlPercentage || 0), 0);
+    
+    // 3. RETURNS: Ensure we parse the numbers correctly
+    const totalReturn = executedTrades.reduce((sum, t) => sum + (parseFloat(t.pnlPercentage) || 0), 0);
     const avgReturn = totalReturn / totalTrades;
 
-    const validMafe = tradesList.filter(t => t.mafePercentage !== undefined && t.mafePercentage !== null);
-    const avgMafe = validMafe.length > 0 
-        ? validMafe.reduce((sum, t) => sum + parseFloat(t.mafePercentage), 0) / validMafe.length 
-        : 0;
+    // Standard metric aggregations
+    const getAvg = (arr, prop) => {
+        const valid = arr.filter(x => x[prop] != null && !isNaN(x[prop]));
+        return valid.length > 0 ? valid.reduce((s, v) => s + parseFloat(v[prop]), 0) / valid.length : 0;
+    };
 
-    const validMae = tradesList.filter(t => t.maePercentage !== undefined && t.maePercentage !== null);
-    const avgMae = validMae.length > 0 
-        ? validMae.reduce((sum, t) => sum + parseFloat(t.maePercentage), 0) / validMae.length 
-        : 0;
-
-    return { totalTrades, winRate, totalReturn, avgReturn, avgMafe, avgMae };
+    return { 
+        totalTrades, 
+        winRate, 
+        totalReturn, 
+        avgReturn, 
+        avgMafe: getAvg(executedTrades, 'mafePercentage'), 
+        avgMae: getAvg(executedTrades, 'maePercentage'), 
+        avgRRR: getAvg(executedTrades, 'rrr') 
+    };
 }
 
 // --- Dynamic Table Builder Functions ---
@@ -456,6 +505,10 @@ async function main() {
             const date = getDateString(signal.timestamp);
             const barType = signal.bar_type || 'volume';
 
+             if (trade.status === 'completed' && trade.pnlPercentage === 0 && trade.entry === trade.exitPrice) {
+                trade.exitReason = 'never_filled';
+            }
+
             flatTrades.push({
                 trade,
                 strategy: signal.version,
@@ -481,9 +534,11 @@ async function main() {
         );
 
         const uniqueVersions = [...new Set(flatTrades.map(t => t.strategy))].sort((a,b) => {
-            const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
-            const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
-            return numA - numB;
+            const pa = parseVersionNum(a), pb = parseVersionNum(b);
+            if (pa.num !== pb.num) return pa.num - pb.num;
+            if (pa.suffix === '' && pb.suffix !== '') return -1;
+            if (pa.suffix !== '' && pb.suffix === '') return 1;
+            return pa.suffix.localeCompare(pb.suffix);
         });
 
         const uniqueInstruments = [...new Set(flatTrades.map(t => t.instrument))].sort();
@@ -494,7 +549,7 @@ async function main() {
         let md = `# Portfolio Live Signals Performance Report\n\n`;
         md += `*Report Generated on (Local): ${new Date().toLocaleString()}*\n`;
         md += `*Session Filtering Window (IST):* ${startTime} to ${resolvedEndTime}\n`;
-        md += `*Rule Validation Model Range:* V1 to V106\n`;
+        md += `*Rule Validation Model Range:* V1 to V904 (including V5A-V50A)\n`;
         md += `*Analyzed Period Range:* ${uniqueDates[0]} to ${uniqueDates[uniqueDates.length - 1]}\n\n`;
 
         // ============================================================
@@ -516,7 +571,7 @@ async function main() {
         // ============================================================
         // SECTION 2: DETAILED VERSION PERFORMANCE (SPLIT BY BAR TYPE)
         // ============================================================
-        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V106)\n\n`;
+        md += `## Section 2: Detailed Performance by Strategy Version (V1 to V904)\n\n`;
 
         uniqueVersions.forEach(v => {
             const vTrades = flatTrades.filter(t => t.strategy === v);
@@ -539,6 +594,7 @@ async function main() {
                     block += `*   **Cumulative Average MAFE:** ${m.avgMafe.toFixed(2)}%\n`;
                     block += `*   **Cumulative Average MAE:** ${m.avgMae.toFixed(2)}%\n`;
                 }
+                block += `*   **Cumulative Average RRR:** ${m.totalTrades ? m.avgRRR.toFixed(2) : '0.00'}\n`;
                 block += `\n`;
 
                 const pairs = [...new Set(trades.map(t => `${t.instrument} (Threshold ${t.threshold})`))].sort();
@@ -551,6 +607,7 @@ async function main() {
                     if (hasMaeMafe) {
                         block += ` | MAFE: ${pm.avgMafe.toFixed(1)}% | MAE: ${pm.avgMae.toFixed(1)}%`;
                     }
+                    block += ` | Avg RRR: ${pm.totalTrades ? pm.avgRRR.toFixed(2) : '0.00'}`;
                     block += `\n`;
 
                     const pairDates = [...new Set(pairTrades.map(t => t.date))].sort();
@@ -674,23 +731,28 @@ async function main() {
                         block += `*   **Average MAFE:** ${thm.avgMafe.toFixed(2)}%\n`;
                         block += `*   **Average MAE:** ${thm.avgMae.toFixed(2)}%\n`;
                     }
+                    block += `*   **Average RRR:** ${thm.avgRRR.toFixed(2)}\n`;
                     block += `\n`;
 
-                    block += `******Strategy Version Breakdown (${label}):******\n`;
+                    block += `******Strategy** Version Breakdown (${label}):******\n`;
                     block += `| Strategy Version | Cumulative Trades | Win Rate % | Total Return % | Avg Return % |`;
                     if (hasMaeMafe) {
                         block += ` Avg MAFE % | Avg MAE % |`;
                     }
+                    block += ` Avg RRR |`;
                     block += `\n| :--- | :---: | :---: | :---: | :---: |`;
                     if (hasMaeMafe) {
                         block += ` :---: | :---: |`;
                     }
+                    block += ` :---: |`;
                     block += `\n`;
 
                     const thVersions = [...new Set(trades.map(t => t.strategy))].sort((a,b) => {
-                        const numA = parseInt(a.match(versionRegex)?.[1] || 0, 10);
-                        const numB = parseInt(b.match(versionRegex)?.[1] || 0, 10);
-                        return numA - numB;
+                        const pa = parseVersionNum(a), pb = parseVersionNum(b);
+                        if (pa.num !== pb.num) return pa.num - pb.num;
+                        if (pa.suffix === '' && pb.suffix !== '') return -1;
+                        if (pa.suffix !== '' && pb.suffix === '') return 1;
+                        return pa.suffix.localeCompare(pb.suffix);
                     });
 
                     thVersions.forEach(v => {
@@ -701,6 +763,7 @@ async function main() {
                         if (hasMaeMafe) {
                             row += ` ${vThm.avgMafe.toFixed(1)}% | ${vThm.avgMae.toFixed(1)}% |`;
                         }
+                        row += ` ${vThm.avgRRR.toFixed(2)} |`;
                         block += row + `\n`;
                     });
                     block += `\n`;
@@ -783,12 +846,12 @@ function generateCompactSummary(allTrades) {
 
         // ── Section A: Per-Instrument Top 3 Version+Threshold Combinations ──
         md += `### Best Version+Threshold Per Instrument (${barType})\n\n`;
-        md += `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`;
-        md += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
+        md += `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Avg RRR | Trades |\n`;
+        md += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
 
         for (const entry of perInstrumentTop3) {
             entry.top3.forEach((v, idx) => {
-                md += `| ${entry.instrument} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`;
+                md += `| ${entry.instrument} | #${idx + 1} | ${v.version} | ${v.threshold} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.avgRRR.toFixed(2)} | ${v.trades} |\n`;
             });
         }
         md += `\n`;

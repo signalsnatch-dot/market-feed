@@ -14,20 +14,23 @@ const fs = require('fs');
 const path = require('path');
 const { STRATEGIES, runPriceActionBacktest } = require('./priceActionStrategyV2');
 
-const EXTRACTED_DIR = './extracted';
+const EXTRACTED_DIR = './extracted-2';
 const CONFIG_FILE = './build-version-config.json';
 const RESULTS_DIR = './live-backtest-results';
 const CANDLES_DIR = './candles/live';
 
-// MCX multipliers for lot sizing
+// MCX multipliers for lot sizing// ─── UPDATED AUGUST 2026 MULTIPLIERS ────────────────────────
 const MCX_MULTIPLIERS = {
-    '538685': 1250, '538686': 250, '520702': 100, '520703': 10,
-    '464150': 30, '471726': 5, '488788': 1, '568831': 2500,
-    '568836': 5000, '568833': 5000, '568830': 5000, '466583': 100,
-    '510764': 10, '552721': 1, '552706': 5000, '552709': 5000,
-    '552708': 2500, '552711': 5000, '464151': 5, '477177': 1, '510464': 1
+    '561496': 1250, '561497': 250,  // Natural Gas & Mini
+    '555922': 100,  '560977': 10,   // Crude Oil & Mini
+    '471725': 30,   '471726': 5,    '488788': 1,    // Silver, Mini, Micro
+    '568831': 2500, '568836': 5000, '568833': 5000, '568830': 5000, // Metals
+    '466583': 100,  '510764': 10,   '562056': 1     // Gold, Mini, Petal
 };
-const INDEX_MULTIPLIERS = { '61093': 75, '61088': 30, '61091': 40, '61092': 120 };
+
+const INDEX_MULTIPLIERS = { 
+    '58072': 75, '58067': 30, '58070': 40, '58071': 120 // Nifty, Bank, Fin, Midcap
+};
 
 function getLotMultiplier(instKey) {
     try {
@@ -77,7 +80,9 @@ function resolveThresholds(buildInst, liveInst, dateKey) {
     let thresholds = [];
 
     // 1. Date-specific thresholds (NEW format: date → [10 values])
-    if (buildInst.thresholds && typeof buildInst.thresholds === 'object' && !Array.isArray(buildInst.thresholds)) {
+    const hasDateMap = buildInst.thresholds && typeof buildInst.thresholds === 'object' && !Array.isArray(buildInst.thresholds);
+
+    if (hasDateMap) {
         if (dateKey && buildInst.thresholds[dateKey] !== undefined) {
             const dateVal = buildInst.thresholds[dateKey];
             if (Array.isArray(dateVal)) {
@@ -85,25 +90,32 @@ function resolveThresholds(buildInst, liveInst, dateKey) {
                 // Date-specific arrays are self-contained — no merging needed
                 return dateVal.sort((a, b) => a - b);
             } else if (typeof dateVal === 'number') {
-                // LEGACY format: single number → index into static_thresholds
+                // LEGACY format: p-index → look up actual threshold from static_thresholds
                 const idx = dateVal - 1; // legacy was 1-indexed
                 if (Array.isArray(buildInst.static_thresholds) && buildInst.static_thresholds[idx] !== undefined) {
                     thresholds.push(buildInst.static_thresholds[idx]);
                 }
             }
         }
-    } else if (Array.isArray(buildInst.thresholds)) {
+        // If instrument has date-specific thresholds object but NO mapping for this date,
+        // return empty array — caller should skip this instrument/date combination.
+        // Do NOT fall back to static_thresholds.
+        return thresholds;
+    }
+
+    // LEGACY: thresholds is a flat array (no date keys)
+    if (Array.isArray(buildInst.thresholds)) {
         thresholds = [...buildInst.thresholds];
     }
 
-    // 2. Static thresholds from build config (only if no date-specific array was found)
+    // 2. Static thresholds from build config (only for legacy instruments without date map)
     if (Array.isArray(buildInst.static_thresholds) && thresholds.length === 0) {
         for (const v of buildInst.static_thresholds) {
             if (!thresholds.includes(v)) thresholds.push(v);
         }
     }
 
-    // 3. From config.json volumePerBar (only if still empty)
+    // 3. Fallback: config.json volumePerBar (only if still empty)
     if (liveInst && Array.isArray(liveInst.volumePerBar) && thresholds.length === 0) {
         for (const v of liveInst.volumePerBar) {
             if (!thresholds.includes(v)) thresholds.push(v);
@@ -150,11 +162,17 @@ class VolumeCandle {
 }
 
 class Trade {
-    constructor(strategy, signal, barNumber, entryTime, entryIndex, initialCapital, confidenceScale) {
+    constructor(strategy, signal, barNumber, entryTime, entryIndex, initialCapital, confidenceScale, tickSize, slippageTicks) {
         this.strategy = strategy;
         // Normalize BUY_STOP/SELL_STOP → BUY/SELL for direction checks
         this.direction = signal.type && signal.type.startsWith('BUY') ? 'BUY' : 'SELL';
-        this.entryPrice = signal.triggerPrice;
+        this.slippage = (slippageTicks || 0) * (tickSize || 0.05);
+        // Apply 2-tick slippage: adjust 2*tickSize unfavorably from entry
+        if (this.direction === 'BUY') {
+            this.entryPrice = signal.triggerPrice + this.slippage;
+        } else {
+            this.entryPrice = signal.triggerPrice - this.slippage;
+        }
         this.stopLoss = signal.stopLoss;
         this.takeProfit = signal.takeProfit;
         this.confidence = signal.confidence || 50;
@@ -188,7 +206,6 @@ class Trade {
 // ============================================================
 // CORE PROCESSOR
 // ============================================================
-
 function processThresholdBarClose(s, closedBar, currentTime, ltp, exIso, barIndex) {
     const startIdx = Math.max(0, s.completedBars.length - 100);
     const strategyCandles = s.completedBars.slice(startIdx).map(b => ({
@@ -196,91 +213,37 @@ function processThresholdBarClose(s, closedBar, currentTime, ltp, exIso, barInde
         volume: b.volume, timestamp: b.endTime
     }));
 
-    // ================================================================
-    // FIX #5: CONFIRMATION BAR LOGIC
-    //
-    // Brooks principle: A setup signal on bar N must be confirmed by
-    // bar N+1 closing beyond the trigger price (bar N's high for buys,
-    // bar N's low for sells). Only then is the stop-entry order placed.
-    // If bar N+1 closes inside the signal bar's range, the breakout
-    // failed and the pending signal is discarded.
-    //
-    // This replaces the old "immediate entry on signal bar" approach
-    // which caused many false breakouts to become losing trades.
-    // ================================================================
-
-    // STEP 1: Check pending signals from the PREVIOUS bar.
-    // The signal was stored when it appeared on bar N. Now bar N+1 has
-    // just closed (closedBar = bar N+1). If it confirmed, create the trade.
-    /*
+    // 1. CHECK PENDING TRIGGERS USING BAR HIGH/LOW
     for (const [versionName, pending] of s.pendingSignals) {
-        const signalDirection = pending.type && pending.type.startsWith('BUY') ? 'BUY' : 'SELL';
-        let confirmed = false;
-        if (signalDirection === 'BUY') {
-            // Buy stop: signal bar is pending.barIndex-1 (or simply the bar that generated it)
-            // Confirmation: this closed bar closes ABOVE signal bar's high
-            // Use pending.triggerPrice which is signal bar's high + 1 tick
-            confirmed = closedBar.close > pending.triggerPrice;
-        } else {
-            // Sell stop: confirmation = this closed bar closes BELOW signal bar's low
-            confirmed = closedBar.close < pending.triggerPrice;
-        }
+        const isBuy = pending.type && pending.type.startsWith('BUY');
+        let triggeredInBar = false;
 
-        if (confirmed && !s.activeTrades.has(versionName)) {
-            const confidenceScale = (pending.confidence || 50) / 100;
-            //const trade = new Trade(versionName, pending, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
-                        
-            //Fix to execution bias
-            const confirmedSignal = { ...pending, triggerPrice: ltp }; // Set entry to the actual market price (Close of N+1)
-            const trade = new Trade(versionName, confirmedSignal, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
-            trade.triggered = true; // Mark as triggered immediately since we are entering "At Market" on the close
+        // Use the bar's extreme to see if it touched our trigger at any point
+        if (isBuy && closedBar.high >= pending.triggerPrice) triggeredInBar = true;
+        if (!isBuy && closedBar.low <= pending.triggerPrice) triggeredNow = true;
 
-            s.activeTrades.set(versionName, trade);
-        }
-        // Remove pending signal regardless of outcome (one shot)
-        s.pendingSignals.delete(versionName);
-    }
-        */
-    for (const [versionName, pending] of s.pendingSignals) {
-        const signalDirection = pending.type && pending.type.startsWith('BUY') ? 'BUY' : 'SELL';
-        const closePrice = closedBar.close; // This is the close of N+1
-        
-        let isConfirmed = false;
-        let alreadyHitTP = false;
-
-        if (signalDirection === 'BUY') {
-            // Confirm: Bar N+1 closed above Signal Bar Trigger
-            isConfirmed = closePrice > pending.triggerPrice;
-            // Filter: If Close is already at or above TP, we are too late
-            alreadyHitTP = closePrice >= pending.takeProfit;
-        } else {
-            // Confirm: Bar N+1 closed below Signal Bar Trigger
-            isConfirmed = closePrice < pending.triggerPrice;
-            // Filter: If Close is already at or below TP, we are too late
-            alreadyHitTP = closePrice <= pending.takeProfit;
-        }
-
-        // Only enter if confirmed and the target hasn't been hit yet
-        if (isConfirmed && !alreadyHitTP && !s.activeTrades.has(versionName)) {
+        if (triggeredInBar && !s.activeTrades.has(versionName)) {
             const confidenceScale = (pending.confidence || 50) / 100;
             
-            // Create Trade using Signal Bar (N) parameters (SL and TP stay original)
-            const trade = new Trade(versionName, pending, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale);
+            // Create trade. We assume entry at triggerPrice (or Bar Open if it gapped)
+            const trade = new Trade(versionName, pending, closedBar.barNumber, currentTime, barIndex, s.initialCapital, confidenceScale, s.tickSize, 0);
             
-            // UPDATE: Override entry price to Bar N+1 Close, but leave SL/TP as they were
-            trade.entryPrice = closePrice; 
-            trade.filled = true;    // Market entry at close
+            // Assume we entered at the trigger price 
+            // (Note: This is the 'Bias' point - we don't know the exact tick)
+            trade.entryPrice = isBuy ? Math.max(closedBar.open, pending.triggerPrice) 
+                                     : Math.min(closedBar.open, pending.triggerPrice);
+            
             trade.triggered = true; 
-            
+            trade.filled = true;
             s.activeTrades.set(versionName, trade);
         }
-        // One-shot: Remove pending signal regardless of outcome
+        
+        // Brooks N+1 Rule: If the bar finishes and didn't trigger, or even if it did, 
+        // the setup window for this specific signal is now closed.
         s.pendingSignals.delete(versionName);
     }
 
-    // ================================================================
-    // KEEP: SCAN FOR NEW SIGNALS (FOR BAR N)
-    // ================================================================
+    // 2. SCAN FOR NEW SIGNALS (SETUP GENERATION)
     if (strategyCandles.length >= 32) {
         for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
             const params = {
@@ -291,10 +254,8 @@ function processThresholdBarClose(s, closedBar, currentTime, ltp, exIso, barInde
             const signals = strategyFn(strategyCandles, params);
             if (signals && signals.length > 0) {
                 const latestSignal = signals[signals.length - 1];
-                // If signal was generated on the bar that just closed (Bar N)
                 if (latestSignal.index === strategyCandles.length - 1) {
                     if (!s.activeTrades.has(versionName)) {
-                        // Store as pending to check confirmation at end of Bar N+1
                         s.pendingSignals.set(versionName, { ...latestSignal });
                     }
                 }
@@ -559,11 +520,11 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
 
                         let hit = false;
                         if (trade.direction === 'BUY') {
-                            if (ltp >= trade.takeProfit) { trade.exitPrice = trade.takeProfit; trade.exitReason = 'take_profit'; hit = true; }
-                            else if (ltp <= trade.stopLoss) { trade.exitPrice = trade.stopLoss; trade.exitReason = 'stop_loss'; hit = true; }
+                            if (ltp >= trade.takeProfit) { trade.exitPrice = trade.takeProfit - trade.slippage; trade.exitReason = 'take_profit'; hit = true; }
+                            else if (ltp <= trade.stopLoss) { trade.exitPrice = trade.stopLoss - trade.slippage; trade.exitReason = 'stop_loss'; hit = true; }
                         } else {
-                            if (ltp <= trade.takeProfit) { trade.exitPrice = trade.takeProfit; trade.exitReason = 'take_profit'; hit = true; }
-                            else if (ltp >= trade.stopLoss) { trade.exitPrice = trade.stopLoss; trade.exitReason = 'stop_loss'; hit = true; }
+                            if (ltp <= trade.takeProfit) { trade.exitPrice = trade.takeProfit + trade.slippage; trade.exitReason = 'take_profit'; hit = true; }
+                            else if (ltp >= trade.stopLoss) { trade.exitPrice = trade.stopLoss + trade.slippage; trade.exitReason = 'stop_loss'; hit = true; }
                         }
                         if (hit) {
                             trade.exitIndex = s.barIndex;
@@ -659,11 +620,11 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
                 // Check for intra-bar TP/SL hit
                 let hit = false;
                 if (trade.direction === 'BUY') {
-                    if (ltp >= trade.takeProfit) { trade.exitPrice = trade.takeProfit; trade.exitReason = 'take_profit'; hit = true; }
-                    else if (ltp <= trade.stopLoss) { trade.exitPrice = trade.stopLoss; trade.exitReason = 'stop_loss'; hit = true; }
+                    if (ltp >= trade.takeProfit) { trade.exitPrice = trade.takeProfit - trade.slippage; trade.exitReason = 'take_profit'; hit = true; }
+                    else if (ltp <= trade.stopLoss) { trade.exitPrice = trade.stopLoss - trade.slippage; trade.exitReason = 'stop_loss'; hit = true; }
                 } else {
-                    if (ltp <= trade.takeProfit) { trade.exitPrice = trade.takeProfit; trade.exitReason = 'take_profit'; hit = true; }
-                    else if (ltp >= trade.stopLoss) { trade.exitPrice = trade.stopLoss; trade.exitReason = 'stop_loss'; hit = true; }
+                    if (ltp <= trade.takeProfit) { trade.exitPrice = trade.takeProfit + trade.slippage; trade.exitReason = 'take_profit'; hit = true; }
+                    else if (ltp >= trade.stopLoss) { trade.exitPrice = trade.stopLoss + trade.slippage; trade.exitReason = 'stop_loss'; hit = true; }
                 }
                 if (hit) {
                     trade.exitIndex = s.barIndex;
@@ -804,6 +765,7 @@ function processTickFile(instrumentKey, tickFile, thresholds, buildInst, liveIns
                         exitReason: t.exitReason,
                         mafePercentage: t.mafePercent,
                         maePercentage: t.maePercent,
+                        rrr: t.risk > 0 ? parseFloat((t.reward / t.risk).toFixed(2)) : 0,
                         stopLoss: t.stopLoss,
                         takeProfit: t.takeProfit
                     }))
@@ -896,9 +858,9 @@ async function cmdRun(instrumentKey, opts = {}) {
     if (process.argv.includes('--brooks-only')) {
         Object.keys(STRATEGIES).forEach(k => {
             const num = parseInt(k.substring(1), 10);
-            if (!k.startsWith('V') || !k.includes("Brooks") || isNaN(num) || num < 976 || num > 999 ) {
+            if (!k.startsWith('V') || isNaN(num) || !(num == 955 ||num == 25 ||num == 935 || num == 125 ||num == 925 ||num == 945) ) {
                 delete STRATEGIES[k];
-            }     
+            }
         });
     }
     const buildInst = buildConfig.find(x => x.instrument_key === instrumentKey);
@@ -1054,7 +1016,6 @@ async function cmdRunAll() {
 async function cmdRunAllParallel() {
     const { spawn } = require('child_process');
     const os = require('os');
-    const numWorkers = parseInt(process.env.BACKTEST_WORKERS, 10) || Math.max(1, os.cpus().length - 1);
 
     const buildConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
 
@@ -1077,57 +1038,68 @@ async function cmdRunAllParallel() {
         instrumentTasks.get(instKey).push(tickFile);
     }
 
-    const instKeys = [...instrumentTasks.keys()];
+    let instKeys = [...instrumentTasks.keys()];
+
+    // Sort: lotMultiplier=1 first (most work-intensive, maximize parallel utilization)
+    instKeys.sort((a, b) => {
+        const la = getLotMultiplier(a);
+        const lb = getLotMultiplier(b);
+        return la - lb;
+    });
+
+    const numWorkers = parseInt(process.env.BACKTEST_WORKERS, 10) || Math.max(1, os.cpus().length - 1);
     console.log(`📂 Found ${allTickFiles.length} files → ${instKeys.length} instruments`);
-    console.log(`🔧 Spawning ${numWorkers} parallel node processes (run <instrument_key> for each)`);
+    console.log(`🔧 Dynamic worker pool: ${numWorkers} parallel node processes`);
 
     let completed = 0;
     const startTime = Date.now();
     const scriptPath = path.resolve(__dirname, 'backtesterAsLive.js');
 
-    function runInstrument(instKey, instName) {
-        return new Promise((resolve) => {
-            // Just forward the child's output with an instrument prefix
-            const child = spawn('node', [scriptPath, 'run', instKey], {
-                stdio: ['ignore', 'pipe', 'pipe'],
-                env: { ...process.env, BACKTEST_WORKERS: '1' } // prevent recursion
-            });
+    // Dynamic worker pool: workers pick next available instrument from queue
+    let nextIdx = 0;
 
-            let stdout = '';
-            let stderr = '';
-            child.stdout.on('data', d => { stdout += d.toString(); process.stdout.write(`[${instName}] ${d}`); });
-            child.stderr.on('data', d => { stderr += d.toString(); process.stderr.write(`[${instName}] ${d}`); });
-
-            child.on('close', (code) => {
-                completed++;
-                if (code === 0) {
-                    console.log(`   ✅ ${instName} (${instKey}): done`);
-                } else {
-                    console.error(`   ❌ ${instName} (${instKey}): exit code ${code}`);
-                }
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-                console.log(`   📊 ${completed}/${instKeys.length} instruments done (${elapsed}s elapsed)`);
-                resolve();
-            });
-
-            child.on('error', (err) => {
-                completed++;
-                console.error(`   ❌ ${instName} (${instKey}): ${err.message}`);
-                resolve();
-            });
-        });
-    }
-
-    // Simple concurrency: process instruments in batches of numWorkers
-    for (let i = 0; i < instKeys.length; i += numWorkers) {
-        const batch = instKeys.slice(i, i + numWorkers);
-        const batchPromises = batch.map(k => {
-            const inst = instrumentTasks.get(k);
+    async function runWorker() {
+        while (nextIdx < instKeys.length) {
+            const idx = nextIdx++;
+            const instKey = instKeys[idx];
+            const inst = instrumentTasks.get(instKey);
             const name = `${inst[0].split('_raw_ticks_')[0]} (${inst.length} files)`;
-            return runInstrument(k, name);
-        });
-        await Promise.all(batchPromises);
+
+            await new Promise((resolve) => {
+                const child = spawn('node', [scriptPath, 'run', instKey], {
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    env: { ...process.env, BACKTEST_WORKERS: '1' } // prevent recursion
+                });
+
+                child.stdout.on('data', d => process.stdout.write(`[${name}] ${d}`));
+                child.stderr.on('data', d => process.stderr.write(`[${name}] ${d}`));
+
+                child.on('close', (code) => {
+                    completed++;
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+                    if (code === 0) {
+                        console.log(`   ✅ [${completed}/${instKeys.length}] ${name}: done (${elapsed}s)`);
+                    } else {
+                        console.error(`   ❌ [${completed}/${instKeys.length}] ${name}: exit code ${code} (${elapsed}s)`);
+                    }
+                    resolve();
+                });
+
+                child.on('error', (err) => {
+                    completed++;
+                    console.error(`   ❌ ${name} (${instKey}): ${err.message}`);
+                    resolve();
+                });
+            });
+        }
     }
+
+    // Start numWorkers workers concurrently
+    const workers = [];
+    for (let i = 0; i < numWorkers; i++) {
+        workers.push(runWorker());
+    }
+    await Promise.all(workers);
 
     const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`\n✅ Done! ${instKeys.length} instruments in ${totalSec}s`);
@@ -1136,7 +1108,6 @@ async function cmdRunAllParallel() {
 async function cmdRunBrooksParallel() {
     const { spawn } = require('child_process');
     const os = require('os');
-    const numWorkers = Math.max(1, os.cpus().length - 1);
     const buildConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     const allTickFiles = fs.readdirSync(EXTRACTED_DIR).filter(f => f.toLowerCase().endsWith('.csv'));
 
@@ -1147,18 +1118,67 @@ async function cmdRunBrooksParallel() {
         return safe.substring(0, lastU) + '|' + safe.substring(lastU + 1);
     }))].filter(k => buildConfig.find(x => x.instrument_key === k));
 
-    console.log(`🚀 Parallel Brooks Run: ${instKeys.length} instruments.`);
+    // Sort instruments: lotMultiplier=1 first (slowest/critical for throughput)
+    // Instruments with larger lotMultiplier process less per tick (fewer bars) and finish faster
+    const sortedKeys = [...instKeys].sort((a, b) => {
+        const la = getLotMultiplier(a);
+        const lb = getLotMultiplier(b);
+        return la - lb; // lotMul=1 first (most work-intensive)
+    });
+
+    // Count files per instrument for logging
+    const instFileCounts = {};
+    for (const f of allTickFiles) {
+        const safe = f.split('_raw_ticks_')[0];
+        const lastU = safe.lastIndexOf('_');
+        const k = safe.substring(0, lastU) + '|' + safe.substring(lastU + 1);
+        instFileCounts[k] = (instFileCounts[k] || 0) + 1;
+    }
+
+    const numWorkers = parseInt(process.env.BACKTEST_WORKERS, 10) || Math.max(1, os.cpus().length - 1);
+    console.log(`🚀 Parallel Brooks Run: ${sortedKeys.length} instruments, ${numWorkers} workers.`);
+    console.log(`   Instruments sorted by lotMultiplier (1 first = most work-intensive first)`);
     const scriptPath = path.resolve(__dirname, 'backtesterAsLive.js');
 
-    for (let i = 0; i < instKeys.length; i += numWorkers) {
-        const batch = instKeys.slice(i, i + numWorkers);
-        await Promise.all(batch.map(instKey => {
-            return new Promise((resolve) => {
-                const child = spawn('node', [scriptPath, 'run', instKey, '--brooks-only'], { stdio: 'inherit' });
-                child.on('close', resolve);
+    // Dynamic worker pool: pick from queue instead of batch waiting
+    let totalCompleted = 0;
+    const startTime = Date.now();
+    let nextIdx = 0;
+    const active = new Set();
+
+    async function runWorker() {
+        while (nextIdx < sortedKeys.length) {
+            const idx = nextIdx++;
+            const instKey = sortedKeys[idx];
+            const lotMul = getLotMultiplier(instKey);
+            const fileCount = instFileCounts[instKey] || 0;
+
+            await new Promise((resolve) => {
+                const child = spawn('node', [scriptPath, 'run', instKey, '--brooks-only'], {
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    env: { ...process.env, BACKTEST_WORKERS: '1' }
+                });
+                child.stdout.on('data', d => process.stdout.write(`[W${active.size}/${numWorkers}][${instKey}] ${d}`));
+                child.stderr.on('data', d => process.stderr.write(`[W${active.size}/${numWorkers}][${instKey}] ${d}`));
+                child.on('close', () => {
+                    totalCompleted++;
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+                    console.log(`   ✅ [${totalCompleted}/${sortedKeys.length}] ${instKey} (lotMul=${lotMul}, ${fileCount} files, ${elapsed}s)`);
+                    resolve();
+                });
             });
-        }));
+        }
     }
+
+    // Start numWorkers workers concurrently
+    const workers = [];
+    for (let i = 0; i < numWorkers; i++) {
+        workers.push(runWorker());
+    }
+    await Promise.all(workers);
+
+    const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`\n✅ Done! ${sortedKeys.length} instruments in ${totalSec}s (${numWorkers} workers)`);
 }
 
 

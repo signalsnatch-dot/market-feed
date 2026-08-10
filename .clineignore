@@ -13,6 +13,9 @@ test-result-comparison*
 backtest_analysis_report.md
 volume-profiles.json
 latency-analysis-report.json
+brooksCoreEngine.js
+brooksPullbackStrategy.js
+brooksChapterStrategy.js
 
 # Data directories (all market data)
 market_data/
@@ -28,10 +31,10 @@ candle-versions/
 backtest-logs/
 compare-output/
 backtest-results/
-live-backtest-results/
-candles/
 .temp_version_report/
 .temp_live_report/
+venv/
+.roo/
 
 # Legacy data directories (if any)
 data/

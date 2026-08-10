@@ -13,6 +13,7 @@ test-result-comparison*
 backtest_analysis_report.md
 volume-profiles.json
 latency-analysis-report.json
+fixes-planned-as-per-book.md
 
 # Data directories (all market data)
 market_data/
@@ -34,6 +35,9 @@ live-backtest-results/
 candles/
 .temp_version_report/
 .temp_live_report/
+venv/
+.roo/
+al-brooks-bar-by-bar/
 
 # Legacy data directories (if any)
 data/

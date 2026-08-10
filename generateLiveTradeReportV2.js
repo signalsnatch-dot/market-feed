@@ -8,6 +8,13 @@
 const fs = require('fs');
 const path = require('path');
 
+// Import strategy version sets from the main strategy engine
+const { FLEX_STRATEGIES, STRATEGIES: TOP_10_ELITE_STRATEGIES } = require('./priceActionStrategyV2.js');
+
+// Derive strategy version lists from imported maps
+const flexStrategyVersions = Object.keys(FLEX_STRATEGIES).filter(k => typeof FLEX_STRATEGIES[k] === 'function');
+const eliteStrategyVersions = Object.keys(TOP_10_ELITE_STRATEGIES).filter(k => typeof TOP_10_ELITE_STRATEGIES[k] === 'function');
+
 // --- Configuration ---
 const OUTPUT_DIR = './live-performance-report';
 
@@ -27,12 +34,42 @@ console.log(`Report date: ${reportDate}`);
 // Convert DD/MM/YY → YYYY-MM-DD for the URL
 const dateParts = reportDate.split('/');
 const urlDate = `20${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-const DATA_URL = `http://13.201.36.159:8000/candles_data/signals_today_${urlDate}.json`;
+const DATA_URL = `http://3.110.195.197:8000/candles_data/signals_today_${urlDate}.json`;
 
 const startTime = '09:00';
 const endTime = '23:35';
 
-const versionRegex = /^V(\d+):/;
+const versionRegex = /^(V(\d+[A-Z]?):|ELITE_V(\d+[A-Z]?))/;
+
+// Helper: parse version string into numeric and suffix parts for stable sorting
+function parseVersionNum(v) {
+    // Try standard V-prefix format first
+    let m = v.match(/^V(\d+[A-Z]?):/);
+    if (m) {
+        const cap = m[1];
+        const num = parseInt(cap, 10);
+        const suffix = cap.replace(/^\d+/, '');
+        return { num, suffix };
+    }
+    // Try ELITE_ prefixed format: ELITE_V123A_N_LOOSE → map to base num + high offset
+    m = v.match(/^ELITE_V(\d+[A-Z]?)/);
+    if (m) {
+        const cap = m[1];
+        const num = 1000 + parseInt(cap, 10);
+        const suffix = 'E';
+        return { num, suffix };
+    }
+    return { num: 0, suffix: '' };
+}
+
+function compareVersions(a, b) {
+    const pa = parseVersionNum(a), pb = parseVersionNum(b);
+    if (pa.num !== pb.num) return pa.num - pb.num;
+    if (pa.suffix === '' && pb.suffix !== '') return -1;
+    if (pa.suffix !== '' && pb.suffix === '') return 1;
+    return pa.suffix.localeCompare(pb.suffix);
+}
+
 const MIN_TRADES = 1; // For live reports, show even single trades
 
 const INSTRUMENT_NAMES = {
@@ -40,36 +77,35 @@ const INSTRUMENT_NAMES = {
     'INE090A01021': 'ICICI Bank', 'INE062A01020': 'SBI', 'INE467B01029': 'TCS',
     'INE009A01021': 'Infosys (INFY)', 'INE154A01025': 'ITC', 'INE397D01024': 'Bharti Airtel',
     'INE238A01034': 'Axis Bank', 'INE018A01030': 'L&T', 'INE081A01020': 'Tata Steel',
-    'INE155A01022': 'Tata Motors', 'INE1TAE01010': 'Tata Motors (Cash)',
-    'INE296A01032': 'Bajaj Finance', 'INE237A01036': 'Kotak Bank', 'INE044A01036': 'Sun Pharma',
-    'INE019A01038': 'JSW Steel', 'INE522F01014': 'Coal India', 'INE423A01024': 'Adani Enterprises',
-    'INE742F01042': 'Adani Ports', 'INE038A01020': 'Hindalco', 'INE437A01024': 'Apollo Hospitals',
-    'INE160A01022': 'PNB', 'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON',
-    'INE928J01020': 'PAYTM', 'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC',
-    'INE202E01016': 'IREDA', 'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL',
-    'INE849A01020': 'TRENT',
-    '538685': 'Natural Gas Future', '538686': 'Natural Gas Mini Future',
-    '520702': 'Crude Oil Future', '520703': 'Crude Oil Mini Future',
-    '464150': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
+    'INE1TAE01010': 'Tata Motors (Cash)', 'INE296A01032': 'Bajaj Finance', 
+    'INE237A01036': 'Kotak Bank', 'INE044A01036': 'Sun Pharma', 'INE019A01038': 'JSW Steel', 
+    'INE522F01014': 'Coal India', 'INE423A01024': 'Adani Enterprises', 'INE742F01042': 'Adani Ports', 
+    'INE038A01020': 'Hindalco', 'INE437A01024': 'Apollo Hospitals', 'INE160A01022': 'PNB', 
+    'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON', 'INE928J01020': 'PAYTM', 
+    'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC', 'INE202E01016': 'IREDA', 
+    'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL', 'INE849A01020': 'TRENT',
+
+    // August MCX IDs
+    '561496': 'Natural Gas Future', '561497': 'Natural Gas Mini Future',
+    '555922': 'Crude Oil Future', '560977': 'Crude Oil Mini Future',
+    '471725': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
     '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
     '568830': 'Aluminium Future', '466583': 'Gold Future', '510764': 'Gold Mini Future',
-    '552721': 'Gold Petal Future',
-    '61093': 'Nifty 50 Future', '61088': 'Nifty Bank Future', '61091': 'Fin Nifty Future',
-    '61092': 'Midcap Nifty Future', '61284': 'Reliance Future', '61189': 'HDFC Bank Future',
-    '61197': 'ICICI Bank Future', '61289': 'SBI Future', '61304': 'TCS Future',
-    '61209': 'Infosys Future', '61216': 'ITC Future', '61127': 'Bharti Airtel Future',
-    '61114': 'Axis Bank Future', '61232': 'L&T Future', '61303': 'Tata Steel Future',
-    '61235': 'Tata Motors Future', '61118': 'Bajaj Finance Future', '61226': 'Kotak Bank Future',
-    '61296': 'Sun Pharma Future', '61220': 'JSW Steel Future', '61143': 'Coal India Future',
-    '61099': 'Adani Enterprises Future', '61101': 'Adani Ports Future', '61192': 'Hindalco Future',
-    '61108': 'Apollo Hospitals Future', '61274': 'PNB Future', '61286': 'SAIL Future',
-    '61298': 'SUZLON Future', '61265': 'PAYTM Future', '61285': 'RVNL Future',
-    '61215': 'IRFC Future', '61214': 'IREDA Future', '61128': 'BHEL Future',
-    '61170': 'GAIL Future', '61310': 'TRENT Future',
-    '552706': 'Aluminium (MCX)', '552709': 'Lead (MCX)', '552708': 'Copper (MCX)',
-    '552711': 'Zinc (MCX)', '464151': 'Silver Mini (MCX)', '477177': 'Silver Micro (MCX)',
-    '510464': 'Gold Petal (MCX)', '62329': 'Nifty 50', '62326': 'Bank Nifty',
-    '62327': 'Fin Nifty', '62328': 'Midcap Nifty'
+    '562056': 'Gold Petal Future',
+
+    // August NSE Index/Stock IDs
+    '58072': 'Nifty 50 Future', '58067': 'Nifty Bank Future', '58070': 'Fin Nifty Future',
+    '58071': 'Midcap Nifty Future', '58371': 'Reliance Future', '58216': 'HDFC Bank Future',
+    '58232': 'ICICI Bank Future', '58382': 'SBI Future', '58399': 'TCS Future',
+    '58245': 'Infosys Future', '58250': 'ITC Future', '58132': 'Bharti Airtel Future',
+    '58117': 'Axis Bank Future', '58298': 'L&T Future', '58398': 'Tata Steel Future',
+    '58403': 'Tata Motors Future', '58121': 'Bajaj Finance Future', '58277': 'Kotak Bank Future',
+    '58391': 'Sun Pharma Future', '58258': 'JSW Steel Future', '58148': 'Coal India Future',
+    '58088': 'Adani Enterprises Future', '58090': 'Adani Ports Future', '58225': 'Hindalco Future',
+    '58105': 'Apollo Hospitals Future', '58350': 'PNB Future', '58375': 'SAIL Future',
+    '58393': 'SUZLON Future', '58342': 'PAYTM Future', '58374': 'RVNL Future',
+    '58249': 'IRFC Future', '58248': 'IREDA Future', '58133': 'BHEL Future',
+    '58189': 'GAIL Future', '58405': 'TRENT Future'
 };
 
 function getInstrumentDisplayName(rawInstrument) {
@@ -85,6 +121,41 @@ function getFormattedTimestamp() {
 }
 
 function write(w, str) { w.write(str); }
+
+
+function normalizeTimestamp(ts) {
+    if (!ts) return null;
+    return ts < 99999999999 ? ts * 1000 : ts;
+}
+
+
+function timeToMinutes(timeStr) {
+    const [hh, mm] = timeStr.split(':').map(Number);
+    return hh * 60 + mm;
+}
+
+function isTimeInWindow(timestamp, startStr, endStr) {
+    const ms = normalizeTimestamp(timestamp);
+    if (!ms) return false;
+    
+    const date = new Date(ms);
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(date);
+    const hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+    const minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+    
+    const tradeMinutes = hour * 60 + minute;
+    const startMinutes = timeToMinutes(startStr);
+    const endMinutes = timeToMinutes(endStr);
+    
+    return tradeMinutes >= startMinutes && tradeMinutes <= endMinutes;
+}
+
 
 function computeMetricsRaw(arr) {
     const totalTrades = arr.length;
@@ -166,6 +237,11 @@ async function main() {
             const instrumentName = getInstrumentDisplayName(signal.instrument || signal.name || '');
             const threshold = signal.threshold || signal.volumePerBar || 'N/A';
             const barType = signal.bar_type || 'volume';
+
+            // Apply session time window filter aligned to IST
+            if (!isTimeInWindow(signal.timestamp, startTime, resolvedEndTime)) {
+                return;
+            }
 
             const trade = {
                 version: signal.version,
@@ -472,8 +548,7 @@ async function main() {
         write(cw, `### Section D.1: All Versions — Cumulative Cross-Instrument Metrics\n\n`);
         write(cw, `| Version | Instruments | Total Trades | Win Rate | Avg Return | Total Return |\n`);
         write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: |\n`);
-        const sortedBest = [...versionBest.entries()].sort((a, b) =>
-            parseInt(a[0].match(versionRegex)?.[1] || '0') - parseInt(b[0].match(versionRegex)?.[1] || '0'));
+        const sortedBest = [...versionBest.entries()].sort((a, b) => compareVersions(a[0], b[0]));
         for (const [ver, d] of sortedBest) {
             write(cw, `| ${ver} | ${d.instrumentsUsed} | ${d.totalTrades} | ${d.winRate.toFixed(1)}% | ${d.avgReturn >= 0 ? '+' : ''}${d.avgReturn.toFixed(2)}% | ${d.totalPnlPct >= 0 ? '+' : ''}${d.totalPnlPct.toFixed(2)}% |\n`);
         }

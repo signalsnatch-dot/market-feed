@@ -86,6 +86,7 @@ const NSE_EQ_INSTRUMENTS = new Set([
 ]);
 
 function getLotMultiplier(instKey) {
+    console.log(instKey);
     if (!instKey) return 1;
     // Attempt to read from current config.json first (the file you just shared)
     try {
@@ -93,10 +94,12 @@ function getLotMultiplier(instKey) {
         const i = cfg.instruments?.find(x => x.key === instKey);
         // Important: Use lotSize if it's explicitly defined in config
          if (i && i.lotSize !== undefined) return i.lotSize;
-    } catch (e) { /* fallback */ }
+    } catch (e) { 
+        console.log("error" + e);
+        /* fallback */ }
 
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
-
+    console.log("Taking from lot multipler" +  id);
     return LOT_MULTIPLIERS[id] || 1;
 }
 
@@ -196,7 +199,7 @@ async function getAccessToken() {
 async function fetchDailyCandles(instKey, accessToken) {
     const toDate = new Date().toISOString().split('T')[0];
     const fromDateObj = new Date();
-    fromDateObj.setDate(fromDateObj.getDate() - 90);
+    fromDateObj.setDate(fromDateObj.getDate() - 50);
     const fromDate = fromDateObj.toISOString().split('T')[0];
     const encodedKey = encodeURIComponent(instKey);
     const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${accessToken}` };
@@ -312,7 +315,7 @@ function getDayOfWeek(dateIso) {
 }
 
 // ─── Volume projection (enhanced) ───────────────────────────
-function projectVolumeEnhanced(values, dates, volumeProfile) {
+function projectVolumeEnhanced(values, dates, volumeProfile, targetDateIso) {
     const recent = values.slice(-LOOKBACK);
     const recentDates = dates.slice(-LOOKBACK);
     const median = rollingMedian(recent);
@@ -333,15 +336,13 @@ function projectVolumeEnhanced(values, dates, volumeProfile) {
 
     // 3. Day-of-week adjustment
     if (volumeProfile && volumeProfile.dayOfWeekFactor) {
-        const today = getTodayISO();
-        const dow = getDayOfWeek(today);
+        const dow = getDayOfWeek(targetDateIso);
         const dowFactor = volumeProfile.dayOfWeekFactor[dow] || 1.0;
         baseProjection *= dowFactor;
     }
 
     // 4. Expiry day adjustment
-    const today = getTodayISO();
-    if (isExpiryDay(today, '')) {
+    if (isExpiryDay(targetDateIso, '')) {
         baseProjection *= 1.25; // 25% volume spike on expiry
     }
 
@@ -501,7 +502,9 @@ async function processInstrumentPremarket(instKey, instName, accessToken, volume
         if (!dateKey || !dateIso) continue;
 
         const windowVolumes = dailyVolumesLots.slice(i - LOOKBACK, i);
-        const projectedVol = projectVolumeEnhanced(windowVolumes, dates.slice(i - LOOKBACK, i), volumeProfiles);
+        
+        const projectedVol = projectVolumeEnhanced(windowVolumes, dates.slice(i - LOOKBACK, i), volumeProfiles, dateIso);
+    
         const avgVol = windowVolumes.reduce((a, b) => a + b, 0) / windowVolumes.length;
         const tier = getLiquidityTier(avgVol);
         const thresholds = generateThresholds(projectedVol, tier);

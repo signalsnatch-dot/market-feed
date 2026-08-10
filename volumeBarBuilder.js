@@ -413,9 +413,13 @@ class VolumeBarBuilder extends EventEmitter {
             try {
                 const tickSize = this.tickSizeMap.get(bar.instrument_key) || 0.05;
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
-                
+                 const strategyParams = { 
+                    tickSize, 
+                    instrument_key: bar.instrument_key 
+                };
+
                 for (const [versionName, strategyFn] of Object.entries(STRATEGIES)) {
-                    const signals = strategyFn(strategyCandles, { tickSize });
+                    const signals = strategyFn(strategyCandles, strategyParams);
                     if (signals && signals.length > 0) {
                         const latestSignal = signals[signals.length - 1];
                         if (latestSignal.index === strategyCandles.length - 1) {

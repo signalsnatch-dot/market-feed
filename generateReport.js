@@ -18,7 +18,33 @@ const RESULTS_DIR = IS_LIVE ? './live-backtest-results' : './version-backtest-re
 const OUTPUT_DIR = './version-backtest-report';
 const TEMP_DIR = IS_LIVE ? './.temp_live_report' : './.temp_version_report';
 
-const versionRegex = /^V(\d+):/;
+const versionRegex = /^(?:ELITE_)?V(\d+[A-Z]?)/;
+
+// Helper: parse version string into numeric and suffix parts for stable sorting
+function parseVersionNum(v) {
+    const m = v.match(versionRegex);
+    if (!m) return { num: 0, suffix: '' };
+    const cap = m[1];
+    const num = parseInt(cap, 10);
+    const suffix = cap.replace(/^\d+/, '');
+    return { num, suffix };
+}
+
+// Compare two version strings: numeric ascending, then letter variants sort after non-letter
+function compareVersions(a, b) {
+    const pa = parseVersionNum(a), pb = parseVersionNum(b);
+    if (pa.num !== pb.num) return pa.num - pb.num;
+    if (pa.suffix === '' && pb.suffix !== '') return -1;
+    if (pa.suffix !== '' && pb.suffix === '') return 1;
+    return pa.suffix.localeCompare(pb.suffix);
+}
+
+// Check if a version string matches a plain numeric version (no letter suffix)
+function versionNumPlain(v, num) {
+    const p = parseVersionNum(v);
+    return p.num === num && p.suffix === '';
+}
+
 const workersIdx = process.argv.findIndex((a, i) => a === '--workers' && process.argv[i + 1]);
 const NUM_WORKERS = workersIdx !== -1 ? parseInt(process.argv[workersIdx + 1], 10) : Math.max(1, os.cpus().length - 1);
 
@@ -60,36 +86,31 @@ const INSTRUMENT_NAMES = {
     'INE090A01021': 'ICICI Bank', 'INE062A01020': 'SBI', 'INE467B01029': 'TCS',
     'INE009A01021': 'Infosys (INFY)', 'INE154A01025': 'ITC', 'INE397D01024': 'Bharti Airtel',
     'INE238A01034': 'Axis Bank', 'INE018A01030': 'L&T', 'INE081A01020': 'Tata Steel',
-    'INE155A01022': 'Tata Motors', 'INE1TAE01010': 'Tata Motors (Cash)',
-    'INE296A01032': 'Bajaj Finance', 'INE237A01036': 'Kotak Bank', 'INE044A01036': 'Sun Pharma',
-    'INE019A01038': 'JSW Steel', 'INE522F01014': 'Coal India', 'INE423A01024': 'Adani Enterprises',
-    'INE742F01042': 'Adani Ports', 'INE038A01020': 'Hindalco', 'INE437A01024': 'Apollo Hospitals',
-    'INE160A01022': 'PNB', 'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON',
-    'INE928J01020': 'PAYTM', 'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC',
-    'INE202E01016': 'IREDA', 'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL',
-    'INE849A01020': 'TRENT',
-    '538685': 'Natural Gas Future', '538686': 'Natural Gas Mini Future',
-    '520702': 'Crude Oil Future', '520703': 'Crude Oil Mini Future',
-    '464150': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
+    'INE1TAE01010': 'Tata Motors (Cash)', 'INE296A01032': 'Bajaj Finance', 
+    'INE237A01036': 'Kotak Bank', 'INE044A01036': 'Sun Pharma', 'INE019A01038': 'JSW Steel', 
+    'INE522F01014': 'Coal India', 'INE423A01024': 'Adani Enterprises', 'INE742F01042': 'Adani Ports', 
+    'INE038A01020': 'Hindalco', 'INE437A01024': 'Apollo Hospitals', 'INE160A01022': 'PNB', 
+    'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON', 'INE928J01020': 'PAYTM', 
+    'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC', 'INE202E01016': 'IREDA', 
+    'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL', 'INE849A01020': 'TRENT',
+    '561496': 'Natural Gas Future', '561497': 'Natural Gas Mini Future',
+    '555922': 'Crude Oil Future', '560977': 'Crude Oil Mini Future',
+    '471725': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
     '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
     '568830': 'Aluminium Future', '466583': 'Gold Future', '510764': 'Gold Mini Future',
-    '552721': 'Gold Petal Future',
-    '61093': 'Nifty 50 Future', '61088': 'Nifty Bank Future', '61091': 'Fin Nifty Future',
-    '61092': 'Midcap Nifty Future', '61284': 'Reliance Future', '61189': 'HDFC Bank Future',
-    '61197': 'ICICI Bank Future', '61289': 'SBI Future', '61304': 'TCS Future',
-    '61209': 'Infosys Future', '61216': 'ITC Future', '61127': 'Bharti Airtel Future',
-    '61114': 'Axis Bank Future', '61232': 'L&T Future', '61303': 'Tata Steel Future',
-    '61235': 'Tata Motors Future', '61118': 'Bajaj Finance Future', '61226': 'Kotak Bank Future',
-    '61296': 'Sun Pharma Future', '61220': 'JSW Steel Future', '61143': 'Coal India Future',
-    '61099': 'Adani Enterprises Future', '61101': 'Adani Ports Future', '61192': 'Hindalco Future',
-    '61108': 'Apollo Hospitals Future', '61274': 'PNB Future', '61286': 'SAIL Future',
-    '61298': 'SUZLON Future', '61265': 'PAYTM Future', '61285': 'RVNL Future',
-    '61215': 'IRFC Future', '61214': 'IREDA Future', '61128': 'BHEL Future',
-    '61170': 'GAIL Future', '61310': 'TRENT Future',
-    '552706': 'Aluminium (MCX)', '552709': 'Lead (MCX)', '552708': 'Copper (MCX)',
-    '552711': 'Zinc (MCX)', '464151': 'Silver Mini (MCX)', '477177': 'Silver Micro (MCX)',
-    '510464': 'Gold Petal (MCX)', '62329': 'Nifty 50', '62326': 'Bank Nifty',
-    '62327': 'Fin Nifty', '62328': 'Midcap Nifty'
+    '562056': 'Gold Petal Future',
+    '58072': 'Nifty 50 Future', '58067': 'Nifty Bank Future', '58070': 'Fin Nifty Future',
+    '58071': 'Midcap Nifty Future', '58371': 'Reliance Future', '58216': 'HDFC Bank Future',
+    '58232': 'ICICI Bank Future', '58382': 'SBI Future', '58399': 'TCS Future',
+    '58245': 'Infosys Future', '58250': 'ITC Future', '58132': 'Bharti Airtel Future',
+    '58117': 'Axis Bank Future', '58298': 'L&T Future', '58398': 'Tata Steel Future',
+    '58403': 'Tata Motors Future', '58121': 'Bajaj Finance Future', '58277': 'Kotak Bank Future',
+    '58391': 'Sun Pharma Future', '58258': 'JSW Steel Future', '58148': 'Coal India Future',
+    '58088': 'Adani Enterprises Future', '58090': 'Adani Ports Future', '58225': 'Hindalco Future',
+    '58105': 'Apollo Hospitals Future', '58350': 'PNB Future', '58375': 'SAIL Future',
+    '58393': 'SUZLON Future', '58342': 'PAYTM Future', '58374': 'RVNL Future',
+    '58249': 'IRFC Future', '58248': 'IREDA Future', '58133': 'BHEL Future',
+    '58189': 'GAIL Future', '58405': 'TRENT Future'
 };
 
 function getInstrumentDisplayName(rawInstrument) {
@@ -108,12 +129,13 @@ function getFormattedTimestamp() {
 
 function deriveMetrics(d) {
     const count = d.count || 0;
-    if (count === 0) return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0 };
+    if (count === 0) return { totalTrades: 0, winRate: 0, totalReturn: 0, avgReturn: 0, avgMafe: 0, avgMae: 0, avgRRR: 0 };
     const winRate = (d.wins / count) * 100;
     const avgReturn = d.sumPnl / count;
     const avgMafe = d.sumMafe / count;
     const avgMae = d.sumMae / count;
-    return { totalTrades: count, winRate, totalReturn: d.sumPnl, avgReturn, avgMafe, avgMae };
+    const avgRRR = d.sumRRR != null ? d.sumRRR / count : 0;
+    return { totalTrades: count, winRate, totalReturn: d.sumPnl, avgReturn, avgMafe, avgMae, avgRRR };
 }
 
 // ── Phase 1: Parallel aggregation via worker processes ──
@@ -235,10 +257,10 @@ async function collectAggregatedData() {
             merged.L1_mae[key] = (merged.L1_mae[key] || 0) + val;
         }
 
-        // Merge L2: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumConfidence}
+        // Merge L2: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumRRR, sumConfidence}
         for (const [key, val] of Object.entries(data.L2 || {})) {
             if (!merged.L2[key]) {
-                merged.L2[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumConfidence: 0 };
+                merged.L2[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumRRR: 0, sumConfidence: 0 };
             }
             merged.L2[key].count += val.count;
             merged.L2[key].wins += val.wins;
@@ -246,13 +268,14 @@ async function collectAggregatedData() {
             merged.L2[key].sumPnlAmount += val.sumPnlAmount || 0;
             merged.L2[key].sumMafe += val.sumMafe || 0;
             merged.L2[key].sumMae += val.sumMae || 0;
+            merged.L2[key].sumRRR += val.sumRRR || 0;
             merged.L2[key].sumConfidence += val.sumConfidence || 0;
         }
 
-        // Merge L3: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae}
+        // Merge L3: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumRRR}
         for (const [key, val] of Object.entries(data.L3 || {})) {
             if (!merged.L3[key]) {
-                merged.L3[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0 };
+                merged.L3[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumRRR: 0 };
             }
             merged.L3[key].count += val.count;
             merged.L3[key].wins += val.wins;
@@ -260,6 +283,7 @@ async function collectAggregatedData() {
             merged.L3[key].sumPnlAmount += val.sumPnlAmount || 0;
             merged.L3[key].sumMafe += val.sumMafe || 0;
             merged.L3[key].sumMae += val.sumMae || 0;
+            merged.L3[key].sumRRR += val.sumRRR || 0;
         }
 
         // Merge L3_candle: (version, instrument, candleBucket) → {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae}
@@ -452,11 +476,7 @@ async function generateReport(merged) {
         dates.add(parts[3]);
     }
 
-    const uniqueVersions = [...versionSet].sort((a, b) => {
-        const na = parseInt(a.match(versionRegex)?.[1] || '0', 10);
-        const nb = parseInt(b.match(versionRegex)?.[1] || '0', 10);
-        return na - nb;
-    });
+    const uniqueVersions = [...versionSet].sort(compareVersions);
     const uniqueInstruments = [...instruments].sort();
     const uniqueDates = [...dates].sort();
 
@@ -493,12 +513,13 @@ async function generateReport(merged) {
     // Version rankings
     const versionRankings = uniqueVersions.map(v => {
         const entries = _l2ByVersion.get(v) || [];
-        let count = 0, wins = 0, sumPnl = 0, sumMafe = 0, sumMae = 0;
+        let count = 0, wins = 0, sumPnl = 0, sumMafe = 0, sumMae = 0, sumRRR = 0;
         for (const d of entries) {
             count += d.count; wins += d.wins; sumPnl += d.sumPnl;
             sumMafe += d.sumMafe; sumMae += d.sumMae;
+            sumRRR += d.sumRRR || 0;
         }
-        return { name: v, totalTrades: count, winRate: count ? (wins / count) * 100 : 0, totalReturn: sumPnl, avgReturn: count ? sumPnl / count : 0, avgMafe: count ? sumMafe / count : 0, avgMae: count ? sumMae / count : 0 };
+        return { name: v, totalTrades: count, winRate: count ? (wins / count) * 100 : 0, totalReturn: sumPnl, avgReturn: count ? sumPnl / count : 0, avgMafe: count ? sumMafe / count : 0, avgMae: count ? sumMae / count : 0, avgRRR: count ? sumRRR / count : 0 };
     });
 
     const top3 = [...versionRankings].sort((a, b) => b.totalReturn - a.totalReturn).slice(0, 3);
@@ -519,10 +540,10 @@ async function generateReport(merged) {
         const vEntries = _l2ByVersion.get(v) || [];
         if (vEntries.length === 0) continue;
 
-        let vCount = 0, vWins = 0, vSumPnl = 0, vSumMafe = 0, vSumMae = 0;
+        let vCount = 0, vWins = 0, vSumPnl = 0, vSumMafe = 0, vSumMae = 0, vSumRRR = 0;
         for (const d of vEntries) {
             vCount += d.count; vWins += d.wins; vSumPnl += d.sumPnl;
-            vSumMafe += d.sumMafe; vSumMae += d.sumMae;
+            vSumMafe += d.sumMafe; vSumMae += d.sumMae; vSumRRR += d.sumRRR || 0;
         }
 
         write(w, `### **${v}**\n`);
@@ -531,21 +552,22 @@ async function generateReport(merged) {
         write(w, `*   **Cumulative Total Return:** ${vSumPnl >= 0 ? '+' : ''}${vSumPnl.toFixed(2)}%\n`);
         write(w, `*   **Cumulative Avg. Return per Trade:** ${(vSumPnl / vCount) >= 0 ? '+' : ''}${(vSumPnl / vCount).toFixed(3)}%\n`);
         write(w, `*   **Cumulative Average MAFE:** ${(vSumMafe / vCount).toFixed(2)}%\n`);
-        write(w, `*   **Cumulative Average MAE:** ${(vSumMae / vCount).toFixed(2)}%\n\n`);
+        write(w, `*   **Cumulative Average MAE:** ${(vSumMae / vCount).toFixed(2)}%\n`);
+        write(w, `*   **Cumulative Average RRR:** ${vCount ? (vSumRRR / vCount).toFixed(2) : '0.00'}\n\n`);
 
         const pairMap = new Map();
         for (const d of vEntries) {
             const parts = d.key.split('|');
             const pair = `${parts[1]} (Threshold ${parts[2]})`;
-            if (!pairMap.has(pair)) pairMap.set(pair, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 });
+            if (!pairMap.has(pair)) pairMap.set(pair, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0, sumRRR: 0 });
             const e = pairMap.get(pair);
-            e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae;
+            e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae; e.sumRRR += d.sumRRR || 0;
         }
 
         write(w, `#### **Asset & Threshold Breakdowns for ${v}**\n`);
         for (const [pair, pc] of [...pairMap].sort()) {
             write(w, `##### **${pair}**\n`);
-            write(w, `*   **Cumulative:** ${pc.count} Trades | Win Rate: ${((pc.wins / pc.count) * 100).toFixed(2)}% | Return: ${pc.sumPnl >= 0 ? '+' : ''}${pc.sumPnl.toFixed(2)}% | MAFE: ${(pc.sumMafe / pc.count).toFixed(1)}% | MAE: ${(pc.sumMae / pc.count).toFixed(1)}%\n\n`);
+            write(w, `*   **Cumulative:** ${pc.count} Trades | Win Rate: ${((pc.wins / pc.count) * 100).toFixed(2)}% | Return: ${pc.sumPnl >= 0 ? '+' : ''}${pc.sumPnl.toFixed(2)}% | MAFE: ${(pc.sumMafe / pc.count).toFixed(1)}% | MAE: ${(pc.sumMae / pc.count).toFixed(1)}% | Avg RRR: ${pc.count ? (pc.sumRRR / pc.count).toFixed(2) : '0.00'}\n\n`);
         }
         write(w, `---\n\n`);
 
@@ -611,27 +633,23 @@ async function generateReport(merged) {
             write(w, `*   **Average MAE:** ${tc ? (tma / tc).toFixed(2) : '0.00'}%\n\n`);
 
             write(w, `##### **Strategy Version Performance under Threshold ${th}**\n`);
-            write(w, `| Strategy Version | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % |\n`);
-            write(w, `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+            write(w, `| Strategy Version | Trades | Win Rate % | Total Return % | Avg Return % | Avg MAFE % | Avg MAE % | Avg RRR |\n`);
+            write(w, `| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
 
             const tvMap = new Map();
             for (const d of thEntries) {
                 const parts = d.key.split('|');
                 const ver = parts[0];
-                if (!tvMap.has(ver)) tvMap.set(ver, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0 });
+                if (!tvMap.has(ver)) tvMap.set(ver, { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0, sumRRR: 0 });
                 const e = tvMap.get(ver);
-                e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae;
+                e.count += d.count; e.wins += d.wins; e.sumPnl += d.sumPnl; e.sumMafe += d.sumMafe; e.sumMae += d.sumMae; e.sumRRR += d.sumRRR || 0;
             }
 
-            const sv = [...tvMap.entries()].sort((a, b) => {
-                const na = parseInt(a[0].match(versionRegex)?.[1] || '0');
-                const nb = parseInt(b[0].match(versionRegex)?.[1] || '0');
-                return na - nb;
-            });
+            const sv = [...tvMap.entries()].sort((a, b) => compareVersions(a[0], b[0]));
 
             for (const [ver, vd] of sv) {
                 const m = deriveMetrics(vd);
-                write(w, `| **${ver}** | ${m.totalTrades} | ${m.winRate.toFixed(2)}% | ${m.totalReturn >= 0 ? '+' : ''}${m.totalReturn.toFixed(2)}% | ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}% | ${m.avgMafe.toFixed(1)}% | ${m.avgMae.toFixed(1)}% |\n`);
+                write(w, `| **${ver}** | ${m.totalTrades} | ${m.winRate.toFixed(2)}% | ${m.totalReturn >= 0 ? '+' : ''}${m.totalReturn.toFixed(2)}% | ${m.avgReturn >= 0 ? '+' : ''}${m.avgReturn.toFixed(3)}% | ${m.avgMafe.toFixed(1)}% | ${m.avgMae.toFixed(1)}% | ${m.avgRRR.toFixed(2)} |\n`);
             }
             write(w, `\n`);
         }
@@ -1128,13 +1146,12 @@ function generateCompactSummaryStream(merged, cw) {
 
     for (let origV = 1; origV <= 50; origV++) {
         const origEntry = [...versionBest.entries()].find(([k]) => {
-            const vn = parseInt(k.match(versionRegex)?.[1]);
-            return vn === origV && !k.includes('(Original)');
+            return versionNumPlain(k, origV) && !k.includes('(Original)');
         });
         if (!origEntry) continue;
         for (const batch of BATCH_OFFSETS) {
             const cloneV = origV + batch.offset;
-            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
+            const cloneEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, cloneV));
             if (!cloneEntry) continue;
             const o = origEntry[1], c = cloneEntry[1];
             if (o.totalTrades < MIN_TRADES || c.totalTrades < MIN_TRADES) continue;
@@ -1155,11 +1172,11 @@ function generateCompactSummaryStream(merged, cw) {
         { offset: 12, label: "Exit Mgmt" },
     ];
     for (const origV of brooksOrig) {
-        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === origV);
+        const origEntry = [...versionBest.entries()].find(([k]) => parseVersionNum(k).num === origV && parseVersionNum(k).suffix === '');
         if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
         for (const batch of brooksBatchOffsets) {
             const cloneV = 851 + batch.offset + (origV - 851);
-            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
+            const cloneEntry = [...versionBest.entries()].find(([k]) => parseVersionNum(k).num === cloneV && parseVersionNum(k).suffix === '');
             if (!cloneEntry || cloneEntry[1].totalTrades < MIN_TRADES) continue;
             const o = origEntry[1], c = cloneEntry[1];
             write(cw, `| V${origV} | ${batch.label} | ${origEntry[0]} | ${o.winRate.toFixed(1)}% | ${o.avgReturn >= 0 ? '+' : ''}${o.avgReturn.toFixed(2)}% | ${cloneEntry[0]} | ${c.winRate.toFixed(1)}% | ${c.avgReturn >= 0 ? '+' : ''}${c.avgReturn.toFixed(2)}% | ${(c.winRate - o.winRate) >= 0 ? '+' : ''}${(c.winRate - o.winRate).toFixed(1)}% | ${(c.avgReturn - o.avgReturn) >= 0 ? '+' : ''}${(c.avgReturn - o.avgReturn).toFixed(2)}% |\n`);
@@ -1180,11 +1197,10 @@ function generateCompactSummaryStream(merged, cw) {
         const deltas = [];
         for (let origV = 1; origV <= 50; origV++) {
             const origEntry = [...versionBest.entries()].find(([k]) => {
-                const vn = parseInt(k.match(versionRegex)?.[1]);
-                return vn === origV && !k.includes('(Original)');
+                return versionNumPlain(k, origV) && !k.includes('(Original)');
             });
             const fixV = baseVersion + origV - 1;
-            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            const fixEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, fixV));
             if (origEntry && fixEntry) {
                 const o = origEntry[1], f = fixEntry[1];
                 if (o.totalTrades >= MIN_TRADES && f.totalTrades >= MIN_TRADES) {
@@ -1204,9 +1220,7 @@ function generateCompactSummaryStream(merged, cw) {
     write(cw, `### Section D.1: All Versions — Cumulative Cross-Instrument Metrics (Best P-Value Per Instrument)\n\n`);
     write(cw, `| Version | Instruments | Total Trades | Win Rate | Avg Return | Total Return | Best P-Values |\n`);
     write(cw, `| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
-    const sortedBest = [...versionBest.entries()].sort((a, b) =>
-        parseInt(a[0].match(versionRegex)?.[1] || '0') - parseInt(b[0].match(versionRegex)?.[1] || '0')
-    );
+    const sortedBest = [...versionBest.entries()].sort((a, b) => compareVersions(a[0], b[0]));
     for (const [ver, d] of sortedBest) {
         const vCombos = versionCumulativeP.get(ver);
         const bestPVals = [];
@@ -1417,7 +1431,7 @@ function generateCompactSummaryStream(merged, cw) {
     ];
 
     for (const base of BROOKS_BASES) {
-        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === base.v);
+        const origEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, base.v));
         if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
         write(cw, `### ${base.name} (V${base.v}) — Batch Profile Impact\n\n`);
         write(cw, `| Profile | Version | WR | Avg Ret | Total Trades | WR Δ vs Base |\n`);
@@ -1427,7 +1441,7 @@ function generateCompactSummaryStream(merged, cw) {
 
         for (const bo of brooksBatchOffsets) {
             const cloneV = 851 + bo.offset + (base.v - 851);
-            const cloneEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === cloneV);
+            const cloneEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, cloneV));
             if (!cloneEntry || cloneEntry[1].totalTrades < MIN_TRADES) continue;
             const c = cloneEntry[1];
             write(cw, `| ${bo.label} | V${cloneV} | ${c.winRate.toFixed(1)}% | ${c.avgReturn >= 0 ? '+' : ''}${c.avgReturn.toFixed(2)}% | ${c.totalTrades} | ${(c.winRate - o.winRate) >= 0 ? '+' : ''}${(c.winRate - o.winRate).toFixed(1)}% |\n`);
@@ -1441,14 +1455,14 @@ function generateCompactSummaryStream(merged, cw) {
     write(cw, `| :--- | :--- | :--- | :---: | :---: | :---: | :---: |\n`);
 
     for (const base of BROOKS_BASES) {
-        const origEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === base.v);
+        const origEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, base.v));
         if (!origEntry || origEntry[1].totalTrades < MIN_TRADES) continue;
         const o = origEntry[1];
 
         for (let fixIdx = 0; fixIdx < FIX_ORDER.length; fixIdx++) {
             // Brooks fix versions start at 854 (Structural Pure), 855 (Volume-Opt), 856 (Selective) for fix 0
             const fixV = 854 + fixIdx * 3 + (base.v - 851);
-            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            const fixEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, fixV));
             if (!fixEntry || fixEntry[1].totalTrades < MIN_TRADES) continue;
             const f = fixEntry[1];
             write(cw, `| ${base.name} | ${FIX_LABELS[FIX_ORDER[fixIdx]]} | V${fixV} | ${f.winRate.toFixed(1)}% | ${f.avgReturn >= 0 ? '+' : ''}${f.avgReturn.toFixed(2)}% | ${f.totalTrades} | ${(f.winRate - o.winRate) >= 0 ? '+' : ''}${(f.winRate - o.winRate).toFixed(1)}% |\n`);
@@ -1531,8 +1545,8 @@ function generateCompactSummaryStream(merged, cw) {
     write(cw, `## Section G: Best Version+Threshold Per Instrument (Top 3 by Win Rate)\n\n`);
     write(cw, `*Performance grouped by raw threshold value — the actual volume bar threshold to use in live trading.*\n`);
     write(cw, `*Note: Same threshold produces consistent candle counts across dates. Use this to configure volume bars.*\n\n`);
-    write(cw, `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Trades |\n`);
-    write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
+    write(cw, `| Instrument | Rank | Version | Threshold | Win Rate | Avg Return | Total Return | MAFE | MAE | Avg RRR | Trades |\n`);
+    write(cw, `| :--- | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`);
 
     const instThrCombos = new Map();
     for (const [key, d] of Object.entries(L3 || {})) {
@@ -1550,7 +1564,7 @@ function generateCompactSummaryStream(merged, cw) {
         const top3 = combos.slice(0, 3);
         top3.forEach((v, idx) => {
             const thDisplay = pIdxToThreshold.get(`${inst}|${v.threshold}`) || v.threshold;
-            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${thDisplay} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.trades} |\n`);
+            write(cw, `| ${inst} | #${idx + 1} | ${v.version} | ${thDisplay} | ${v.winRate.toFixed(1)}% | ${v.avgReturn >= 0 ? '+' : ''}${v.avgReturn.toFixed(2)}% | ${v.totalReturn >= 0 ? '+' : ''}${v.totalReturn.toFixed(2)}% | ${v.avgMafe.toFixed(0)}% | ${v.avgMae.toFixed(0)}% | ${v.avgRRR.toFixed(2)} | ${v.trades} |\n`);
         });
     }
     write(cw, `\n`);
@@ -1566,11 +1580,10 @@ function generateCompactSummaryStream(merged, cw) {
         const baseVersion = 251 + fixIdx * 50;
         for (let origV = 1; origV <= 50; origV++) {
             const origEntry = [...versionBest.entries()].find(([k]) => {
-                const vn = parseInt(k.match(versionRegex)?.[1]);
-                return vn === origV && !k.includes('(Original)');
+                return versionNumPlain(k, origV) && !k.includes('(Original)');
             });
             const fixV = baseVersion + origV - 1;
-            const fixEntry = [...versionBest.entries()].find(([k]) => parseInt(k.match(versionRegex)?.[1]) === fixV);
+            const fixEntry = [...versionBest.entries()].find(([k]) => versionNumPlain(k, fixV));
             if (origEntry && fixEntry) {
                 const o = origEntry[1], f = fixEntry[1];
                 if (o.totalTrades >= MIN_TRADES && f.totalTrades >= MIN_TRADES) {

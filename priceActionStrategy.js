@@ -1863,6 +1863,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100)
                     : 0;
 
+                const rrr = initialSlDist > 0 ? parseFloat((initialTpDist / initialSlDist).toFixed(2)) : 0;
+
                 trades.push({
                     entryIndex: position.entryIndex,
                     exitIndex: i,
@@ -1879,6 +1881,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                     mafePercentage: parseFloat(mafePercentage.toFixed(2)),
                     maePrice: position.worstPrice,
                     maePercentage: parseFloat(maePercentage.toFixed(2)),
+                    rrr,
                     metadata: position.metadata
                 });
 
@@ -1992,6 +1995,8 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             ? Math.max(0, (Math.abs(position.entry - position.worstPrice) / initialSlDist) * 100)
                             : 0;
 
+                        const rrr = initialSlDist > 0 ? parseFloat((initialTpDist / initialSlDist).toFixed(2)) : 0;
+
                         trades.push({
                             entryIndex: position.entryIndex,
                             exitIndex: i,
@@ -2008,6 +2013,7 @@ function runPriceActionBacktest(candles, signals = [], initialCapital = 100000, 
                             mafePercentage: parseFloat(mafePercentage.toFixed(2)),
                             maePrice: position.worstPrice,
                             maePercentage: parseFloat(maePercentage.toFixed(2)),
+                            rrr,
                             metadata: position.metadata
                         });
 
