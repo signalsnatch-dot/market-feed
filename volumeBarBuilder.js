@@ -7,6 +7,7 @@ const { STRATEGIES } = require('./priceActionStrategyV2');
 class VolumeBarBuilder extends EventEmitter {
     constructor(config) {
         super();
+        this.liveActiveSignals = new Map(); // key: version_threshold -> lastSignalBarNumber
         this.instrumentConfigs = config.instruments;
         this.activeBars = new Map();
         this.completedBars = [];
@@ -15,7 +16,6 @@ class VolumeBarBuilder extends EventEmitter {
         this.tickSizeMap = new Map();
         this.instrumentTargetsMap = new Map();
         this.instrumentLotSizeMap = new Map();
-        this.liveActiveSignals = new Map(); // key: version_threshold -> lastSignalBarNumber
 
         
         this.dataDir = config.directories?.candlesDataDir || './candles_data/volume_bars';
@@ -427,6 +427,7 @@ class VolumeBarBuilder extends EventEmitter {
                         if (latestSignal.index === strategyCandles.length - 1) {
                             const signalKey = `${versionName}_${bar.targetVolume}`;
                             const activeSignalBar = this.liveActiveSignals.get(signalKey);
+                            if (!this.liveActiveSignals) this.liveActiveSignals = new Map(); 
 
                             // 1. ENFORCE N+1 RULE: If the previous signal bar is older than N-1, it's expired.
                             // (If bar is 102, and last signal was 100, that signal is dead)

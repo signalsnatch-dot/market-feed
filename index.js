@@ -59,8 +59,19 @@ candleBuilder.on('trade_signal', (signal) => {
 candleBuilder.on('trade_status_update', (update) => {
     if (update.status === 'completed' || update.status === 'cancelled') {
         const signalKey = `${update.version}_${update.threshold}`;
-        candleBuilder.volumeBarBuilder.liveActiveSignals.delete(signalKey);
+
+        const vBuilder = candleBuilder.volumeBuilder || candleBuilder.volumeBarBuilder;
+        if (vBuilder && vBuilder.liveActiveSignals && vBuilder.liveActiveSignals.has(signalKey)) {
+            vBuilder.liveActiveSignals.delete(signalKey);
+        }
+        /*
+        // Also remove from priceBarBuilder if applicable
+        const pBuilder = candleBuilder.priceBuilder || candleBuilder.priceBarBuilder;
+        if (pBuilder && pBuilder.liveActiveSignals && pBuilder.liveActiveSignals.has(signalKey)) {
+            pBuilder.liveActiveSignals.delete(signalKey);
+        } */
     }
+
     chartServer.broadcastTradeStatusUpdate(update);
 });
 // Real-time progress monitoring
@@ -134,13 +145,15 @@ process.on('SIGINT', () => {
     }
     
     // Save state layers dynamically to prevent restart gaps
-    if (candleBuilder.priceBarBuilder && typeof candleBuilder.priceBarBuilder.saveActiveState === 'function') {
-        candleBuilder.priceBarBuilder.saveActiveState();
-    }
-    if (candleBuilder.volumeBarBuilder && typeof candleBuilder.volumeBarBuilder.saveActiveState === 'function') {
-        candleBuilder.volumeBarBuilder.saveActiveState();
-    }
     
+    const vBuilder = candleBuilder.volumeBuilder || candleBuilder.volumeBarBuilder;
+    if (vBuilder && typeof vBuilder.saveActiveState === 'function') {
+        vBuilder.saveActiveState();
+    }
+    const pBuilder = candleBuilder.priceBuilder || candleBuilder.priceBarBuilder;
+    if (pBuilder && typeof pBuilder.saveActiveState === 'function') {
+        pBuilder.saveActiveState();
+    }
     feed.stop();
     console.log('Feeder connections disconnected cleanly. Exiting.');
     process.exit(0);
