@@ -2414,7 +2414,7 @@ const TIERS = {
 };
 
 const FLEX_STRATEGIES = {};
-const PROD_BASES = ["V945A", "V935A", "V125A", "V925A"];
+const PROD_BASES = ["V945A", "V935A", "V125A", "V925A", "V20A", "V955A", "V124A"];
 
 Object.keys(FINAL_STRATEGIES).forEach(baseKey => {
     const isTarget = PROD_BASES.some(t => baseKey.startsWith(t));
