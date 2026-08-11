@@ -15,6 +15,8 @@ class VolumeBarBuilder extends EventEmitter {
         this.tickSizeMap = new Map();
         this.instrumentTargetsMap = new Map();
         this.instrumentLotSizeMap = new Map();
+        this.liveActiveSignals = new Map(); // key: version_threshold -> lastSignalBarNumber
+
         
         this.dataDir = config.directories?.candlesDataDir || './candles_data/volume_bars';
         this.rawDataDir = config.directories?.rawDataDir || './raw_ticks_data';
@@ -30,8 +32,8 @@ class VolumeBarBuilder extends EventEmitter {
             totalVolume: 0,
             totalBars: 0,
             barsByInstrument: new Map()
-        };
-        
+        };    
+
         this.initializeBars();
         this.loadHistoryFromCSV();
         this.loadActiveState();
@@ -423,8 +425,28 @@ class VolumeBarBuilder extends EventEmitter {
                     if (signals && signals.length > 0) {
                         const latestSignal = signals[signals.length - 1];
                         if (latestSignal.index === strategyCandles.length - 1) {
-                            if (bar.lastSignalBarNumbers[versionName] !== bar.barNumber) {
+                            const signalKey = `${versionName}_${bar.targetVolume}`;
+                            const activeSignalBar = this.liveActiveSignals.get(signalKey);
+
+                            // 1. ENFORCE N+1 RULE: If the previous signal bar is older than N-1, it's expired.
+                            // (If bar is 102, and last signal was 100, that signal is dead)
+                            if (activeSignalBar && bar.barNumber > activeSignalBar + 1) {
+                                this.liveActiveSignals.delete(signalKey);
+                                // Optional: emit a cancel event to your execution engine
+                                this.emit('trade_status_update', { 
+                                    version: versionName, 
+                                    threshold: bar.targetVolume, 
+                                    status: 'cancelled', 
+                                    reason: 'Brooks N+1 Timeout' 
+                                });
+                            }
+
+                            // 2. ENFORCE STATE GATE: Only emit if no signal is currently active
+                            // This prevents "Stacking" of the same setup across multiple bars
+                            if (bar.lastSignalBarNumbers[versionName] !== bar.barNumber && !this.liveActiveSignals.has(signalKey)) {
                                 bar.lastSignalBarNumbers[versionName] = bar.barNumber;
+                                this.liveActiveSignals.set(signalKey, bar.barNumber);
+
                                 
                                 let confidence = 50;
                                 const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
