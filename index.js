@@ -54,24 +54,41 @@ candleBuilder.on('bar_close', (bar) => {
 candleBuilder.on('trade_signal', (signal) => {
     chartServer.broadcastTradeSignal(signal);
 });
+// index.js
 
-// FIX: Add missing forwarder to bridge trade status changes (Pending -> Active -> Completed/Cancelled)
 candleBuilder.on('trade_status_update', (update) => {
-    if (update.status === 'completed' || update.status === 'cancelled') {
-        const signalKey = `${update.version}_${update.threshold}`;
+    // 1. Terminal state check
+    const isTerminal = ['completed', 'cancelled', 'expired'].includes(update.status);
+    const isActive = update.status === 'active';
 
-        const vBuilder = candleBuilder.volumeBuilder || candleBuilder.volumeBarBuilder;
-        if (vBuilder && vBuilder.liveActiveSignals && vBuilder.liveActiveSignals.has(signalKey)) {
-            vBuilder.liveActiveSignals.delete(signalKey);
+    if (isActive || isTerminal) {
+        const signalKey = `${update.version}_${update.threshold}`;
+        
+        // Define builder pointers
+        const vBuilder = candleBuilder.volumeBarBuilder || candleBuilder.volumeBuilder;
+        //const pBuilder = candleBuilder.priceBarBuilder || candleBuilder.priceBuilder;
+
+        // Update Volume Builder state
+        if (vBuilder && vBuilder.liveActiveSignals) {
+            if (isActive) {
+                vBuilder.liveActiveSignals.set(signalKey, 999999); // Lock from N+1 expiry
+            } else {
+                vBuilder.liveActiveSignals.delete(signalKey); // Release lock for next setup
+            }
         }
         /*
-        // Also remove from priceBarBuilder if applicable
-        const pBuilder = candleBuilder.priceBuilder || candleBuilder.priceBarBuilder;
-        if (pBuilder && pBuilder.liveActiveSignals && pBuilder.liveActiveSignals.has(signalKey)) {
-            pBuilder.liveActiveSignals.delete(signalKey);
-        } */
+        // Update Price Builder state
+        if (pBuilder && pBuilder.liveActiveSignals) {
+            if (isActive) {
+                pBuilder.liveActiveSignals.set(signalKey, 999999);
+            } else {
+                pBuilder.liveActiveSignals.delete(signalKey);
+            }
+        }
+        */  
     }
 
+    // Always broadcast to the chart server
     chartServer.broadcastTradeStatusUpdate(update);
 });
 // Real-time progress monitoring

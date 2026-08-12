@@ -400,7 +400,7 @@ class VolumeBarBuilder extends EventEmitter {
         this.saveActiveState();
         this.emit('bar_close', completedBar);
         
-        console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${bar.barNumber} (Threshold: ${bar.targetVolume})`);
+        console.log(`\n✅ [VOLUME BAR] COMPLETED: ${bar.name} - Bar #${completedBar.barNumber} (Threshold: ${bar.targetVolume})`);
         
         const strategyCandles = bar.bars.map(b => ({
             open: b.open,
@@ -415,7 +415,9 @@ class VolumeBarBuilder extends EventEmitter {
             try {
                 const tickSize = this.tickSizeMap.get(bar.instrument_key) || 0.05;
                 if (!bar.lastSignalBarNumbers) bar.lastSignalBarNumbers = {};
-                 const strategyParams = { 
+                if (!this.liveActiveSignals) this.liveActiveSignals = new Map(); 
+
+                const strategyParams = { 
                     tickSize, 
                     instrument_key: bar.instrument_key 
                 };
@@ -426,33 +428,35 @@ class VolumeBarBuilder extends EventEmitter {
                         const latestSignal = signals[signals.length - 1];
                         if (latestSignal.index === strategyCandles.length - 1) {
                             const signalKey = `${versionName}_${bar.targetVolume}`;
-                            const activeSignalBar = this.liveActiveSignals.get(signalKey);
-                            if (!this.liveActiveSignals) this.liveActiveSignals = new Map(); 
+                            const lastActiveBar = this.liveActiveSignals.get(signalKey);
 
-                            // 1. ENFORCE N+1 RULE: If the previous signal bar is older than N-1, it's expired.
-                            // (If bar is 102, and last signal was 100, that signal is dead)
-                            if (activeSignalBar && bar.barNumber > activeSignalBar + 1) {
+                            // 1. ENFORCE N+1 RULE (Brooks Expiry)
+                            // If current bar is > signal bar + 1, and the trade isn't 'Active' (999999), it's dead.
+                            if (lastActiveBar && lastActiveBar !== 999999 && completedBar.barNumber > lastActiveBar + 1) {
                                 this.liveActiveSignals.delete(signalKey);
-                                // Optional: emit a cancel event to your execution engine
                                 this.emit('trade_status_update', { 
                                     version: versionName, 
-                                    threshold: bar.targetVolume, 
+                                    instrument: bar.instrument_key,
+                                    threshold: bar.targetVolume,
+                                    barNumber: lastActiveBar,
                                     status: 'cancelled', 
-                                    reason: 'Brooks N+1 Timeout' 
+                                    exitReason: 'Brooks N+1 Timeout' 
                                 });
+                                // If it still meets strategy criteria, we allow a fresh signal to be created below
                             }
 
-                            // 2. ENFORCE STATE GATE: Only emit if no signal is currently active
-                            // This prevents "Stacking" of the same setup across multiple bars
-                            if (bar.lastSignalBarNumbers[versionName] !== bar.barNumber && !this.liveActiveSignals.has(signalKey)) {
-                                bar.lastSignalBarNumbers[versionName] = bar.barNumber;
-                                this.liveActiveSignals.set(signalKey, bar.barNumber);
+                            // 2. STATE GATE (Prevent Stacking)
+                            // If we are already pending or in an active trade for this version/threshold, skip.
+                            if (this.liveActiveSignals.has(signalKey)) {
+                                continue; 
+                            }
 
-                                
-                                let confidence = 50;
-                                const confMatch = latestSignal.reason.match(/Conf:\s*(\d+)/i);
-                                if (confMatch) confidence = parseInt(confMatch[1]);
-                                
+                            // 3. EMIT NEW SIGNAL
+                            if (bar.lastSignalBarNumbers[versionName] !== completedBar.barNumber) {
+                                bar.lastSignalBarNumbers[versionName] = completedBar.barNumber;
+                                this.liveActiveSignals.set(signalKey, completedBar.barNumber);
+
+                                let confidence = latestSignal.confidence || 50;
                                 const signalEvent = {
                                     version: versionName, 
                                     instrument: bar.instrument_key,
@@ -462,11 +466,12 @@ class VolumeBarBuilder extends EventEmitter {
                                     sl: latestSignal.stopLoss,
                                     tp: latestSignal.takeProfit,
                                     confidence: confidence,
-                                    reason: latestSignal.reason.replace('Conf:', 'Volume, Conf:'),
+                                    reason: latestSignal.reason.includes('Volume') ? latestSignal.reason : latestSignal.reason.replace('Conf:', 'Volume, Conf:'),
                                     timestamp: completedBar.timestamp,
-                                    barNumber: bar.barNumber,
+                                    barNumber: completedBar.barNumber,
                                     bar_type: 'volume',
-                                    threshold: bar.targetVolume
+                                    threshold: bar.targetVolume,
+                                    status: 'pending'
                                 };
                                 this.emit('trade_signal', signalEvent);
                             }
@@ -474,7 +479,7 @@ class VolumeBarBuilder extends EventEmitter {
                     }
                 }
             } catch (err) {
-                console.error(`Error processing signals:`, err.message);
+                console.error(`Error processing signals for ${bar.name}:`, err.message);
             }
         }
         
