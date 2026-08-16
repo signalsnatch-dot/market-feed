@@ -56,7 +56,7 @@ jobs:
             pm2 start index.js --name market-feed --node-args="--env-file=.env"
             
             # Start chart server separately
-            pm2 start chartServer.js --name chart-server --node-args="--env-file=.env"
+            #pm2 start chartServer.js --name chart-server --node-args="--env-file=.env"
             
             # Save PM2 configuration
             pm2 save
