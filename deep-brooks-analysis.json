@@ -1,0 +1,30 @@
+{
+  "scanDate": "2026-07-28T21:08:34.476Z",
+  "totalLosersExamined": 14147,
+  "tradesWithNewPatterns": 2045,
+  "newPatternCounts": {
+    "measured_move_target": 1759,
+    "spike_zone_entry": 273,
+    "barb_wire_cluster": 29
+  },
+  "sortedPatterns": [
+    {
+      "pattern": "measured_move_target",
+      "count": 1759,
+      "pctOfAllLosers": "12.4",
+      "pctOfMatched": "86.0"
+    },
+    {
+      "pattern": "spike_zone_entry",
+      "count": 273,
+      "pctOfAllLosers": "1.9",
+      "pctOfMatched": "13.3"
+    },
+    {
+      "pattern": "barb_wire_cluster",
+      "count": 29,
+      "pctOfAllLosers": "0.2",
+      "pctOfMatched": "1.4"
+    }
+  ]
+}
