@@ -169,13 +169,34 @@ function formatDateISO(dateVal) {
 }
 
 function getTodayKey(dateVal) {
-    const today = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : dateVal) : new Date();
-    return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getFullYear()).slice(-2)}`;
+    // 1. Create date from argument or current time
+    const d = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : new Date(Number(dateVal))) : new Date();
+    
+    // 2. Add 5.5 hours to convert UTC timestamp to IST-equivalent window
+    const istMs = d.getTime() + (5.5 * 60 * 60 * 1000);
+    const istDate = new Date(istMs);
+    
+    // 3. Extract components using getUTC to avoid local server time interference
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const year = String(istDate.getUTCFullYear()).slice(-2);
+    
+    return `${day}/${month}/${year}`;
 }
 
 function getTodayISO(dateVal) {
-    const today = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : dateVal) : new Date();
-    return today.toISOString().split('T')[0];
+    const d = dateVal ? (typeof dateVal === 'string' ? new Date(dateVal) : new Date(Number(dateVal))) : new Date();
+    
+    const istMs = d.getTime() + (5.5 * 60 * 60 * 1000);
+    const istDate = new Date(istMs);
+    
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    
+    const isoStr = `${year}-${month}-${day}`;
+    //console.log(`[DATE DEBUG] Input: ${dateVal || 'NOW'} -> IST ISO: ${isoStr}`);
+    return isoStr;
 }
 
 // ─── Auth ────────────────────────────────────────────────────
@@ -226,7 +247,7 @@ async function fetchDailyCandles(instKey, accessToken) {
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-async function fetchIntradayCandles(instKey, accessToken, interval = '30minute', dateIso = null) {
+async function fetchIntradayCandles(instKey, accessToken, interval = '1minute', dateIso = null) {
     const toDate = dateIso || getTodayISO();
     const fromDate = toDate;
     const encodedKey = encodeURIComponent(instKey);
@@ -235,50 +256,28 @@ async function fetchIntradayCandles(instKey, accessToken, interval = '30minute',
     // Try multiple URL formats since MCX and NSE may differ.
     // Upstox uses different segment identifiers in paths for different exchanges.
     // Also try alternative date format (IN timezone) if needed.
+    const activeInterval = (MODE === 'adjust-10am') ? '1minute' : interval;
+
 
     const todayIST = toDate; // already in YYYY-MM-DD
     // For intraday, some API endpoints need fromDate < toDate (not equal)
     const yesterdayIST = new Date();
     yesterdayIST.setDate(yesterdayIST.getDate() - 1);
     const fromDateAlt = yesterdayIST.toISOString().split('T')[0];
-
     const urls = [
-        // v2 with same from/to
-        `https://api.upstox.com/v2/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDate}`,
-        // v3 with same from/to
-        `https://api.upstox.com/v3/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDate}`,
-        // v2 with yesterday as from date (some APIs need from < to)
-        `https://api.upstox.com/v2/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDateAlt}`,
-        // v3 with yesterday as from date
-        `https://api.upstox.com/v3/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDateAlt}`,
+        `https://api.upstox.com/v2/historical-candle/${encodedKey}/${activeInterval}/${toDate}/${fromDate}`,
+        `https://api.upstox.com/v2/historical-candle/${encodedKey}/${activeInterval}/${toDate}`
     ];
 
-    // For profile mode (non-today dates), try more variants
-    if (dateIso) {
-        urls.unshift(
-            `https://api.upstox.com/v2/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDateAlt}`,
-            `https://api.upstox.com/v3/historical-candle/${encodedKey}/${interval}/${toDate}/${fromDateAlt}`,
-        );
-    }
-
-    let lastError = null;
     for (const url of urls) {
         try {
-            const resp = await axios.get(url, { headers, timeout: 15000 });
+            const resp = await axios.get(url, { headers, timeout: 10000 });
             if (resp.data?.status === 'success' && Array.isArray(resp.data.data?.candles)) {
                 return resp.data.data.candles;
             }
-            lastError = `status=${resp.data?.status}, code=${resp.status}`;
-        } catch (e) {
-            lastError = e.response?.status ? `HTTP ${e.response.status}` : e.message;
-        }
+        } catch (e) { /* try next url */ }
     }
-    // Log the last attempt for debugging
-    if (lastError) {
-        const shortName = instKey.includes('|') ? instKey.split('|').slice(1).join('|') : instKey;
-        console.log(`  ℹ️ ${shortName}: intraday fetch failed (${lastError}) — tried ${urls.length} URL formats`);
-    }
-    return null; // Return null — caller handles gracefully
+    return null;
 }
 
 // ─── Math helpers ───────────────────────────────────────────
@@ -473,7 +472,7 @@ async function buildDayOfWeekProfile(instKey, accessToken) {
 }
 
 // ─── Per-instrument processing (premarket) ──────────────────
-async function processInstrumentPremarket(instKey, instName, accessToken, volumeProfiles) {
+async function processInstrumentPremarket(instKey, instName, accessToken, volumeProfile) {
     console.log(`\n📊 ${instName} (${instKey})`);
 
     let candlesRaw;
@@ -503,7 +502,7 @@ async function processInstrumentPremarket(instKey, instName, accessToken, volume
 
         const windowVolumes = dailyVolumesLots.slice(i - LOOKBACK, i);
         
-        const projectedVol = projectVolumeEnhanced(windowVolumes, dates.slice(i - LOOKBACK, i), volumeProfiles, dateIso);
+        const projectedVol = projectVolumeEnhanced(windowVolumes, dates.slice(i - LOOKBACK, i), volumeProfile, dateIso);
     
         const avgVol = windowVolumes.reduce((a, b) => a + b, 0) / windowVolumes.length;
         const tier = getLiquidityTier(avgVol);
@@ -517,7 +516,7 @@ async function processInstrumentPremarket(instKey, instName, accessToken, volume
 
     // Today's projection
     const recentVolumes = dailyVolumesLots.slice(-LOOKBACK);
-    const todayProjectedVol = projectVolumeEnhanced(recentVolumes, dates.slice(-LOOKBACK), volumeProfiles);
+    const todayProjectedVol = projectVolumeEnhanced(recentVolumes, dates.slice(-LOOKBACK), volumeProfile, getTodayISO());
     const todayAvgVol = recentVolumes.reduce((a, b) => a + b, 0) / recentVolumes.length;
     const todayTier = getLiquidityTier(todayAvgVol);
     const todayThresholds = generateThresholds(todayProjectedVol, todayTier);
@@ -537,6 +536,7 @@ async function processInstrumentPremarket(instKey, instName, accessToken, volume
         daily_bar_estimates: dailyBarEstimates,
         volume_history: volumeHistory.slice(-LOOKBACK),
         projected_vol_lots: todayProjectedVol,
+        volume_profile: volumeProfile,
         last_updated: new Date().toISOString(),
         recommended_ratios: ratios,
     };
@@ -545,34 +545,29 @@ async function processInstrumentPremarket(instKey, instName, accessToken, volume
 // ─── Per-instrument processing (10am adjustment) ────────────
 async function adjustInstrumentAt10am(instKey, instName, accessToken, existingEntry) {
     const lotMul = getLotMultiplier(instKey);
-    const intradayCandles = await fetchIntradayCandles(instKey, accessToken);
-    if (!intradayCandles || intradayCandles.length < 2) {
-        console.log(`  ⚠️ ${instName}: No intraday data yet`);
+    const candles = await fetchIntradayCandles(instKey, accessToken);
+    if (!candles || candles.length < 10) {
+        console.log(`  ⚠️ ${instName}: Insufficient intraday data (got ${candles?.length || 0} mins)`);
         return null;
     }
 
-    // First 2 candles = ~1h (9:15-10:15)
-    const firstHourRawVol = intradayCandles.slice(0, 2).reduce((s, c) => s + (Number(c[5]) || 0), 0);
+    // Sum volume for the first 60 minutes of the session
+    const firstHourRawVol = candles.slice(0, 60).reduce((s, c) => s + (Number(c[5]) || 0), 0);
     const firstHourLots = firstHourRawVol / lotMul;
 
     const profile = existingEntry.volume_profile || {};
-    const firstHourPct = profile.firstHourPct || 0.12; // default ~12%
+    const firstHourPct = profile.firstHourPct || 0.14; 
     const projectedFull = firstHourLots / firstHourPct;
 
-    // Compare to current estimate
     const currentThresholds = existingEntry.static_thresholds || [];
     const currentProjected = existingEntry.projected_vol_lots || projectedFull;
-    const { should, deviation, newThresholds } = shouldAdjust(projectedFull, currentThresholds, projectedFull);
-
-    console.log(`  📊 ${instName}: 1h=${firstHourLots.toLocaleString()} lots (${(firstHourPct*100).toFixed(0)}% expected) → projected=${Math.round(projectedFull).toLocaleString()} (deviation: ${(deviation*100).toFixed(1)}%)`);
+    const { should, deviation } = shouldAdjust(projectedFull, currentThresholds, projectedFull);
 
     if (should) {
-        // Cap adjustment
         const cappedProjection = currentProjected + Math.min(Math.max(projectedFull - currentProjected, -currentProjected * ADJUSTMENT_CAP), currentProjected * ADJUSTMENT_CAP);
         const tier = getLiquidityTier(cappedProjection);
         const cappedThresholds = generateThresholds(Math.round(cappedProjection), tier);
-        logAdjustment(instKey, instName, `10am: 1h=${Math.round(firstHourLots)} lots, dev=${(deviation*100).toFixed(0)}%`, currentThresholds, cappedThresholds, currentProjected, Math.round(cappedProjection));
-
+        
         return {
             newThresholds: cappedThresholds,
             newProjectedVol: Math.round(cappedProjection),
@@ -580,7 +575,6 @@ async function adjustInstrumentAt10am(instKey, instName, accessToken, existingEn
             deviation, reason: '10am_adjustment',
         };
     }
-
     return { noChange: true };
 }
 
@@ -791,13 +785,19 @@ async function main() {
                 }
             } catch (e) { /* ignore */ }
             if (profile) {
-                profiles[inst.key] = { ...profile, dayOfWeekFactor: dowFactors || {} };
-                console.log(`  ✅ 1h pct: ${(profile.firstHourPct*100).toFixed(1)}% (heuristic) | dailyVol: ~${Math.round(profile.totalVol).toLocaleString()} lots | DOW: ${JSON.stringify(dowFactors)}`);
+                const fullProfile = { ...profile, dayOfWeekFactor: dowFactors || {} };
+                profiles[inst.key] = fullProfile;
+
+                // SYNC build-version-config immediately
+                const buildIdx = buildConfig.findIndex(c => c.instrument_key === inst.key);
+                if (buildIdx !== -1) buildConfig[buildIdx].volume_profile = fullProfile;
             } else {
                 console.log(`  ⚠️ No daily data available`);
             }
         }
         fs.writeFileSync(VOLUME_PROFILE_PATH, JSON.stringify(profiles, null, 2));
+        fs.writeFileSync(BUILD_CONFIG_PATH, JSON.stringify(buildConfig, null, 2));
+
         console.log(`\n📄 Wrote volume-profiles.json (${Object.keys(profiles).length} instruments)`);
         return;
     }
@@ -805,24 +805,28 @@ async function main() {
     // ─── MODE: premarket ─────────────────────────────────────
     if (MODE === 'premarket') {
         const newBuildConfig = [];
+        const cutoffDate = new Date();
         let adjustedCount = 0;
+        cutoffDate.setDate(cutoffDate.getDate() - 30);
         for (const inst of instruments) {
-            const entry = await processInstrumentPremarket(inst.key, inst.name, accessToken, volumeProfiles[inst.key]);
+            const authorityProfile = volumeProfiles[inst.key] || null;
+            const entry = await processInstrumentPremarket(inst.key, inst.name, accessToken, authorityProfile);
             if (!entry) {
                 const existing = buildConfig.find(c => c.instrument_key === inst.key);
                 if (existing) newBuildConfig.push(existing);
                 continue;
             }
-
-            // Attach volume profile if available
-            if (volumeProfiles[inst.key]) entry.volume_profile = volumeProfiles[inst.key];
-
             const existing = buildConfig.find(c => c.instrument_key === entry.instrument_key);
             const merged = { ...entry };
             if (existing) {
                 if (existing.thresholds && typeof existing.thresholds === 'object') {
-                    for (const [k, v] of Object.entries(existing.thresholds)) {
-                        if (!merged.thresholds[k]) merged.thresholds[k] = Array.isArray(v) ? v : existing.static_thresholds;
+                    for (const [dateKey, v] of Object.entries(existing.thresholds)) {
+                        const parts = dateKey.split('/');
+                        const d = new Date(2000 + parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        // Pruning + Preservation of actuals
+                        if (d >= cutoffDate && !merged.thresholds[dateKey]) {
+                            merged.thresholds[dateKey] = v;
+                        }                    
                     }
                 }
             }
@@ -926,93 +930,46 @@ async function main() {
     }
 
     // ─── MODE: update-day ────────────────────────────────────
-    if (MODE === 'update-day') {
-        // Parse target date
+     if (MODE === 'update-day') {
         let targetDateObj;
         if (UPDATE_DAY) {
-            // UPDATE_DAY is in DD/MM/YY format — parse it
             const parts = UPDATE_DAY.split('/');
-            if (parts.length === 3) {
-                const d = parseInt(parts[0], 10);
-                const m = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-                const y = parseInt(parts[2], 10) + 2000;
-                targetDateObj = new Date(y, m, d);
-            } else {
-                console.error('❌ Invalid date format. Use DD/MM/YY (e.g., 05/08/26)');
-                process.exit(1);
-            }
+            targetDateObj = new Date(2000 + parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
         } else {
-            // Default to yesterday
             targetDateObj = new Date();
             targetDateObj.setDate(targetDateObj.getDate() - 1);
         }
 
-        if (isNaN(targetDateObj.getTime())) {
-            console.error('❌ Invalid date provided. Use DD/MM/YY format (e.g., 05/08/26)');
-            process.exit(1);
-        }
-
         const targetKey = getTodayKey(targetDateObj);
-        const targetIso = getTodayISO(targetDateObj);
-
-        // Validate: target *must* be a completed day (not today, not in the future)
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (targetDateObj >= todayStart) {
-            console.error('❌ Target day must be a completed past day (today or future not allowed)');
-            process.exit(1);
-        }
-
-        console.log(`\n📅 Updating thresholds for completed day: ${targetKey} (${targetIso})`);
-        console.log(`   (Using actual completed candle data, not projections)\n`);
+        console.log(`\n📅 Recording ACTUALS for: ${targetKey}`);
 
         let updatedCount = 0;
-        let skippedCount = 0;
 
         for (const inst of instruments) {
             const existing = buildConfig.find(c => c.instrument_key === inst.key);
-            if (!existing) {
-                console.log(`  ⚠️ ${inst.name}: No existing entry in build-version-config, skipping`);
-                skippedCount++;
-                continue;
+            if (!existing) continue;
+
+            const result = await updateInstrumentDay(inst.key, inst.name, accessToken, existing, targetDateObj, volumeProfiles[inst.key]);
+
+            if (result) {
+                if (!existing.thresholds) existing.thresholds = {};
+                
+                // ONLY update the history map. 
+                // DO NOT touch existing.static_thresholds or existing.projected_vol_lots
+                existing.thresholds[targetKey] = result.thresholds;
+                
+                // Log the volume into history if provided
+                if (result.volume_history) {
+                    existing.volume_history = result.volume_history;
+                }
+                updatedCount++;
             }
-
-            const result = await updateInstrumentDay(
-                inst.key, inst.name, accessToken, existing, targetDateObj, volumeProfiles[inst.key]
-            );
-
-            if (!result) {
-                skippedCount++;
-                continue;
-            }
-
-            // Update the specific day entry in the thresholds map
-            if (!existing.thresholds || typeof existing.thresholds !== 'object') {
-                existing.thresholds = {};
-            }
-
-            // CRITICAL: Replace the entry for this day with the actual computed thresholds
-            existing.thresholds[targetKey] = result.thresholds;
-
-            // Also update static_thresholds if this was the most recent completed day
-            // (we generally keep static as today's, but record the actual in history)
-            // We also update the volume_history and other metadata
-            existing.projected_vol_lots = result.projected_vol_lots;
-            existing.daily_bar_estimates = result.dailyBarEstimates;
-            if (result.volume_history) {
-                existing.volume_history = result.volume_history;
-            }
-            existing.last_updated = new Date().toISOString();
-            existing.recommended_ratios = result.recommended_ratios;
-
-            updatedCount++;
         }
 
-        // Write updated configs
+        // SAVE ONLY to build-version-config.json
+        // DO NOT save to config.json (Live config should stay as Premarket/Adjusted)
         fs.writeFileSync(BUILD_CONFIG_PATH, JSON.stringify(buildConfig, null, 2));
-        console.log(`\n📄 Updated build-version-config.json`);
-
-        console.log(`\n✅ Update-day completed: ${updatedCount} instruments updated, ${skippedCount} skipped`);
+        console.log(`\n✅ Update-day completed: ${updatedCount} historical entries recorded.`);
         return;
     }
 }
