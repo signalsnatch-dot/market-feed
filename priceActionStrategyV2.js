@@ -2489,22 +2489,27 @@ const TOP_10_ELITE_STRATEGIES = {
     "ELITE_V935A_TIER_HIGH": (c, p) => FINAL_STRATEGIES["V935A: Wade Structural (Structural-Calibrated) (ATR Floor + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, pivotConfirmationBars: 1, adxThreshold: 14, atrStopMultiplier: 0.35, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25, normalizedSlope: 0.015 })
 };
 
+// 1. Define the shorthand aliases to point to your base Elite strategies
+const ELITE_U = TOP_10_ELITE_STRATEGIES["ELITE_V945A_S_ULTRA"];
+const ELITE_L = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"];
+const ELITE_T = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"];
+const ELITE_H = TOP_10_ELITE_STRATEGIES["ELITE_V935A_TIER_HIGH"];
 
-
+// 2. Now the mapping will work without the "undefined" error
 const ELITE_META_VERSIONS = {
     // 3. Stealth Only (Floor 0)
     "ELITE_R3_ULTRA_STEALTH": (c, p) => metaUtils.filterSignals("RULE_3", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
-    // 4. Stealth + 125 Equal (Sync uses Potential Reward/Risk)
+    // 4. Stealth + 125 Equal
     "ELITE_R4_STEALTH_SYNC": (c, p) => metaUtils.filterSignals("RULE_4", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
-    // 5. Stealth + 935 Veto (Heavy Consensus)
+    // 5. Stealth + 935 Veto
     "ELITE_R5_STEALTH_VETO": (c, p) => metaUtils.filterSignals("RULE_5", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
     // 6. Stealth + Equal + Veto
     "ELITE_R6_STEALTH_SYNC_VETO": (c, p) => metaUtils.filterSignals("RULE_6", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
-    // 7. Perfect Protocol (Floor 0 + Absorption Veto)
+    // 7. Perfect Protocol (Floor 0)
     "ELITE_R7_PERFECT": (c, p) => metaUtils.filterSignals("RULE_7", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
     // 8. High Tier Stealth Only (Floor 0)
@@ -2513,16 +2518,15 @@ const ELITE_META_VERSIONS = {
     // 9. Dual Stealth (Ultra + HT - Floor 0)
     "ELITE_R9_DUAL_STEALTH": (c, p) => metaUtils.filterSignals("RULE_9", ELITE_U(c, p), [], [], ELITE_H(c, p)),
     
-    // 10. Powerhouse (Rule 7 + HT Stealth - Floor 0)
+    // 10. Powerhouse (Floor 0)
     "ELITE_R10_POWERHOUSE": (c, p) => metaUtils.filterSignals("RULE_10", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p)),
     
-    // 11. Perfect With Floor (Rule 7 + Config Floor)
+    // 11. Perfect With Floor (Rule 7 logic + Config Floor)
     "ELITE_R11_PERFECT_WITH_FLOOR": (c, p) => metaUtils.filterSignals("RULE_11", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p)),
     
-    // 12. Powerhouse With Floor (Rule 10 + Config Floor)
+    // 12. Powerhouse With Floor (Rule 10 logic + Config Floor)
     "ELITE_R12_POWERHOUSE_WITH_FLOOR": (c, p) => metaUtils.filterSignals("RULE_12", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p))
 };
-
 
 const ALL_STRATEGIES = {
     ...TOP_10_ELITE_STRATEGIES,
