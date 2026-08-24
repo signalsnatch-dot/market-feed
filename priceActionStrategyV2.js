@@ -19,6 +19,7 @@
 
 const original = require('./priceActionStrategy');
 const brooksChapterStrategy = require('./brooksChapterStrategy');
+const metaUtils = require('./elite-strategy');
 
 
 // ============================================================
@@ -2488,9 +2489,40 @@ const TOP_10_ELITE_STRATEGIES = {
     "ELITE_V935A_TIER_HIGH": (c, p) => FINAL_STRATEGIES["V935A: Wade Structural (Structural-Calibrated) (ATR Floor + ADX Filter) (No Traps)"](c, { ...p, ...PROD_GUARDRAILS, pivotConfirmationBars: 1, adxThreshold: 14, atrStopMultiplier: 0.35, emaTouchRatioV2: 0.25, doubleTopBottomToleranceRatioV2: 0.25, normalizedSlope: 0.015 })
 };
 
+
+const META_ELITE_STRATEGIES = {
+    /**
+     * ELITE_PERFECT_RULE_7 
+     * Continuous monitoring of S_ULTRA vs (Loose + Trend)
+     */
+    "ELITE_PERFECT_RULE_7": (c, p) => {
+        const ultra = TOP_10_ELITE_STRATEGIES["ELITE_V945A_S_ULTRA"](c, p);
+        const loose = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"](c, p);
+        const trend = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"](c, p);
+        
+        return metaUtils.filterSignals("ELITE_PERFECT_RULE_7", ultra, loose, trend);
+    },
+
+    /**
+     * ELITE_POWERHOUSE_RULE_10
+     * Perfect + High Tier Stealth Monitoring
+     */
+    "ELITE_POWERHOUSE_RULE_10": (c, p) => {
+        const ultra = TOP_10_ELITE_STRATEGIES["ELITE_V945A_S_ULTRA"](c, p);
+        const loose = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"](c, p);
+        const trend = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"](c, p);
+        const ht = TOP_10_ELITE_STRATEGIES["ELITE_V935A_TIER_HIGH"](c, p);
+        
+        return metaUtils.filterSignals("ELITE_POWERHOUSE_RULE_10", ultra, loose, trend, ht);
+    }
+};
+
+
 const ALL_STRATEGIES = {
     ...FLEX_STRATEGIES,
-    ...TOP_10_ELITE_STRATEGIES
+    ...TOP_10_ELITE_STRATEGIES,
+    ...META_ELITE_STRATEGIES // New Meta-Strategies now listed here
+
 };
 
 
