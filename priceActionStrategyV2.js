@@ -2490,36 +2490,25 @@ const TOP_10_ELITE_STRATEGIES = {
 };
 
 
-const META_ELITE_STRATEGIES = {
-    /**
-     * ELITE_PERFECT_RULE_7 
-     * Continuous monitoring of S_ULTRA vs (Loose + Trend)
-     */
-    "ELITE_PERFECT_RULE_7": (c, p) => {
-        const ultra = TOP_10_ELITE_STRATEGIES["ELITE_V945A_S_ULTRA"](c, p);
-        const loose = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"](c, p);
-        const trend = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"](c, p);
-        
-        return metaUtils.filterSignals("ELITE_PERFECT_RULE_7", ultra, loose, trend);
-    },
 
-    /**
-     * ELITE_POWERHOUSE_RULE_10
-     * Perfect + High Tier Stealth Monitoring
-     */
-    "ELITE_POWERHOUSE_RULE_10": (c, p) => {
-        const ultra = TOP_10_ELITE_STRATEGIES["ELITE_V945A_S_ULTRA"](c, p);
-        const loose = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"](c, p);
-        const trend = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"](c, p);
-        const ht = TOP_10_ELITE_STRATEGIES["ELITE_V935A_TIER_HIGH"](c, p);
-        
-        return metaUtils.filterSignals("ELITE_POWERHOUSE_RULE_10", ultra, loose, trend, ht);
-    }
+const ELITE_META_VERSIONS = {
+    // Floorless Versions (Rules 3 - 10)
+    "META_R3_ULTRA_STEALTH": (c, p) => metaUtils.filterSignals("RULE_3", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R4_STEALTH_SYNC": (c, p) => metaUtils.filterSignals("RULE_4", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R5_STEALTH_VETO": (c, p) => metaUtils.filterSignals("RULE_5", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R6_STEALTH_SYNC_VETO": (c, p) => metaUtils.filterSignals("RULE_6", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R7_PERFECT": (c, p) => metaUtils.filterSignals("RULE_7", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R8_HT_STEALTH": (c, p) => metaUtils.filterSignals("RULE_8", [], [], [], ELITE_HT(c, p)),
+    "META_R9_DUAL_STEALTH": (c, p) => metaUtils.filterSignals("RULE_9", ELITE_ULTRA(c, p), [], [], ELITE_HT(c, p)),
+    "META_R10_POWERHOUSE": (c, p) => metaUtils.filterSignals("RULE_10", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p), ELITE_HT(c, p)),
+
+    // Level-Filtered Versions (New Rule 11 & 12)
+    "META_R11_PERFECT_WITH_FLOOR": (c, p) => metaUtils.filterSignals("RULE_11", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p)),
+    "META_R12_POWERHOUSE_WITH_FLOOR": (c, p) => metaUtils.filterSignals("RULE_12", ELITE_ULTRA(c, p), ELITE_LOOSE(c, p), ELITE_TREND(c, p), ELITE_HT(c, p))
 };
 
 
 const ALL_STRATEGIES = {
-    ...FLEX_STRATEGIES,
     ...TOP_10_ELITE_STRATEGIES,
     ...META_ELITE_STRATEGIES // New Meta-Strategies now listed here
 

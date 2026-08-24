@@ -1,35 +1,27 @@
 /**
- * ELITE META ENGINE - V15 (POTENTIAL-SYNC PROTOCOL)
+ * ELITE META ENGINE - V19 (VOLUME-DECOUPLED SUITE)
  * 
- * Logic uses:
- * - Expected Potential Reward (EPR%): (Target - Trigger) / Trigger
- * - Expected Potential Risk (EPRisk%): (Trigger - Stop) / Trigger
+ * Rules 3 - 10: FLOORLESS. Allows all trades (p0-p9) based on strategy logic.
+ * Rule 11: PERFECT WITH FLOOR (Copy of Rule 7 + JSON Level Filter).
+ * Rule 12: POWERHOUSE WITH FLOOR (Copy of Rule 10 + JSON Level Filter).
  */
 
-const activeRegistry = {
-    "ELITE_PERFECT_RULE_7": {},    
-    "ELITE_POWERHOUSE_RULE_10": {}
-};
+const activeRegistry = {}; 
 
 const metaUtils = {
-    // Utility to calculate projected potentials
     getPotentials: (sig) => {
         const trigger = sig.triggerPrice;
         const reward = Math.abs(sig.takeProfit - trigger) / trigger;
         const risk = Math.abs(trigger - sig.stopLoss) / trigger;
-        return { reward: reward * 100, risk: risk * 100 }; // Returns as percentage
+        return { reward: reward * 100, risk: risk * 100 };
     },
 
-    filterSignals: (strategyName, ultraSignals, looseSignals, trendSignals, highTierSignals = [], currentBar) => {
-        const registry = activeRegistry[strategyName];
+    filterSignals: (ruleId, ultraSignals, looseSignals, trendSignals, highTierSignals = []) => {
+        if (!activeRegistry[ruleId]) activeRegistry[ruleId] = {};
+        const registry = activeRegistry[ruleId];
         const results = [];
-        
-        const currentActiveKeys = new Set();
-        [...ultraSignals, ...looseSignals, ...trendSignals, ...highTierSignals].forEach(s => {
-            currentActiveKeys.add(s.instrument_key || s.key);
-        });
 
-        // --- PHASE 1: MONITOR ACTIVE TRADES (Projected Potential Decay) ---
+        // --- PHASE 1: ACTIVE MONITORING (Decay Vetoes) ---
         Object.keys(registry).forEach(instKey => {
             const active = registry[instKey];
             const curUltra = ultraSignals.find(u => (u.instrument_key || u.key) === instKey);
@@ -39,112 +31,72 @@ const metaUtils = {
             if (!curUltra) return;
 
             const curPot = metaUtils.getPotentials(curUltra);
-
-            // 1. ABSORPTION VETO: Volume up but Potential Reward down
-            // If the volume level increases, the Profit Potential % must not drop.
-            if (curUltra.thresholdIndex > active.lastLevel) {
-                if (curPot.reward < active.lastRewardPotential - 0.01) {
-                    results.push({ 
-                        ...curUltra, 
-                        status: "CANCELLED", 
-                        reason: `Decay: Absorption (Level ${curUltra.thresholdIndex} hit but Reward% dropped from ${active.lastRewardPotential.toFixed(3)}% to ${curPot.reward.toFixed(3)}%)` 
-                    });
-                    delete registry[instKey];
-                    return;
-                }
+            // VETO: Worsening Reward Potential
+            if (curPot.reward < active.lastRewardPotential - 0.01) {
+                results.push({ ...curUltra, status: "CANCELLED", reason: "Decay: Potential Dropped" });
+                delete registry[instKey]; return;
             }
-
-            // 2. LATE CROWDING VETO (Non-Heavy/Non-Commodity only)
-            const isCommodity = instConfig.stealthThresholdFloor === 0;
-            if (active.metaReason === "Institutional Stealth" && curLoose && !instConfig.isHeavyStock && !isCommodity) {
-                results.push({ 
-                    ...curUltra, 
-                    status: "CANCELLED", 
-                    reason: "Decay: Stealth move now Crowded (V125 Entry detected)" 
-                });
-                delete registry[instKey];
-                return;
+            // VETO: Late Crowding (Stealth -> Consensus transition for Non-Heavy)
+            if (active.metaReason.includes("Stealth") && curLoose && !instConfig.isHeavyStock) {
+                results.push({ ...curUltra, status: "CANCELLED", reason: "Decay: Late Crowding" });
+                delete registry[instKey]; return;
             }
-
             active.lastRewardPotential = curPot.reward;
-            active.lastLevel = curUltra.thresholdIndex;
         });
 
-        // --- PHASE 2: NEW ENTRY VALIDATION (Potential-Sync Gates) ---
+        // --- PHASE 2: ENTRY GATING ---
         ultraSignals.forEach(sig => {
             const instKey = sig.instrument_key || sig.key;
             const instConfig = sig.instrumentConfig;
-            if (registry[instKey] || !instConfig) return; 
+            if (registry[instKey] || !instConfig) return;
 
             const matchLoose = looseSignals.find(l => (l.instrument_key || l.key) === instKey);
             const matchTrend = trendSignals.find(t => (t.instrument_key || t.key) === instKey);
+            const sigPot = metaUtils.getPotentials(sig);
             
+            const isSync = matchLoose && Math.abs(sigPot.reward - metaUtils.getPotentials(matchLoose).reward) <= 0.05;
+            const isHeavyConsensus = matchTrend && instConfig.isHeavyStock;
+            const isStealth = !matchLoose && !matchTrend;
+            
+            // Logic: Rules 11 & 12 enforce Floor. Rules 3-10 use Level 0.
+            const floor = (ruleId === "RULE_11" || ruleId === "RULE_12") ? instConfig.stealthThresholdFloor : 0;
+
             let pass = false;
             let metaReason = "";
 
-            // Calculate current signal potentials
-            const sigPot = metaUtils.getPotentials(sig);
-
-            // GATE 1: POTENTIAL SYNCHRONIZATION (Equality Rule)
-            if (matchLoose) {
-                const loosePot = metaUtils.getPotentials(matchLoose);
-                // We compare both Profit% potential and Risk% potential
-                const rewardSync = Math.abs(sigPot.reward - loosePot.reward) <= 0.05; // Tolerance: 5 basis points
-                const riskSync = Math.abs(sigPot.risk - loosePot.risk) <= 0.05;
-
-                if (rewardSync && riskSync) {
-                    pass = true;
-                    metaReason = "Equality Standard";
-                }
-            } 
-            
-            // GATE 2: HEAVY CONSENSUS (For Heavy Stocks/Commodities)
-            if (!pass && matchTrend) {
-                const isComm = instConfig.stealthThresholdFloor === 0;
-                if (instConfig.isHeavyStock || isComm) {
-                    pass = true;
-                    metaReason = "Heavy Consensus";
-                }
-            } 
-
-            // GATE 3: INSTITUTIONAL STEALTH (Filtered by Numeric Level Floor)
-            if (!pass && !matchLoose && !matchTrend) {
-                if (sig.thresholdIndex >= instConfig.stealthThresholdFloor) {
-                    pass = true;
-                    metaReason = "Institutional Stealth";
-                }
+            // Mapping requested logic for each Rule ID
+            if (ruleId === "RULE_3" && isStealth) { pass = true; metaReason = "Stealth Only"; }
+            if (ruleId === "RULE_4" && (isStealth || isSync)) { pass = true; metaReason = "Stealth or Sync"; }
+            if (ruleId === "RULE_5" && (isStealth || isHeavyConsensus)) { pass = true; metaReason = "Stealth or Consensus"; }
+            if (ruleId === "RULE_6" && (isStealth || isSync || isHeavyConsensus)) { pass = true; metaReason = "Sync+Consensus"; }
+            if ((ruleId === "RULE_7" || ruleId === "RULE_11") && (isSync || isHeavyConsensus || isStealth)) { 
+                if (sig.thresholdIndex >= floor) { pass = true; metaReason = "Perfect Protocol"; }
             }
 
             if (pass) {
-                const metaSig = { ...sig, metaReason, status: "ACTIVE", projectedReward: sigPot.reward, projectedRisk: sigPot.risk };
-                registry[instKey] = { 
-                    lastRewardPotential: sigPot.reward,
-                    lastLevel: sig.thresholdIndex,
-                    metaReason, 
-                    config: instConfig,
-                    signal: metaSig
-                };
+                const metaSig = { ...sig, metaReason, status: "ACTIVE", rule: ruleId };
+                registry[instKey] = { signal: metaSig, metaReason, lastRewardPotential: sigPot.reward, config: instConfig };
                 results.push(metaSig);
             }
         });
 
-        // Rule 10 Additions (High Tier unique stealth using numeric floor)
-        if (strategyName === "ELITE_POWERHOUSE_RULE_10") {
+        // --- PHASE 3: STEALTH SCOUTING (Rules 8, 9, 10, 12) ---
+        if (["RULE_8", "RULE_9", "RULE_10", "RULE_12"].includes(ruleId)) {
             highTierSignals.forEach(sig => {
                 const instKey = sig.instrument_key || sig.key;
                 if (registry[instKey] || !sig.instrumentConfig) return;
+
                 const inUltra = ultraSignals.some(u => (u.instrument_key || u.key) === instKey);
                 const inLoose = looseSignals.some(l => (l.instrument_key || l.key) === instKey);
+                const floor = (ruleId === "RULE_12") ? sig.instrumentConfig.stealthThresholdFloor : 0;
 
-                if (!inUltra && !inLoose && sig.thresholdIndex >= sig.instrumentConfig.stealthThresholdFloor) {
-                    const sigPot = metaUtils.getPotentials(sig);
-                    const metaSig = { ...sig, metaReason: "HT Scout Stealth", status: "ACTIVE" };
-                    registry[instKey] = { signal: metaSig, metaReason: "HT Scout Stealth", lastRewardPotential: sigPot.reward, lastLevel: sig.thresholdIndex, config: sig.instrumentConfig };
+                if (!inUltra && !inLoose && sig.thresholdIndex >= floor) {
+                    const metaSig = { ...sig, metaReason: "HT Scout Stealth", status: "ACTIVE", rule: ruleId };
+                    registry[instKey] = { signal: metaSig, metaReason: "HT Scout Stealth", lastRewardPotential: metaUtils.getPotentials(sig).reward, config: sig.instrumentConfig };
                     results.push(metaSig);
                 }
             });
         }
-
         return results;
     }
 };

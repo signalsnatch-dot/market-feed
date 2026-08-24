@@ -147,13 +147,27 @@
         "require_strong_trend_bar_in_break": true
     },
     "instruments": [
-          {
+        {
             "key": "MCX_FO|561496",
             "name": "Natural Gas Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [150, 250],
-            "volumePerBar": [685, 723, 767, 809, 863, 925, 997, 1070, 1167, 1284],
+            "priceBarTicks": [
+                150,
+                250
+            ],
+            "volumePerBar": [
+                618,
+                653,
+                692,
+                730,
+                779,
+                835,
+                900,
+                965,
+                1053,
+                1159
+            ],
             "lotSize": 1,
             "tickSize": 0.1,
             "exchange": "MCX_FO",
@@ -173,8 +187,22 @@
             "name": "Natural Gas Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [200, 330],
-            "volumePerBar": [1007, 1064, 1127, 1190, 1269, 1361, 1467, 1574, 1717, 1888],
+            "priceBarTicks": [
+                200,
+                330
+            ],
+            "volumePerBar": [
+                963,
+                1017,
+                1078,
+                1137,
+                1214,
+                1301,
+                1402,
+                1504,
+                1641,
+                1805
+            ],
             "lotSize": 1,
             "tickSize": 0.1,
             "exchange": "MCX_FO",
@@ -194,8 +222,22 @@
             "name": "Crude Oil Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [195, 206, 218, 230, 246, 263, 284, 304, 332, 365],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                195,
+                206,
+                218,
+                230,
+                246,
+                263,
+                284,
+                304,
+                332,
+                365
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -215,8 +257,22 @@
             "name": "Crude Oil Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [250, 400],
-            "volumePerBar": [407, 430, 456, 481, 513, 550, 593, 636, 694, 763],
+            "priceBarTicks": [
+                250,
+                400
+            ],
+            "volumePerBar": [
+                407,
+                430,
+                456,
+                481,
+                513,
+                550,
+                593,
+                636,
+                694,
+                763
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -236,8 +292,22 @@
             "name": "Silver Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [60, 100],
-            "volumePerBar": [68, 72, 76, 81, 86, 92, 100, 107, 116, 128],
+            "priceBarTicks": [
+                60,
+                100
+            ],
+            "volumePerBar": [
+                79,
+                84,
+                89,
+                94,
+                100,
+                107,
+                115,
+                124,
+                135,
+                149
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -257,8 +327,22 @@
             "name": "Silver Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [110, 180],
-            "volumePerBar": [283, 299, 317, 334, 357, 382, 412, 442, 482, 530],
+            "priceBarTicks": [
+                110,
+                180
+            ],
+            "volumePerBar": [
+                337,
+                356,
+                377,
+                398,
+                425,
+                455,
+                490,
+                526,
+                574,
+                631
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -278,8 +362,22 @@
             "name": "Silver Micro Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [240, 400],
-            "volumePerBar": [787, 832, 881, 930, 992, 1064, 1146, 1230, 1342, 1476],
+            "priceBarTicks": [
+                240,
+                400
+            ],
+            "volumePerBar": [
+                936,
+                988,
+                1047,
+                1105,
+                1179,
+                1264,
+                1362,
+                1462,
+                1595,
+                1754
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -299,8 +397,22 @@
             "name": "Zinc Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [10, 18],
-            "volumePerBar": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+            "priceBarTicks": [
+                10,
+                18
+            ],
+            "volumePerBar": [
+                24,
+                25,
+                26,
+                27,
+                28,
+                29,
+                31,
+                32,
+                34,
+                36
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -320,8 +432,22 @@
             "name": "Lead Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [3, 5],
-            "volumePerBar": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            "priceBarTicks": [
+                3,
+                5
+            ],
+            "volumePerBar": [
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -341,8 +467,22 @@
             "name": "Aluminium Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [10, 18],
-            "volumePerBar": [22, 23, 24, 25, 26, 27, 28, 30, 31, 33],
+            "priceBarTicks": [
+                10,
+                18
+            ],
+            "volumePerBar": [
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "MCX_FO",
@@ -362,8 +502,22 @@
             "name": "Gold Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [25, 40],
-            "volumePerBar": [29, 30, 31, 33, 34, 36, 37, 39, 41, 44],
+            "priceBarTicks": [
+                25,
+                40
+            ],
+            "volumePerBar": [
+                29,
+                30,
+                31,
+                33,
+                34,
+                36,
+                37,
+                39,
+                41,
+                44
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -383,8 +537,27 @@
             "name": "Gold Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [65, 95, 125, 155, 185, 215, 245, 275, 305, 335, 365, 395, 425, 455, 492],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                65,
+                95,
+                125,
+                155,
+                185,
+                215,
+                245,
+                275,
+                305,
+                335,
+                365,
+                395,
+                425,
+                455,
+                492
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -404,8 +577,22 @@
             "name": "Gold Petal Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [300, 500],
-            "volumePerBar": [1384, 1462, 1549, 1635, 1744, 1870, 2015, 2162, 2359, 2595],
+            "priceBarTicks": [
+                300,
+                500
+            ],
+            "volumePerBar": [
+                1831,
+                1934,
+                2050,
+                2163,
+                2308,
+                2475,
+                2667,
+                2861,
+                3121,
+                3434
+            ],
             "lotSize": 1,
             "tickSize": 1,
             "exchange": "MCX_FO",
@@ -425,8 +612,22 @@
             "name": "Nifty 50 Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [450, 750],
-            "volumePerBar": [217, 230, 243, 257, 274, 294, 317, 340, 371, 408],
+            "priceBarTicks": [
+                450,
+                750
+            ],
+            "volumePerBar": [
+                225,
+                238,
+                252,
+                266,
+                284,
+                304,
+                328,
+                352,
+                384,
+                422
+            ],
             "lotSize": 75,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -446,8 +647,22 @@
             "name": "Nifty Bank Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [280, 460],
-            "volumePerBar": [96, 102, 108, 114, 121, 130, 140, 150, 164, 180],
+            "priceBarTicks": [
+                280,
+                460
+            ],
+            "volumePerBar": [
+                120,
+                127,
+                135,
+                142,
+                152,
+                163,
+                175,
+                188,
+                205,
+                226
+            ],
             "lotSize": 30,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -467,8 +682,22 @@
             "name": "Fin Nifty Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [30, 50],
-            "volumePerBar": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            "priceBarTicks": [
+                30,
+                50
+            ],
+            "volumePerBar": [
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11
+            ],
             "lotSize": 40,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -488,8 +717,22 @@
             "name": "Midcap Nifty Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+            ],
             "lotSize": 120,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -509,8 +752,22 @@
             "name": "Reliance Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [170, 280],
-            "volumePerBar": [117, 124, 131, 138, 148, 158, 170, 183, 199, 219],
+            "priceBarTicks": [
+                170,
+                280
+            ],
+            "volumePerBar": [
+                146,
+                154,
+                163,
+                172,
+                183,
+                197,
+                212,
+                227,
+                248,
+                273
+            ],
             "lotSize": 500,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -530,8 +787,22 @@
             "name": "Reliance Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [170, 280],
-            "volumePerBar": [64601, 68241, 72315, 76301, 81430, 87299, 94080, 100940, 110116, 121128],
+            "priceBarTicks": [
+                170,
+                280
+            ],
+            "volumePerBar": [
+                69203,
+                73102,
+                77466,
+                81736,
+                87231,
+                93518,
+                100781,
+                108130,
+                117960,
+                129756
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -551,8 +822,22 @@
             "name": "HDFC Bank Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [250, 420],
-            "volumePerBar": [201, 212, 225, 237, 253, 271, 292, 314, 342, 376],
+            "priceBarTicks": [
+                250,
+                420
+            ],
+            "volumePerBar": [
+                291,
+                307,
+                325,
+                343,
+                366,
+                393,
+                423,
+                454,
+                496,
+                545
+            ],
             "lotSize": 650,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -572,8 +857,22 @@
             "name": "HDFC Bank Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [250, 420],
-            "volumePerBar": [173561, 183339, 194285, 204993, 218775, 234542, 252759, 271189, 295843, 325427],
+            "priceBarTicks": [
+                250,
+                420
+            ],
+            "volumePerBar": [
+                144529,
+                152672,
+                161787,
+                170704,
+                182180,
+                195310,
+                210480,
+                225827,
+                246357,
+                270992
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -593,8 +892,22 @@
             "name": "ICICI Bank Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [170, 280],
-            "volumePerBar": [74, 79, 83, 88, 94, 101, 108, 116, 127, 140],
+            "priceBarTicks": [
+                170,
+                280
+            ],
+            "volumePerBar": [
+                62,
+                65,
+                69,
+                73,
+                78,
+                83,
+                90,
+                97,
+                105,
+                116
+            ],
             "lotSize": 700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -614,8 +927,22 @@
             "name": "ICICI Bank Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [170, 280],
-            "volumePerBar": [78454, 82874, 87821, 92662, 98891, 106019, 114253, 122584, 133728, 147101],
+            "priceBarTicks": [
+                170,
+                280
+            ],
+            "volumePerBar": [
+                53345,
+                56351,
+                59715,
+                63006,
+                67242,
+                72088,
+                77687,
+                83352,
+                90930,
+                100022
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -635,8 +962,22 @@
             "name": "SBI Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [62, 66, 69, 73, 78, 84, 90, 97, 106, 116],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                70,
+                74,
+                78,
+                82,
+                88,
+                94,
+                102,
+                109,
+                119,
+                131
+            ],
             "lotSize": 750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -656,8 +997,22 @@
             "name": "SBI Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [54121, 57171, 60584, 63923, 68220, 73137, 78818, 84565, 92252, 101478],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                63267,
+                66831,
+                70821,
+                74724,
+                79748,
+                85496,
+                92136,
+                98854,
+                107841,
+                118625
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -677,8 +1032,22 @@
             "name": "TCS Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [100, 170],
-            "volumePerBar": [59, 62, 66, 70, 74, 80, 86, 92, 100, 110],
+            "priceBarTicks": [
+                100,
+                170
+            ],
+            "volumePerBar": [
+                81,
+                85,
+                90,
+                95,
+                102,
+                109,
+                118,
+                126,
+                138,
+                151
+            ],
             "lotSize": 225,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -698,8 +1067,22 @@
             "name": "TCS Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [100, 170],
-            "volumePerBar": [17608, 18600, 19710, 20796, 22194, 23794, 25642, 27512, 30013, 33014],
+            "priceBarTicks": [
+                100,
+                170
+            ],
+            "volumePerBar": [
+                17020,
+                17979,
+                19052,
+                20103,
+                21454,
+                23000,
+                24787,
+                26594,
+                29012,
+                31913
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -719,8 +1102,22 @@
             "name": "Infosys Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [176, 290],
-            "volumePerBar": [140, 148, 157, 165, 176, 189, 204, 218, 238, 262],
+            "priceBarTicks": [
+                176,
+                290
+            ],
+            "volumePerBar": [
+                143,
+                151,
+                160,
+                169,
+                180,
+                193,
+                208,
+                223,
+                243,
+                268
+            ],
             "lotSize": 400,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -740,8 +1137,22 @@
             "name": "Infosys Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [176, 290],
-            "volumePerBar": [63375, 66945, 70942, 74852, 79884, 85641, 92293, 99023, 108025, 118828],
+            "priceBarTicks": [
+                176,
+                290
+            ],
+            "volumePerBar": [
+                57160,
+                60381,
+                63986,
+                67512,
+                72051,
+                77244,
+                83243,
+                89313,
+                97433,
+                107176
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -761,8 +1172,22 @@
             "name": "ITC Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [39, 41, 44, 46, 49, 53, 57, 61, 66, 73],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                38,
+                41,
+                43,
+                45,
+                49,
+                52,
+                56,
+                60,
+                66,
+                72
+            ],
             "lotSize": 1725,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -782,8 +1207,22 @@
             "name": "ITC Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [78526, 82950, 87902, 92747, 98982, 106116, 114358, 122697, 133851, 147236],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                77002,
+                81341,
+                86197,
+                90948,
+                97062,
+                104057,
+                112139,
+                120316,
+                131254,
+                144380
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -803,8 +1242,22 @@
             "name": "Bharti Airtel Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [65, 69, 73, 77, 82, 88, 95, 102, 111, 122],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                114,
+                121,
+                128,
+                135,
+                144,
+                154,
+                166,
+                179,
+                195,
+                214
+            ],
             "lotSize": 475,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -824,8 +1277,22 @@
             "name": "Bharti Airtel Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [39529, 41755, 44248, 46687, 49826, 53417, 57566, 61763, 67378, 74116],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                52225,
+                55168,
+                58461,
+                61683,
+                65830,
+                70575,
+                76056,
+                81602,
+                89020,
+                97922
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -845,8 +1312,22 @@
             "name": "Axis Bank Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [47, 50, 53, 56, 59, 64, 69, 74, 80, 88],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                52,
+                55,
+                58,
+                62,
+                66,
+                70,
+                76,
+                81,
+                89,
+                98
+            ],
             "lotSize": 625,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -866,8 +1347,22 @@
             "name": "Axis Bank Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [33851, 35758, 37893, 39981, 42669, 45744, 49297, 52892, 57700, 63470],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                33505,
+                35393,
+                37506,
+                39573,
+                42233,
+                45277,
+                48794,
+                52352,
+                57111,
+                62822
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -887,8 +1382,22 @@
             "name": "L&T Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [24, 25, 26, 27, 28, 29, 31, 32, 34, 35],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                29,
+                30,
+                32,
+                34
+            ],
             "lotSize": 175,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -908,8 +1417,22 @@
             "name": "L&T Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [8572, 9055, 9596, 10124, 10805, 11584, 12483, 13394, 14611, 16072],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                10571,
+                11166,
+                11833,
+                12485,
+                13325,
+                14285,
+                15395,
+                16517,
+                18019,
+                19821
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -929,8 +1452,22 @@
             "name": "Tata Steel Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [176, 290],
-            "volumePerBar": [39, 41, 43, 46, 49, 53, 57, 61, 66, 73],
+            "priceBarTicks": [
+                176,
+                290
+            ],
+            "volumePerBar": [
+                59,
+                62,
+                66,
+                69,
+                74,
+                79,
+                85,
+                92,
+                100,
+                110
+            ],
             "lotSize": 2750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -950,8 +1487,22 @@
             "name": "Tata Steel Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [176, 290],
-            "volumePerBar": [132995, 140488, 148875, 157081, 167641, 179723, 193682, 207804, 226696, 249365],
+            "priceBarTicks": [
+                176,
+                290
+            ],
+            "volumePerBar": [
+                153470,
+                162116,
+                171794,
+                181263,
+                193449,
+                207391,
+                223499,
+                239796,
+                261596,
+                287755
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -971,8 +1522,22 @@
             "name": "Tata Motors Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [172, 182, 193, 203, 217, 233, 251, 269, 293, 323],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                202,
+                214,
+                227,
+                239,
+                255,
+                274,
+                295,
+                316,
+                345,
+                380
+            ],
             "lotSize": 300,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -992,8 +1557,22 @@
             "name": "Tata Motors Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [35892, 37914, 40178, 42392, 45242, 48503, 52270, 56082, 61180, 67298],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                46503,
+                49123,
+                52056,
+                54925,
+                58617,
+                62842,
+                67723,
+                72661,
+                79267,
+                87193
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1013,8 +1592,22 @@
             "name": "Bajaj Finance Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [25, 26, 28, 30, 32, 34, 36, 39, 43, 47],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                29,
+                31,
+                33,
+                34,
+                37,
+                39,
+                42,
+                45,
+                50,
+                54
+            ],
             "lotSize": 750,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1034,8 +1627,22 @@
             "name": "Bajaj Finance Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [28242, 29833, 31614, 33356, 35599, 38164, 41129, 44128, 48139, 52953],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                25544,
+                26983,
+                28594,
+                30170,
+                32198,
+                34519,
+                37200,
+                39913,
+                43541,
+                47895
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1055,8 +1662,22 @@
             "name": "Kotak Bank Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [33, 35, 37, 39, 42, 45, 49, 52, 57, 63],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                30,
+                32,
+                33,
+                35,
+                38,
+                40,
+                44,
+                47,
+                51,
+                56
+            ],
             "lotSize": 2000,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1076,8 +1697,22 @@
             "name": "Kotak Bank Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [59255, 62593, 66330, 69986, 74691, 80074, 86294, 92586, 101003, 111103],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                51184,
+                54068,
+                57296,
+                60454,
+                64518,
+                69168,
+                74540,
+                79976,
+                87246,
+                95971
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1097,8 +1732,22 @@
             "name": "Sun Pharma Aug Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [20, 21, 22, 23, 24, 25, 26, 27, 28, 30],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                20,
+                21,
+                23,
+                24,
+                26,
+                27,
+                30,
+                32,
+                35,
+                38
+            ],
             "lotSize": 350,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1118,8 +1767,22 @@
             "name": "Sun Pharma Cash Equity",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [11113, 11739, 12439, 13125, 14007, 15017, 16183, 17363, 18942, 20836],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                10765,
+                11371,
+                12050,
+                12714,
+                13569,
+                14547,
+                15677,
+                16820,
+                18349,
+                20184
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1139,8 +1802,22 @@
             "name": "JSW Steel Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [16, 17, 18, 19, 20, 22, 24, 25, 28, 30],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                27,
+                28,
+                30,
+                32,
+                34,
+                36,
+                39,
+                42,
+                46,
+                50
+            ],
             "lotSize": 675,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1160,8 +1837,22 @@
             "name": "JSW Steel Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [9487, 10022, 10620, 11205, 11959, 12820, 13816, 14824, 16171, 17788],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                10089,
+                10658,
+                11294,
+                11916,
+                12717,
+                13634,
+                14693,
+                15764,
+                17197,
+                18917
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1181,8 +1872,22 @@
             "name": "Coal India Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [33, 35, 36, 37, 39, 41, 43, 45, 48, 50],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                26,
+                28,
+                29,
+                31,
+                33,
+                35,
+                38,
+                41,
+                44,
+                49
+            ],
             "lotSize": 1350,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1202,8 +1907,22 @@
             "name": "Coal India Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [120, 200],
-            "volumePerBar": [43843, 46313, 49078, 51783, 55264, 59247, 63849, 68504, 74732, 82205],
+            "priceBarTicks": [
+                120,
+                200
+            ],
+            "volumePerBar": [
+                33766,
+                35669,
+                37798,
+                39882,
+                42563,
+                45630,
+                49174,
+                52760,
+                57556,
+                63312
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1223,8 +1942,22 @@
             "name": "Adani Enterprises Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [23, 25, 26, 28, 30, 32, 34, 37, 40, 44],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                27,
+                28,
+                30,
+                32,
+                34,
+                36,
+                39,
+                42,
+                46,
+                50
+            ],
             "lotSize": 309,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1244,8 +1977,22 @@
             "name": "Adani Enterprises Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [6293, 6647, 7044, 7432, 7932, 8504, 9164, 9832, 10726, 11799],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                6139,
+                6485,
+                6872,
+                7250,
+                7738,
+                8296,
+                8940,
+                9592,
+                10464,
+                11510
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1265,8 +2012,22 @@
             "name": "Adani Ports Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [21, 22, 23, 24, 25, 26, 27, 29, 30, 32],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                40,
+                41,
+                43,
+                44,
+                47,
+                49,
+                51,
+                53,
+                57,
+                59
+            ],
             "lotSize": 475,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1286,8 +2047,22 @@
             "name": "Adani Ports Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [9198, 9716, 10296, 10864, 11594, 12429, 13395, 14372, 15678, 17246],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                11352,
+                11991,
+                12707,
+                13407,
+                14309,
+                15340,
+                16532,
+                17737,
+                19349,
+                21284
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1307,8 +2082,22 @@
             "name": "Hindalco Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [52, 55, 58, 61, 65, 70, 76, 81, 88, 97],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                79,
+                83,
+                88,
+                93,
+                99,
+                106,
+                115,
+                123,
+                134,
+                148
+            ],
             "lotSize": 700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1328,8 +2117,22 @@
             "name": "Hindalco Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [160, 265],
-            "volumePerBar": [32586, 34422, 36477, 38487, 41074, 44035, 47455, 50915, 55544, 61098],
+            "priceBarTicks": [
+                160,
+                265
+            ],
+            "volumePerBar": [
+                29518,
+                31181,
+                33042,
+                34864,
+                37207,
+                39889,
+                42987,
+                46122,
+                50315,
+                55346
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1349,8 +2152,22 @@
             "name": "Apollo Hospitals Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [80, 140],
-            "volumePerBar": [19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+            "priceBarTicks": [
+                80,
+                140
+            ],
+            "volumePerBar": [
+                27,
+                28,
+                29,
+                30,
+                31,
+                32,
+                34,
+                36,
+                38,
+                40
+            ],
             "lotSize": 125,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1370,8 +2187,22 @@
             "name": "Apollo Hospitals Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [96, 160],
-            "volumePerBar": [2609, 2756, 2920, 3081, 3288, 3525, 3799, 4076, 4447, 4891],
+            "priceBarTicks": [
+                96,
+                160
+            ],
+            "volumePerBar": [
+                2882,
+                3044,
+                3226,
+                3404,
+                3633,
+                3895,
+                4197,
+                4503,
+                4912,
+                5404
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1391,8 +2222,22 @@
             "name": "PNB Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [21, 22, 23, 24, 25, 26, 27, 28, 30, 31],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                33,
+                34,
+                36,
+                37,
+                39,
+                41,
+                43,
+                45,
+                48,
+                50
+            ],
             "lotSize": 8000,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1412,8 +2257,22 @@
             "name": "PNB Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [66830, 70595, 74809, 78933, 84239, 90310, 97325, 104421, 113914, 125306],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                90752,
+                95865,
+                101588,
+                107188,
+                114394,
+                122638,
+                132164,
+                141800,
+                154691,
+                170161
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1433,8 +2292,22 @@
             "name": "SAIL Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [80, 140],
-            "volumePerBar": [21, 22, 23, 24, 25, 26, 27, 28, 30, 32],
+            "priceBarTicks": [
+                80,
+                140
+            ],
+            "volumePerBar": [
+                27,
+                28,
+                29,
+                30,
+                31,
+                33,
+                35,
+                36,
+                38,
+                40
+            ],
             "lotSize": 4700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1454,8 +2327,22 @@
             "name": "SAIL Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [80, 140],
-            "volumePerBar": [96036, 101446, 107502, 113428, 121053, 129778, 139858, 150056, 163697, 180067],
+            "priceBarTicks": [
+                80,
+                140
+            ],
+            "volumePerBar": [
+                121510,
+                128355,
+                136018,
+                143515,
+                153163,
+                164202,
+                176956,
+                189859,
+                207119,
+                227831
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1475,8 +2362,22 @@
             "name": "SUZLON Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [25, 26, 28, 29, 30, 31, 33, 34, 36, 38],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                26,
+                27,
+                28,
+                29,
+                31,
+                32,
+                33,
+                35,
+                37,
+                39
+            ],
             "lotSize": 12700,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1496,8 +2397,22 @@
             "name": "SUZLON Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [140, 230],
-            "volumePerBar": [335419, 354316, 375469, 396164, 422797, 453269, 488474, 524092, 571737, 628911],
+            "priceBarTicks": [
+                140,
+                230
+            ],
+            "volumePerBar": [
+                337350,
+                356355,
+                377630,
+                398444,
+                425231,
+                455878,
+                491286,
+                527109,
+                575028,
+                632530
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1517,8 +2432,22 @@
             "name": "PAYTM Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [80, 140],
-            "volumePerBar": [60, 63, 67, 71, 75, 81, 87, 93, 102, 112],
+            "priceBarTicks": [
+                80,
+                140
+            ],
+            "volumePerBar": [
+                31,
+                33,
+                35,
+                37,
+                39,
+                42,
+                45,
+                48,
+                53,
+                58
+            ],
             "lotSize": 725,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1538,8 +2467,27 @@
             "name": "PAYTM Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [80, 140],
-            "volumePerBar": [27, 40, 53, 66, 79, 92, 105, 118, 131, 144, 157, 170, 183, 196, 205],
+            "priceBarTicks": [
+                80,
+                140
+            ],
+            "volumePerBar": [
+                27,
+                40,
+                53,
+                66,
+                79,
+                92,
+                105,
+                118,
+                131,
+                144,
+                157,
+                170,
+                183,
+                196,
+                205
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1559,8 +2507,22 @@
             "name": "RVNL Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [19, 20, 21, 22, 23, 24, 25, 26, 28, 29],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                30,
+                31
+            ],
             "lotSize": 1925,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1580,8 +2542,22 @@
             "name": "RVNL Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [20390, 21538, 22824, 24082, 25701, 27554, 29694, 31859, 34755, 38231],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                27568,
+                29121,
+                30859,
+                32560,
+                34749,
+                37253,
+                40147,
+                43074,
+                46990,
+                51689
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1601,8 +2577,22 @@
             "name": "IRFC Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23
+            ],
             "lotSize": 5425,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1622,8 +2612,22 @@
             "name": "IRFC Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [110, 185],
-            "volumePerBar": [33910, 35820, 37958, 40051, 42743, 45824, 49383, 52984, 57800, 63580],
+            "priceBarTicks": [
+                110,
+                185
+            ],
+            "volumePerBar": [
+                49217,
+                51990,
+                55094,
+                58131,
+                62039,
+                66510,
+                71676,
+                76902,
+                83893,
+                92283
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1643,8 +2647,22 @@
             "name": "IREDA Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [19, 20, 21, 22, 23, 24, 25, 26, 28, 29],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27
+            ],
             "lotSize": 4525,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1664,8 +2682,22 @@
             "name": "IREDA Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [29419, 31076, 32931, 34746, 37082, 39755, 42843, 45967, 50146, 55160],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                25012,
+                26421,
+                27998,
+                29541,
+                31527,
+                33799,
+                36425,
+                39081,
+                42633,
+                46897
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1685,8 +2717,22 @@
             "name": "BHEL Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [25, 26, 27, 28, 30, 31, 32, 34, 36, 38],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                32,
+                34,
+                36,
+                38,
+                41,
+                43,
+                47,
+                50,
+                55,
+                60
+            ],
             "lotSize": 2625,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1706,8 +2752,22 @@
             "name": "BHEL Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [33792, 35696, 37827, 39912, 42595, 45665, 49212, 52801, 57601, 63361],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                43050,
+                45475,
+                48190,
+                50846,
+                54265,
+                58176,
+                62694,
+                67266,
+                73381,
+                80719
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1727,8 +2787,22 @@
             "name": "GAIL Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20
+            ],
             "lotSize": 3550,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1748,8 +2822,27 @@
             "name": "GAIL Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [90, 150],
-            "volumePerBar": [120, 175, 230, 285, 340, 395, 450, 505, 560, 615, 670, 725, 780, 835, 902],
+            "priceBarTicks": [
+                90,
+                150
+            ],
+            "volumePerBar": [
+                120,
+                175,
+                230,
+                285,
+                340,
+                395,
+                450,
+                505,
+                560,
+                615,
+                670,
+                725,
+                780,
+                835,
+                902
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
@@ -1769,8 +2862,22 @@
             "name": "TRENT Aug Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
-            "priceBarTicks": [100, 169],
-            "volumePerBar": [20, 21, 22, 24, 25, 27, 29, 31, 34, 37],
+            "priceBarTicks": [
+                100,
+                169
+            ],
+            "volumePerBar": [
+                24,
+                26,
+                27,
+                29,
+                31,
+                33,
+                35,
+                38,
+                41,
+                45
+            ],
             "lotSize": 225,
             "tickSize": 0.05,
             "exchange": "NSE_FO",
@@ -1790,8 +2897,22 @@
             "name": "TRENT Cash Equity",
             "isHeavyStock": false,
             "stealthThresholdFloor": 7,
-            "priceBarTicks": [144, 240],
-            "volumePerBar": [8237, 8701, 9220, 9729, 10383, 11131, 11996, 12870, 14040, 15444],
+            "priceBarTicks": [
+                144,
+                240
+            ],
+            "volumePerBar": [
+                4444,
+                4694,
+                4975,
+                5249,
+                5602,
+                6005,
+                6472,
+                6944,
+                7575,
+                8332
+            ],
             "lotSize": 1,
             "tickSize": 0.05,
             "exchange": "NSE_EQ",
