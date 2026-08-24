@@ -26,7 +26,7 @@ const metaUtils = {
 
     filterSignals: (ruleId, ultraSignals = [], looseSignals = [], trendSignals = [], highTierSignals = []) => {
         if (!activeRegistry[ruleId]) activeRegistry[ruleId] = {};
-        const registry = activeRegistry[ru  leId];
+        const registry = activeRegistry[ruleId];
         const results = [];
 
         // Track instruments in this bar for registry cleanup
