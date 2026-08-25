@@ -19,17 +19,17 @@ const CONFIG_FILE = './build-version-config.json';
 const RESULTS_DIR = './live-backtest-results';
 const CANDLES_DIR = './candles/live';
 
-// MCX multipliers for lot sizing// ─── UPDATED AUGUST 2026 MULTIPLIERS ────────────────────────
+// ─── UPDATED SEPTEMBER/OCTOBER 2026 MULTIPLIERS ────────────────────────
 const MCX_MULTIPLIERS = {
-    '561496': 1250, '561497': 250,  // Natural Gas & Mini
-    '555922': 100,  '560977': 10,   // Crude Oil & Mini
-    '471725': 30,   '471726': 5,    '488788': 1,    // Silver, Mini, Micro
-    '568831': 2500, '568836': 5000, '568833': 5000, '568830': 5000, // Metals
-    '466583': 100,  '510764': 10,   '562056': 1     // Gold, Mini, Petal
+    '568245': 1250, '568246': 250,  // Natural Gas & Mini
+    '565899': 100,  '565900': 10,   // Crude Oil & Mini
+    '574824': 30,   '483080': 5,    '562058': 1,    // Silver, Mini, Micro
+    '571298': 2500, '571303': 5,    '571300': 5,    '571297': 5,    // Copper, Zinc, Lead, Alu
+    '483079': 1,    '569003': 100,  '568839': 1     // Gold, Mini, Petal
 };
 
 const INDEX_MULTIPLIERS = { 
-    '58072': 75, '58067': 30, '58070': 40, '58071': 120 // Nifty, Bank, Fin, Midcap
+    '68407': 65, '68390': 30, '68391': 60, '68406': 120 // Nifty, Bank, Fin, Midcap
 };
 
 function getLotMultiplier(instKey) {

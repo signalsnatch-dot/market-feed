@@ -86,26 +86,26 @@ const INSTRUMENT_NAMES = {
     'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL', 'INE849A01020': 'TRENT',
 
     // August MCX IDs
-    '561496': 'Natural Gas Future', '561497': 'Natural Gas Mini Future',
-    '555922': 'Crude Oil Future', '560977': 'Crude Oil Mini Future',
-    '471725': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
-    '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
-    '568830': 'Aluminium Future', '466583': 'Gold Future', '510764': 'Gold Mini Future',
-    '562056': 'Gold Petal Future',
+    '568245': 'Natural Gas Future', '568246': 'Natural Gas Mini Future',
+    '565899': 'Crude Oil Future', '565900': 'Crude Oil Mini Future',
+    '574824': 'Silver Future', '483080': 'Silver Mini Future', '562058': 'Silver Micro Future',
+    '571298': 'Copper Future', '571303': 'Zinc Future', '571300': 'Lead Future',
+    '571297': 'Aluminium Future', '483079': 'Gold Future', '569003': 'Gold Mini Future',
+    '568839': 'Gold Petal Future',
 
-    // August NSE Index/Stock IDs
-    '58072': 'Nifty 50 Future', '58067': 'Nifty Bank Future', '58070': 'Fin Nifty Future',
-    '58071': 'Midcap Nifty Future', '58371': 'Reliance Future', '58216': 'HDFC Bank Future',
-    '58232': 'ICICI Bank Future', '58382': 'SBI Future', '58399': 'TCS Future',
-    '58245': 'Infosys Future', '58250': 'ITC Future', '58132': 'Bharti Airtel Future',
-    '58117': 'Axis Bank Future', '58298': 'L&T Future', '58398': 'Tata Steel Future',
-    '58403': 'Tata Motors Future', '58121': 'Bajaj Finance Future', '58277': 'Kotak Bank Future',
-    '58391': 'Sun Pharma Future', '58258': 'JSW Steel Future', '58148': 'Coal India Future',
-    '58088': 'Adani Enterprises Future', '58090': 'Adani Ports Future', '58225': 'Hindalco Future',
-    '58105': 'Apollo Hospitals Future', '58350': 'PNB Future', '58375': 'SAIL Future',
-    '58393': 'SUZLON Future', '58342': 'PAYTM Future', '58374': 'RVNL Future',
-    '58249': 'IRFC Future', '58248': 'IREDA Future', '58133': 'BHEL Future',
-    '58189': 'GAIL Future', '58405': 'TRENT Future'
+    // September NSE Index/Stock IDs
+    '68407': 'Nifty 50 Future', '68390': 'Nifty Bank Future', '68391': 'Fin Nifty Future',
+    '68406': 'Midcap Nifty Future', '68777': 'Reliance Future', '68534': 'HDFC Bank Future',
+    '68542': 'ICICI Bank Future', '68782': 'SBI Future', '68797': 'TCS Future',
+    '68553': 'Infosys Future', '68558': 'ITC Future', '68449': 'Bharti Airtel Future',
+    '68434': 'Axis Bank Future', '68620': 'L&T Future', '68796': 'Tata Steel Future',
+    '68801': 'Tata Motors Future', '68442': 'Bajaj Finance Future', '68610': 'Kotak Bank Future',
+    '68789': 'Sun Pharma Future', '68564': 'JSW Steel Future', '68463': 'Coal India Future',
+    '68417': 'Adani Enterprises Future', '68419': 'Adani Ports Future', '68537': 'Hindalco Future',
+    '68426': 'Apollo Hospitals Future', '68766': 'PNB Future', '68779': 'SAIL Future',
+    '68791': 'SUZLON Future', '68758': 'PAYTM Future', '68778': 'RVNL Future',
+    '68557': 'IRFC Future', '68556': 'IREDA Future', '68450': 'BHEL Future',
+    '68482': 'GAIL Future', '68803': 'TRENT Future'
 };
 
 function getInstrumentDisplayName(rawInstrument) {

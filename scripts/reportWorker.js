@@ -16,6 +16,8 @@ const path = require('path');
 
 const versionRegex = /^(?:ELITE_)?V(\d+[A-Z]?)/;
 
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 // ── Helper functions (copied from generateReport.js to keep worker self-contained) ──
 
 const INSTRUMENT_NAMES = {
@@ -32,25 +34,26 @@ const INSTRUMENT_NAMES = {
     'INE849A01020': 'TRENT',
 
     // August MCX IDs
-    '561496': 'Natural Gas Future', '561497': 'Natural Gas Mini Future',
-    '555922': 'Crude Oil/Gold Mini Future', '560977': 'Crude Oil Mini Future',
-    '471725': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
-    '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
-    '568830': 'Aluminium Future', '466583': 'Gold Future', '562056': 'Gold Petal Future',
+    '568245': 'Natural Gas Future', '568246': 'Natural Gas Mini Future',
+    '565899': 'Crude Oil Future', '565900': 'Crude Oil Mini Future',
+    '574824': 'Silver Future', '483080': 'Silver Mini Future', '562058': 'Silver Micro Future',
+    '571298': 'Copper Future', '571303': 'Zinc Future', '571300': 'Lead Future',
+    '571297': 'Aluminium Future', '483079': 'Gold Future', '569003': 'Gold Mini Future',
+    '568839': 'Gold Petal Future',
 
-    // August NSE Index/Stock IDs
-    '58072': 'Nifty 50 Future', '58067': 'Nifty Bank Future', '58070': 'Fin Nifty Future',
-    '58071': 'Midcap Nifty Future', '58371': 'Reliance Future', '58216': 'HDFC Bank Future',
-    '58232': 'ICICI Bank Future', '58382': 'SBI Future', '58399': 'TCS Future',
-    '58245': 'Infosys Future', '58250': 'ITC Future', '58132': 'Bharti Airtel Future',
-    '58117': 'Axis Bank Future', '58298': 'L&T Future', '58398': 'Tata Steel Future',
-    '58403': 'Tata Motors Future', '58121': 'Bajaj Finance Future', '58277': 'Kotak Bank Future',
-    '58391': 'Sun Pharma Future', '58258': 'JSW Steel Future', '58148': 'Coal India Future',
-    '58088': 'Adani Enterprises Future', '58090': 'Adani Ports Future', '58225': 'Hindalco Future',
-    '58105': 'Apollo Hospitals Future', '58350': 'PNB Future', '58375': 'SAIL Future',
-    '58393': 'SUZLON Future', '58342': 'PAYTM Future', '58374': 'RVNL Future',
-    '58249': 'IRFC Future', '58248': 'IREDA Future', '58133': 'BHEL Future',
-    '58189': 'GAIL Future', '58405': 'TRENT Future'
+    // September/October NSE Index/Stock IDs
+    '68407': 'Nifty 50 Future', '68390': 'Nifty Bank Future', '68391': 'Fin Nifty Future',
+    '68406': 'Midcap Nifty Future', '68777': 'Reliance Future', '68534': 'HDFC Bank Future',
+    '68542': 'ICICI Bank Future', '68782': 'SBI Future', '68797': 'TCS Future',
+    '68553': 'Infosys Future', '68558': 'ITC Future', '68449': 'Bharti Airtel Future',
+    '68434': 'Axis Bank Future', '68620': 'L&T Future', '68796': 'Tata Steel Future',
+    '68801': 'Tata Motors Future', '68442': 'Bajaj Finance Future', '68610': 'Kotak Bank Future',
+    '68789': 'Sun Pharma Future', '68564': 'JSW Steel Future', '68463': 'Coal India Future',
+    '68417': 'Adani Enterprises Future', '68419': 'Adani Ports Future', '68537': 'Hindalco Future',
+    '68426': 'Apollo Hospitals Future', '68766': 'PNB Future', '68779': 'SAIL Future',
+    '68791': 'SUZLON Future', '68758': 'PAYTM Future', '68778': 'RVNL Future',
+    '68557': 'IRFC Future', '68556': 'IREDA Future', '68450': 'BHEL Future',
+    '68482': 'GAIL Future', '68803': 'TRENT Future'
 };
 
 function getInstrumentDisplayName(rawInstrument) {
@@ -266,6 +269,8 @@ const L2_candle = new Map(); // "version|instrument|candleBucket|date" → {...}
 const L3_candle = new Map(); // "version_name|instrument|candleBucket" → {...}
 const candleCountMap = {};    // "instrumentName|date" → candlesCount (for percentile computation)
 const instRawInstrument = {}; // "instrumentName" → rawInstrument key (for mapping back)
+const L_Time = new Map(); // "version|instrument|pIndex|day|hour" -> metrics
+
 
 let filesProcessed = 0;
 let totalRows = 0;
@@ -308,7 +313,6 @@ for (const filePath of fileList) {
 
         // Candle bucket: use raw count for precise labeling, or 'unknown'
         const candleBucket = candlesCount > 0 ? String(candlesCount) : null;
-
         for (const [stratKey, strategyData] of Object.entries(data.strategies)) {
             const vMatch = stratKey.match(versionRegex);
             if (!vMatch) continue;
@@ -319,51 +323,59 @@ for (const filePath of fileList) {
             for (const trade of strategyData.results.trades) {
                 totalRows++;
                 const conf = trade.confidence;
-                const mafe = trade.mafePercentage;
-                const mae = trade.maePercentage;
+                const mafe = parseFloat(trade.mafePercentage) || 0;
+                const mae = parseFloat(trade.maePercentage) || 0;
                 const pnl = parseFloat(trade.pnl) || 0;
                 const pnlAmount = parseFloat(trade.pnlAmount) || 0;
                 const isWin = pnlAmount > 0;
-
-                const confBucket = getConfidenceBucket(conf);
-                const mafeBucket = mafe != null ? getMafeBucket(parseFloat(mafe)) : null;
-                const maeBucket = mae != null ? getMaeBucket(parseFloat(mae)) : null;
-
-                // L1: confidence distribution
-                if (confBucket) {
-                    const l1key = [versionName, instrumentName, pIndex, date, confBucket].join('|');
-                    addL1(L1, l1key, isWin);
-                }
-
-                // L1_mafe
-                if (mafeBucket) {
-                    const key = [versionName, instrumentName, pIndex, date, mafeBucket].join('|');
-                    addL1Bucket(L1_mafe, key);
-                }
-
-                // L1_mae
-                if (maeBucket) {
-                    const key = [versionName, instrumentName, pIndex, date, maeBucket].join('|');
-                    addL1Bucket(L1_mae, key);
-                }
-
                 const rrr = trade.rrr != null ? parseFloat(trade.rrr) : 0;
 
-                // L2: per (version, instrument, pIndex, date)
+                // ── NEW: IST TIME & DAY CALCULATION --    
+                // ── NEW: IST TIME & DAY CALCULATION ──
+                let epoch = trade.entry_time || trade.timestamp || trade.time;
+                if (epoch) {
+                    // Ensure epoch is a number
+                    let timestamp = Number(epoch);
+                    // Normalize to milliseconds if in seconds (10 digits)
+                    if (timestamp < 10000000000) timestamp *= 1000;
+                    
+                    const dateObj = new Date(timestamp);
+                    // IST = UTC + 5.5 hours
+                    const istDate = new Date(dateObj.getTime() + (5.5 * 60 * 60 * 1000));
+                    
+                    // Use UTC methods on the offset-date to get the correct IST day/hour
+                    const day = DAYS[istDate.getUTCDay()];
+                    const hour = istDate.getUTCHours();
+
+                    // Key index 0:Version, 1:Instrument, 2:pIndex, 3:Day, 4:Hour
+                    const timeKey = [versionName, instrumentName, pIndex, day, hour].join('|');
+                    addL2(L_Time, timeKey, isWin, pnl, parseFloat(trade.pnlAmount)||0, parseFloat(trade.mafePercentage)||0, parseFloat(trade.maePercentage)||0, !isNaN(trade.confidence)?trade.confidence:50, parseFloat(trade.rrr)||0);
+                }
+
+                // ── EXISTING LOGIC (Preserved) ──
+                const confBucket = getConfidenceBucket(conf);
+                const mafeBucket = mafe != null ? getMafeBucket(mafe) : null;
+                const maeBucket = mae != null ? getMaeBucket(mae) : null;
+
+                if (confBucket) {
+                    addL1(L1, [versionName, instrumentName, pIndex, date, confBucket].join('|'), isWin);
+                }
+                if (mafeBucket) {
+                    addL1Bucket(L1_mafe, [versionName, instrumentName, pIndex, date, mafeBucket].join('|'));
+                }
+                if (maeBucket) {
+                    addL1Bucket(L1_mae, [versionName, instrumentName, pIndex, date, maeBucket].join('|'));
+                }
+
                 const l2key = [versionName, instrumentName, pIndex, date].join('|');
-                addL2(L2, l2key, isWin, pnl, pnlAmount, parseFloat(mafe) || 0, parseFloat(mae) || 0, !isNaN(conf) ? conf : 50, rrr);
+                addL2(L2, l2key, isWin, pnl, pnlAmount, mafe, mae, !isNaN(conf) ? conf : 50, rrr);
 
-                // L3: per (version_name, instrument, pIndex) — collapsed across dates
                 const l3key = [versionName, instrumentName, pIndex].join('|');
-                addL3(L3, l3key, isWin, pnl, pnlAmount, parseFloat(mafe) || 0, parseFloat(mae) || 0, rrr);
+                addL3(L3, l3key, isWin, pnl, pnlAmount, mafe, mae, rrr);
 
-                // L2_candle: per (version, instrument, candleBucket, date)
                 if (candleBucket) {
-                    const l2cKey = [versionName, instrumentName, candleBucket, date].join('|');
-                    addL2(L2_candle, l2cKey, isWin, pnl, pnlAmount, parseFloat(mafe) || 0, parseFloat(mae) || 0, !isNaN(conf) ? conf : 50, rrr);
-                    // L3_candle: per (versionName, instrument, candleBucket)
                     const l3cKey = [versionName, instrumentName, candleBucket].join('|');
-                    addL3(L3_candle, l3cKey, isWin, pnl, pnlAmount, parseFloat(mafe) || 0, parseFloat(mae) || 0, rrr);
+                    addL3(L3_candle, l3cKey, isWin, pnl, pnlAmount, mafe, mae, rrr);
                 }
             }
         }
@@ -379,14 +391,10 @@ const output = {
     L1_mae: mapToObj(L1_mae),
     L2: mapToObj(L2),
     L3: mapToObj(L3),
-    L2_candle: mapToObj(L2_candle),
     L3_candle: mapToObj(L3_candle),
+    L_Time: mapToObj(L_Time), // Add this
     candleCountMap,
-    meta: {
-        filesProcessed,
-        totalRows,
-        batchFile
-    }
+    meta: { filesProcessed, totalRows, batchFile }
 };
 
 fs.writeFileSync(outputFile, JSON.stringify(output), 'utf8');

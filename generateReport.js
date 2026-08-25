@@ -93,24 +93,24 @@ const INSTRUMENT_NAMES = {
     'INE114A01011': 'SAIL', 'INE040H01021': 'SUZLON', 'INE928J01020': 'PAYTM', 
     'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC', 'INE202E01016': 'IREDA', 
     'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL', 'INE849A01020': 'TRENT',
-    '561496': 'Natural Gas Future', '561497': 'Natural Gas Mini Future',
-    '555922': 'Crude Oil Future', '560977': 'Crude Oil Mini Future',
-    '471725': 'Silver Future', '471726': 'Silver Mini Future', '488788': 'Silver Micro Future',
-    '568831': 'Copper Future', '568836': 'Zinc Future', '568833': 'Lead Future',
-    '568830': 'Aluminium Future', '466583': 'Gold Future', '510764': 'Gold Mini Future',
-    '562056': 'Gold Petal Future',
-    '58072': 'Nifty 50 Future', '58067': 'Nifty Bank Future', '58070': 'Fin Nifty Future',
-    '58071': 'Midcap Nifty Future', '58371': 'Reliance Future', '58216': 'HDFC Bank Future',
-    '58232': 'ICICI Bank Future', '58382': 'SBI Future', '58399': 'TCS Future',
-    '58245': 'Infosys Future', '58250': 'ITC Future', '58132': 'Bharti Airtel Future',
-    '58117': 'Axis Bank Future', '58298': 'L&T Future', '58398': 'Tata Steel Future',
-    '58403': 'Tata Motors Future', '58121': 'Bajaj Finance Future', '58277': 'Kotak Bank Future',
-    '58391': 'Sun Pharma Future', '58258': 'JSW Steel Future', '58148': 'Coal India Future',
-    '58088': 'Adani Enterprises Future', '58090': 'Adani Ports Future', '58225': 'Hindalco Future',
-    '58105': 'Apollo Hospitals Future', '58350': 'PNB Future', '58375': 'SAIL Future',
-    '58393': 'SUZLON Future', '58342': 'PAYTM Future', '58374': 'RVNL Future',
-    '58249': 'IRFC Future', '58248': 'IREDA Future', '58133': 'BHEL Future',
-    '58189': 'GAIL Future', '58405': 'TRENT Future'
+    '568245': 'Natural Gas Future', '568246': 'Natural Gas Mini Future',
+    '565899': 'Crude Oil Future', '565900': 'Crude Oil Mini Future',
+    '574824': 'Silver Future', '483080': 'Silver Mini Future', '562058': 'Silver Micro Future',
+    '571298': 'Copper Future', '571303': 'Zinc Future', '571300': 'Lead Future',
+    '571297': 'Aluminium Future', '483079': 'Gold Future', '569003': 'Gold Mini Future',
+    '568839': 'Gold Petal Future',
+    '68407': 'Nifty 50 Future', '68390': 'Nifty Bank Future', '68391': 'Fin Nifty Future',
+    '68406': 'Midcap Nifty Future', '68777': 'Reliance Future', '68534': 'HDFC Bank Future',
+    '68542': 'ICICI Bank Future', '68782': 'SBI Future', '68797': 'TCS Future',
+    '68553': 'Infosys Future', '68558': 'ITC Future', '68449': 'Bharti Airtel Future',
+    '68434': 'Axis Bank Future', '68620': 'L&T Future', '68796': 'Tata Steel Future',
+    '68801': 'Tata Motors Future', '68442': 'Bajaj Finance Future', '68610': 'Kotak Bank Future',
+    '68789': 'Sun Pharma Future', '68564': 'JSW Steel Future', '68463': 'Coal India Future',
+    '68417': 'Adani Enterprises Future', '68419': 'Adani Ports Future', '68537': 'Hindalco Future',
+    '68426': 'Apollo Hospitals Future', '68766': 'PNB Future', '68779': 'SAIL Future',
+    '68791': 'SUZLON Future', '68758': 'PAYTM Future', '68778': 'RVNL Future',
+    '68557': 'IRFC Future', '68556': 'IREDA Future', '68450': 'BHEL Future',
+    '68482': 'GAIL Future', '68803': 'TRENT Future'
 };
 
 function getInstrumentDisplayName(rawInstrument) {
@@ -231,7 +231,7 @@ async function collectAggregatedData() {
     console.log(`\nMerging ${mergedOutputFiles.length} worker outputs...`);
 
     // ── Phase 2: Merge aggregated outputs AND build indexed lookups ──
-    const merged = { L1: {}, L1_mafe: {}, L1_mae: {}, L2: {}, L3: {}, L3_candle: {} };
+    const merged = { L1: {}, L1_mafe: {}, L1_mae: {}, L2: {}, L3: {}, L3_candle: {}, L_Time: {} };
     // Indexed lookups for O(1) access during report generation
     const l2ByVersion = new Map();    // version → [{key, ...val}]
     const l2ByInstTh = new Map();     // "instrument|threshold" → [{key, ...val}]
@@ -239,70 +239,41 @@ async function collectAggregatedData() {
 
     for (const outputFile of mergedOutputFiles) {
         const data = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
-
-        // Merge L1: {count, wins}
-        for (const [key, val] of Object.entries(data.L1 || {})) {
-            if (!merged.L1[key]) merged.L1[key] = { count: 0, wins: 0 };
-            merged.L1[key].count += val.count;
-            merged.L1[key].wins += val.wins;
-        }
-
-        // Merge L1_mafe: count
-        for (const [key, val] of Object.entries(data.L1_mafe || {})) {
-            merged.L1_mafe[key] = (merged.L1_mafe[key] || 0) + val;
-        }
-
-        // Merge L1_mae: count
-        for (const [key, val] of Object.entries(data.L1_mae || {})) {
-            merged.L1_mae[key] = (merged.L1_mae[key] || 0) + val;
-        }
-
-        // Merge L2: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumRRR, sumConfidence}
-        for (const [key, val] of Object.entries(data.L2 || {})) {
-            if (!merged.L2[key]) {
-                merged.L2[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumRRR: 0, sumConfidence: 0 };
+// Merge L1, mafe, mae, L2, L3 (Standard logic)
+        for (const key of ['L1', 'L1_mafe', 'L1_mae', 'L2', 'L3', 'L3_candle']) {
+            if (!data[key]) continue;
+            for (const [k, v] of Object.entries(data[key])) {
+                if (typeof v === 'number') {
+                    merged[key][k] = (merged[key][k] || 0) + v;
+                } else {
+                    if (!merged[key][k]) merged[key][k] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumRRR: 0, sumConfidence: 0 };
+                    merged[key][k].count += v.count;
+                    merged[key][k].wins += v.wins;
+                    merged[key][k].sumPnl += v.sumPnl || 0;
+                    merged[key][k].sumMafe += v.sumMafe || 0;
+                    merged[key][k].sumMae += v.sumMae || 0;
+                    merged[key][k].sumRRR += v.sumRRR || 0;
+                }
             }
-            merged.L2[key].count += val.count;
-            merged.L2[key].wins += val.wins;
-            merged.L2[key].sumPnl += val.sumPnl || 0;
-            merged.L2[key].sumPnlAmount += val.sumPnlAmount || 0;
-            merged.L2[key].sumMafe += val.sumMafe || 0;
-            merged.L2[key].sumMae += val.sumMae || 0;
-            merged.L2[key].sumRRR += val.sumRRR || 0;
-            merged.L2[key].sumConfidence += val.sumConfidence || 0;
         }
 
-        // Merge L3: {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae, sumRRR}
-        for (const [key, val] of Object.entries(data.L3 || {})) {
-            if (!merged.L3[key]) {
-                merged.L3[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0, sumRRR: 0 };
+        // CRITICAL FIX: Merge L_Time explicitly
+        if (data.L_Time) {
+            for (const [key, val] of Object.entries(data.L_Time)) {
+                if (!merged.L_Time[key]) {
+                    merged.L_Time[key] = { count: 0, wins: 0, sumPnl: 0, sumMafe: 0, sumMae: 0, sumRRR: 0 };
+                }
+                const m = merged.L_Time[key];
+                m.count += val.count;
+                m.wins += val.wins;
+                m.sumPnl += val.sumPnl || 0;
+                m.sumMafe += val.sumMafe || 0;
+                m.sumMae += val.sumMae || 0;
+                m.sumRRR += val.sumRRR || 0;
             }
-            merged.L3[key].count += val.count;
-            merged.L3[key].wins += val.wins;
-            merged.L3[key].sumPnl += val.sumPnl || 0;
-            merged.L3[key].sumPnlAmount += val.sumPnlAmount || 0;
-            merged.L3[key].sumMafe += val.sumMafe || 0;
-            merged.L3[key].sumMae += val.sumMae || 0;
-            merged.L3[key].sumRRR += val.sumRRR || 0;
         }
 
-        // Merge L3_candle: (version, instrument, candleBucket) → {count, wins, sumPnl, sumPnlAmount, sumMafe, sumMae}
-        for (const [key, val] of Object.entries(data.L3_candle || {})) {
-            if (!merged.L3_candle[key]) {
-                merged.L3_candle[key] = { count: 0, wins: 0, sumPnl: 0, sumPnlAmount: 0, sumMafe: 0, sumMae: 0 };
-            }
-            merged.L3_candle[key].count += val.count;
-            merged.L3_candle[key].wins += val.wins;
-            merged.L3_candle[key].sumPnl += val.sumPnl || 0;
-            merged.L3_candle[key].sumPnlAmount += val.sumPnlAmount || 0;
-            merged.L3_candle[key].sumMafe += val.sumMafe || 0;
-            merged.L3_candle[key].sumMae += val.sumMae || 0;
-        }
-
-        // Merge candleCountMap for percentile computation
-        if (data.candleCountMap) {
-            Object.assign(merged._candleCountMap || (merged._candleCountMap = {}), data.candleCountMap);
-        }
+        if (data.candleCountMap) Object.assign(merged._candleCountMap || (merged._candleCountMap = {}), data.candleCountMap);
     }
 
     // Build indexed lookups from merged L2
@@ -657,7 +628,65 @@ async function generateReport(merged) {
 
         if (instIdx % 10 === 0) console.log(`   Section 5: ${instIdx}/${uniqueInstruments.length} instruments written`);
     }
+    console.log('Writing Section 6 (Time analysis)...');
+    write(w, `## Section 6: Time and Day Performance Analysis (IST)\n\n`);
+    write(w, `*Performance breakdown by Indian Standard Time. Useful for identifying high-probability trading windows.*\n\n`);
+    
+    // Expanded to include all days to prevent empty reports for Sunday/Saturday trades
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const allTimeEntries = Object.entries(merged.L_Time || {});
 
+    for (const v of uniqueVersions) {
+        write(w, `### **Time-Based Deep Dive: ${v}**\n\n`);
+
+        for (const inst of uniqueInstruments) {
+            // Filter entries specifically for this version and instrument
+            const relevantEntries = allTimeEntries.filter(([k]) => {
+                const parts = k.split('|');
+                return parts[0] === v && parts[1] === inst;
+            });
+
+            if (relevantEntries.length === 0) continue;
+
+            write(w, `#### **Asset: ${inst}**\n\n`);
+
+            // 1. Day Table
+            write(w, `| Day (IST) | Trades | Win Rate % | Total Return % | Avg Return % |\n`);
+            write(w, `| :--- | :---: | :---: | :---: | :---: |\n`);
+
+            ALL_DAYS.forEach(day => {
+                const dStats = relevantEntries
+                    .filter(([k]) => k.split('|')[3] === day)
+                    .reduce((acc, [_, val]) => {
+                        acc.c += val.count; acc.w += val.wins; acc.p += val.sumPnl; return acc;
+                    }, {c: 0, w: 0, p: 0});
+
+                if (dStats.c > 0) {
+                    write(w, `| ${day} | ${dStats.c} | ${(dStats.w/dStats.c*100).toFixed(2)}% | ${dStats.p.toFixed(2)}% | ${(dStats.p/dStats.c).toFixed(3)}% |\n`);
+                }
+            });
+            write(w, `\n`);
+
+            // 2. Hour Table
+            write(w, `| Hour (IST) | Trades | Win Rate % | Total Return % | Avg Return % |\n`);
+            write(w, `| :--- | :---: | :---: | :---: | :---: |\n`);
+
+            // Check hours from 0 to 23 to cover full market cycles
+            for (let h = 0; h <= 23; h++) {
+                const hStats = relevantEntries
+                    .filter(([k]) => parseInt(k.split('|')[4]) === h)
+                    .reduce((acc, [_, val]) => {
+                        acc.c += val.count; acc.w += val.wins; acc.p += val.sumPnl; return acc;
+                    }, {c: 0, w: 0, p: 0});
+
+                if (hStats.c > 0) {
+                    const label = h < 12 ? `${h === 0 ? 12 : h} AM` : h === 12 ? `12 PM` : `${h - 12} PM`;
+                    write(w, `| ${label} | ${hStats.c} | ${(hStats.w/hStats.c*100).toFixed(2)}% | ${hStats.p.toFixed(2)}% | ${(hStats.p/hStats.c).toFixed(3)}% |\n`);
+                }
+            }
+            write(w, `\n---\n\n`);
+        }
+    }
     // Close stream and free large indexes no longer needed
     await new Promise((resolve, reject) => {
         w.end(() => {
