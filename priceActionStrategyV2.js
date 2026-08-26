@@ -2510,22 +2510,13 @@ const ELITE_META_VERSIONS = {
     "ELITE_R6_STEALTH_SYNC_VETO": (c, p) => eliteMeta.filterSignals("RULE_6", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
     
     // 7. Perfect Protocol (Floor 0)
+       // Standard Meta 2.0 Rules
     "ELITE_R7_PERFECT": (c, p) => eliteMeta.filterSignals("RULE_7", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
-    
-    // 8. High Tier Stealth Only (Floor 0)
-    "ELITE_R8_HT_STEALTH": (c, p) => eliteMeta.filterSignals("RULE_8", [], [], [], ELITE_H(c, p), p.config),
-    
-    // 9. Dual Stealth (Floor 0)
-    "ELITE_R9_DUAL_STEALTH": (c, p) => eliteMeta.filterSignals("RULE_9", ELITE_U(c, p), [], [], ELITE_H(c, p), p.config),
-    
-    // 10. Powerhouse Protocol (Meta 2.0 - Floor 0)
     "ELITE_R10_POWERHOUSE": (c, p) => eliteMeta.filterSignals("RULE_10", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
-    
-    // 11. Perfect With Floor (Config Floors Active)
-    "ELITE_R11_PERFECT_WITH_FLOOR": (c, p) => eliteMeta.filterSignals("RULE_11", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
-    
-    // 12. Powerhouse With Floor (Config Floors Active)
-    "ELITE_R12_POWERHOUSE_WITH_FLOOR": (c, p) => eliteMeta.filterSignals("RULE_12", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config)
+    "ELITE_R12_POWERHOUSE_FLOOR": (c, p) => eliteMeta.filterSignals("RULE_12", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
+
+    // NEW: THE UBER ENGINE (CONTRARIAN)
+    "ELITE_UBER_ENGINE": (c, p) => eliteMeta.filterSignals("UBER_ENGINE", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config)
 };
 
 const ALL_STRATEGIES = {
