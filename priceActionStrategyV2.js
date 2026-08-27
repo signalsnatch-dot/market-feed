@@ -2495,30 +2495,16 @@ const ELITE_L = TOP_10_ELITE_STRATEGIES["ELITE_V125A_N_LOOSE"];
 const ELITE_T = TOP_10_ELITE_STRATEGIES["ELITE_V935A_T_MED"];
 const ELITE_H = TOP_10_ELITE_STRATEGIES["ELITE_V935A_TIER_HIGH"];
 
-
 const ELITE_META_VERSIONS = {
-    // 3. Ultra Stealth Only (Floor 0)
-    "ELITE_R3_STEALTH": (c, p) => eliteMeta.filterSignals("RULE_3", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
+    // 1. Meta 2.0 (Standard Rule 10)
+    "ELITE_META_2_0": (c, p) => eliteMeta.filterSignals("META_2_0", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
     
-    // 4. Stealth + 125 Equal (Floor 0)
-    "ELITE_R4_STEALTH_SYNC": (c, p) => eliteMeta.filterSignals("RULE_4", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
+    // 2. Meta 2.0 Thursday (Triple Sync + Strike Law)
+    "ELITE_META_THURSDAY": (c, p) => eliteMeta.filterSignals("META_THURSDAY", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
     
-    // 5. Stealth + 935 Veto (Floor 0)
-    "ELITE_R5_STEALTH_VETO": (c, p) => eliteMeta.filterSignals("RULE_5", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
-    
-    // 6. Stealth + Equal + Veto (Floor 0)
-    "ELITE_R6_STEALTH_SYNC_VETO": (c, p) => eliteMeta.filterSignals("RULE_6", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
-    
-    // 7. Perfect Protocol (Floor 0)
-       // Standard Meta 2.0 Rules
-    "ELITE_R7_PERFECT": (c, p) => eliteMeta.filterSignals("RULE_7", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config),
-    "ELITE_R10_POWERHOUSE": (c, p) => eliteMeta.filterSignals("RULE_10", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
-    "ELITE_R12_POWERHOUSE_FLOOR": (c, p) => eliteMeta.filterSignals("RULE_12", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config),
-
-    // NEW: THE UBER ENGINE (CONTRARIAN)
-    "ELITE_UBER_ENGINE": (c, p) => eliteMeta.filterSignals("UBER_ENGINE", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), [], p.config)
+    // 3. Uber Engine (The Contrarian Suite)
+    "ELITE_UBER_ENGINE": (c, p) => eliteMeta.filterSignals("UBER_ENGINE", ELITE_U(c, p), ELITE_L(c, p), ELITE_T(c, p), ELITE_H(c, p), p.config)
 };
-
 const ALL_STRATEGIES = {
     ...TOP_10_ELITE_STRATEGIES,
     ...ELITE_META_VERSIONS // New Meta-Strategies now listed here
