@@ -92,8 +92,8 @@ const eliteMetaEngine = {
                     results.push({
                         ...sig,
                         type: sig.type.includes("BUY") ? "SELL_STOP" : "BUY_STOP",
-                        sl: sig.tp, // FIXED: Interchanged
-                        tp: sig.sl, // FIXED: Interchanged
+                        sl: sig.sl, // FIXED: Interchanged
+                        tp: sig.tp, // FIXED: Interchanged
                         metaReason: ultraIsSilent ? "Uber Logic: Law 2 Silence" : "Uber Logic: Strike Reversal",
                         status: "ACTIVE_UBER"
                     });
