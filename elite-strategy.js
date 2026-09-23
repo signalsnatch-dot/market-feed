@@ -91,7 +91,7 @@ const eliteMetaEngine = {
                 if ((ultraIsSilent || strikeVeto) && (maxTime - sig.timestamp <= TIME_WINDOW)) {
                     results.push({
                         ...sig,
-                        type: sig.type.includes("BUY") ? "SELL_STOP" : "BUY_STOP",
+                        type: sig.type.includes("BUY") ? "BUY_STOP" : "SELL_STOP",
                         sl: sig.sl, // FIXED: Interchanged
                         tp: sig.tp, // FIXED: Interchanged
                         metaReason: ultraIsSilent ? "Uber Logic: Law 2 Silence" : "Uber Logic: Strike Reversal",
