@@ -148,7 +148,7 @@
     },
     "instruments": [
         {
-            "key": "MCX_FO|568245",
+            "key": "MCX_FO|570750",
             "name": "Natural Gas Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -157,16 +157,16 @@
                 8
             ],
             "volumePerBar": [
-                667,
-                705,
-                747,
-                788,
-                841,
-                902,
-                972,
-                1043,
-                1138,
-                1251
+                563,
+                595,
+                631,
+                665,
+                710,
+                761,
+                820,
+                880,
+                960,
+                1056
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -180,10 +180,10 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.15,
-            "notes": "NATURALGAS26SEPFUT | NATURALGAS | 2026-09-25"
+            "notes": "NATURALGAS26OCTFUT | NATURALGAS | 2026-10-27"
         },
         {
-            "key": "MCX_FO|568246",
+            "key": "MCX_FO|570751",
             "name": "Natural Gas Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -192,16 +192,16 @@
                 10
             ],
             "volumePerBar": [
-                1049,
-                1108,
-                1174,
-                1239,
-                1322,
-                1417,
-                1527,
-                1639,
-                1788,
-                1966
+                803,
+                848,
+                899,
+                949,
+                1012,
+                1085,
+                1170,
+                1255,
+                1369,
+                1506
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -215,10 +215,10 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.15,
-            "notes": "NATGASMINI26SEPFUT | NATURALGAS | 2026-09-25"
+            "notes": "NATGASMINI26OCTFUT | NATURALGAS | 2026-10-27"
         },
         {
-            "key": "MCX_FO|565899",
+            "key": "MCX_FO|569900",
             "name": "Crude Oil Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -227,16 +227,16 @@
                 18
             ],
             "volumePerBar": [
-                394,
-                416,
-                441,
-                466,
-                497,
-                533,
-                574,
-                616,
-                672,
-                739
+                397,
+                419,
+                444,
+                469,
+                500,
+                536,
+                578,
+                620,
+                676,
+                744
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -250,10 +250,10 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.15,
-            "notes": "CRUDEOIL26SEPFUT | CRUDE OIL | 2026-09-21"
+            "notes": "CRUDEOIL26OCTFUT | CRUDE OIL | 2026-10-19"
         },
         {
-            "key": "MCX_FO|565900",
+            "key": "MCX_FO|569901",
             "name": "Crude Oil Mini Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -262,16 +262,16 @@
                 30
             ],
             "volumePerBar": [
-                1074,
-                1135,
-                1202,
-                1269,
-                1354,
-                1451,
-                1564,
-                1678,
-                1831,
-                2014
+                1120,
+                1183,
+                1253,
+                1323,
+                1411,
+                1513,
+                1631,
+                1750,
+                1909,
+                2100
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -285,10 +285,10 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.15,
-            "notes": "CRUDEOILM26SEPFUT | CRUDE OIL | 2026-09-21"
+            "notes": "CRUDEOILM26OCTFUT | CRUDE OIL | 2026-10-19"
         },
         {
-            "key": "MCX_FO|574824",
+            "key": "MCX_FO|574825",
             "name": "Silver Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -297,16 +297,16 @@
                 250
             ],
             "volumePerBar": [
-                188,
-                198,
-                210,
-                222,
-                236,
-                253,
-                273,
-                293,
-                320,
-                352
+                145,
+                153,
+                163,
+                172,
+                183,
+                196,
+                212,
+                227,
+                248,
+                272
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -320,7 +320,7 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "SILVER10026SEPFUT | SILVER | 2026-09-30"
+            "notes": "SILVER10026OCTFUT | SILVER | 2026-10-30"
         },
         {
             "key": "MCX_FO|483080",
@@ -332,16 +332,16 @@
                 60
             ],
             "volumePerBar": [
-                294,
-                310,
-                329,
-                347,
-                370,
-                397,
-                428,
-                459,
-                501,
-                551
+                374,
+                395,
+                419,
+                442,
+                471,
+                505,
+                545,
+                584,
+                637,
+                701
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -367,16 +367,16 @@
                 110
             ],
             "volumePerBar": [
-                888,
-                938,
-                994,
-                1049,
-                1119,
-                1200,
-                1293,
-                1387,
-                1514,
-                1665
+                1098,
+                1160,
+                1229,
+                1297,
+                1384,
+                1484,
+                1599,
+                1716,
+                1872,
+                2059
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -393,7 +393,7 @@
             "notes": "SILVERMIC26NOVFUT | SILVER | 2026-11-30"
         },
         {
-            "key": "MCX_FO|571303",
+            "key": "MCX_FO|574834",
             "name": "Zinc Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -402,16 +402,16 @@
                 5
             ],
             "volumePerBar": [
+                14,
+                15,
+                16,
+                17,
                 18,
                 19,
                 20,
                 21,
                 22,
-                23,
-                24,
-                25,
-                26,
-                27
+                23
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -425,10 +425,10 @@
             "stopOffsetRatioV2": 0.45,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.18,
-            "notes": "ZINC26SEPFUT | ZINC | 2026-09-30"
+            "notes": "ZINC26OCTFUT | ZINC | 2026-10-30"
         },
         {
-            "key": "MCX_FO|571300",
+            "key": "MCX_FO|574830",
             "name": "Lead Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -460,10 +460,10 @@
             "stopOffsetRatioV2": 0.45,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.18,
-            "notes": "LEAD26SEPFUT | LEAD | 2026-09-30"
+            "notes": "LEAD26OCTFUT | LEAD | 2026-10-30"
         },
         {
-            "key": "MCX_FO|571297",
+            "key": "MCX_FO|574828",
             "name": "Aluminium Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -472,6 +472,8 @@
                 5
             ],
             "volumePerBar": [
+                9,
+                10,
                 11,
                 12,
                 13,
@@ -479,9 +481,7 @@
                 15,
                 16,
                 17,
-                18,
-                19,
-                20
+                18
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -495,7 +495,7 @@
             "stopOffsetRatioV2": 0.45,
             "doubleTopBottomToleranceRatioV2": 0.15,
             "structureOffsetRatio": 0.18,
-            "notes": "ALUMINIUM26SEPFUT | ALUMINIUM | 2026-09-30"
+            "notes": "ALUMINIUM26OCTFUT | ALUMINIUM | 2026-10-30"
         },
         {
             "key": "MCX_FO|483079",
@@ -507,16 +507,16 @@
                 12
             ],
             "volumePerBar": [
-                41,
-                44,
-                46,
-                49,
-                52,
+                45,
+                47,
+                50,
+                53,
                 56,
                 60,
                 65,
-                71,
-                78
+                70,
+                76,
+                84
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -542,16 +542,16 @@
                 70
             ],
             "volumePerBar": [
-                287,
-                303,
-                321,
-                339,
-                362,
-                388,
-                418,
-                448,
-                489,
-                538
+                331,
+                350,
+                371,
+                391,
+                417,
+                447,
+                482,
+                517,
+                564,
+                621
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -568,7 +568,7 @@
             "notes": "GOLDM26OCTFUT | GOLD | 2026-10-05"
         },
         {
-            "key": "MCX_FO|568839",
+            "key": "MCX_FO|571306",
             "name": "Gold Petal Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -577,16 +577,16 @@
                 140
             ],
             "volumePerBar": [
-                1305,
-                1379,
-                1461,
-                1542,
-                1645,
-                1764,
-                1901,
-                2040,
-                2225,
-                2448
+                946,
+                999,
+                1059,
+                1117,
+                1192,
+                1278,
+                1378,
+                1478,
+                1613,
+                1774
             ],
             "lotSize": 1,
             "tickSize": 1,
@@ -600,10 +600,10 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "GOLDPETAL26SEPFUT | GOLD | 2026-09-30"
+            "notes": "GOLDPETAL26OCTFUT | GOLD | 2026-10-30"
         },
         {
-            "key": "NSE_FO|68407",
+            "key": "NSE_FO|48704",
             "name": "Nifty 50 Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -612,16 +612,16 @@
                 200
             ],
             "volumePerBar": [
-                268,
-                283,
-                300,
-                316,
-                338,
-                362,
-                390,
-                419,
-                457,
-                502
+                161,
+                170,
+                180,
+                190,
+                203,
+                217,
+                234,
+                251,
+                274,
+                301
             ],
             "lotSize": 65,
             "tickSize": 0.1,
@@ -635,10 +635,10 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "NIFTY26SEPFUT | NIFTY | 2026-09-29"
+            "notes": "NIFTY26OCTFUT | NIFTY | 2026-10-27"
         },
         {
-            "key": "NSE_FO|68390",
+            "key": "NSE_FO|48699",
             "name": "Nifty Bank Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -647,16 +647,16 @@
                 140
             ],
             "volumePerBar": [
-                95,
-                101,
-                107,
-                113,
-                120,
-                129,
-                139,
-                149,
-                163,
-                179
+                49,
+                52,
+                55,
+                58,
+                62,
+                67,
+                72,
+                77,
+                84,
+                92
             ],
             "lotSize": 30,
             "tickSize": 0.2,
@@ -670,10 +670,10 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.1,
-            "notes": "BANKNIFTY26SEPFUT | BANKNIFTY | 2026-09-29"
+            "notes": "BANKNIFTY26OCTFUT | BANKNIFTY | 2026-10-27"
         },
         {
-            "key": "NSE_FO|68391",
+            "key": "NSE_FO|48702",
             "name": "Fin Nifty Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -705,10 +705,10 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.1,
-            "notes": "FINNIFTY26SEPFUT | FINNIFTY | 2026-09-29"
+            "notes": "FINNIFTY26OCTFUT | FINNIFTY | 2026-10-27"
         },
         {
-            "key": "NSE_FO|68406",
+            "key": "NSE_FO|48703",
             "name": "Midcap Nifty Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 0,
@@ -717,6 +717,7 @@
                 70
             ],
             "volumePerBar": [
+                18,
                 19,
                 20,
                 21,
@@ -725,8 +726,7 @@
                 24,
                 25,
                 26,
-                27,
-                28
+                27
             ],
             "lotSize": 120,
             "tickSize": 0.05,
@@ -740,10 +740,10 @@
             "stopOffsetRatioV2": 0.33,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.1,
-            "notes": "MIDCPNIFTY26SEPFUT | MIDCPNIFTY | 2026-09-29"
+            "notes": "MIDCPNIFTY26OCTFUT | MIDCPNIFTY | 2026-10-27"
         },
         {
-            "key": "NSE_FO|68777",
+            "key": "NSE_FO|48987",
             "name": "Reliance Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -752,16 +752,16 @@
                 25
             ],
             "volumePerBar": [
-                149,
-                157,
-                167,
-                176,
-                188,
-                201,
-                217,
-                233,
-                254,
-                279
+                119,
+                126,
+                133,
+                140,
+                150,
+                161,
+                173,
+                186,
+                203,
+                223
             ],
             "lotSize": 500,
             "tickSize": 0.1,
@@ -775,7 +775,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "RELIANCE26SEPFUT | RELIANCE INDUSTRIES LTD | 2026-09-29"
+            "notes": "RELIANCE26OCTFUT | RELIANCE INDUSTRIES LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE002A01018",
@@ -787,16 +787,16 @@
                 45
             ],
             "volumePerBar": [
-                63200,
-                66761,
-                70746,
-                74646,
-                79664,
-                85406,
-                92039,
-                98750,
-                107727,
-                118500
+                82996,
+                87672,
+                92906,
+                98027,
+                104617,
+                112157,
+                120868,
+                129682,
+                141471,
+                155618
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -813,7 +813,7 @@
             "notes": "RELIANCE | RELIANCE INDUSTRIES LTD | Cash"
         },
         {
-            "key": "NSE_FO|68534",
+            "key": "NSE_FO|48864",
             "name": "HDFC Bank Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -822,16 +822,16 @@
                 30
             ],
             "volumePerBar": [
-                408,
-                431,
-                456,
-                482,
-                514,
-                551,
-                594,
-                637,
-                695,
-                765
+                247,
+                261,
+                276,
+                291,
+                311,
+                333,
+                359,
+                385,
+                420,
+                462
             ],
             "lotSize": 650,
             "tickSize": 0.05,
@@ -845,7 +845,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "HDFCBANK26SEPFUT | HDFC BANK LTD | 2026-09-29"
+            "notes": "HDFCBANK26OCTFUT | HDFC BANK LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE040A01034",
@@ -857,16 +857,16 @@
                 30
             ],
             "volumePerBar": [
-                192053,
-                202873,
-                214985,
-                226834,
-                242084,
-                259531,
-                279689,
-                300083,
-                327363,
-                360099
+                177683,
+                187693,
+                198898,
+                209861,
+                223970,
+                240112,
+                258761,
+                277629,
+                302868,
+                333155
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -883,7 +883,7 @@
             "notes": "HDFCBANK | HDFC BANK LTD | Cash"
         },
         {
-            "key": "NSE_FO|68542",
+            "key": "NSE_FO|48874",
             "name": "ICICI Bank Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -892,16 +892,16 @@
                 25
             ],
             "volumePerBar": [
+                65,
+                69,
                 73,
                 77,
-                81,
-                86,
-                92,
-                98,
-                106,
-                114,
-                124,
-                136
+                82,
+                88,
+                95,
+                102,
+                111,
+                122
             ],
             "lotSize": 700,
             "tickSize": 0.1,
@@ -915,7 +915,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "ICICIBANK26SEPFUT | ICICI BANK LTD. | 2026-09-29"
+            "notes": "ICICIBANK26OCTFUT | ICICI BANK LTD. | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE090A01021",
@@ -927,16 +927,16 @@
                 50
             ],
             "volumePerBar": [
-                52211,
-                55152,
-                58445,
-                61666,
-                65812,
-                70555,
-                76035,
-                81580,
-                88996,
-                97895
+                48558,
+                51293,
+                54356,
+                57352,
+                61207,
+                65619,
+                70715,
+                75871,
+                82769,
+                91046
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -953,7 +953,7 @@
             "notes": "ICICIBANK | ICICI BANK LTD. | Cash"
         },
         {
-            "key": "NSE_FO|68782",
+            "key": "NSE_FO|48994",
             "name": "SBI Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -962,16 +962,16 @@
                 20
             ],
             "volumePerBar": [
-                66,
+                45,
+                47,
+                50,
+                53,
+                56,
+                60,
+                65,
                 70,
-                74,
-                78,
-                83,
-                89,
-                96,
-                103,
-                113,
-                124
+                76,
+                84
             ],
             "lotSize": 750,
             "tickSize": 0.1,
@@ -985,7 +985,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "SBIN26SEPFUT | STATE BANK OF INDIA | 2026-09-29"
+            "notes": "SBIN26OCTFUT | STATE BANK OF INDIA | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE062A01020",
@@ -997,16 +997,16 @@
                 40
             ],
             "volumePerBar": [
-                56054,
-                59212,
-                62747,
-                66205,
-                70656,
-                75748,
-                81632,
-                87584,
-                95546,
-                105101
+                43736,
+                46200,
+                48958,
+                51656,
+                55129,
+                59102,
+                63693,
+                68337,
+                74549,
+                82004
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1023,7 +1023,7 @@
             "notes": "SBIN | STATE BANK OF INDIA | Cash"
         },
         {
-            "key": "NSE_FO|68797",
+            "key": "NSE_FO|49013",
             "name": "TCS Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1032,16 +1032,16 @@
                 45
             ],
             "volumePerBar": [
-                93,
-                99,
-                104,
-                110,
-                118,
-                126,
-                136,
-                146,
-                159,
-                175
+                74,
+                78,
+                83,
+                88,
+                94,
+                100,
+                108,
+                116,
+                127,
+                139
             ],
             "lotSize": 225,
             "tickSize": 0.1,
@@ -1055,7 +1055,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "TCS26SEPFUT | TATA CONSULTANCY SERV LT | 2026-09-29"
+            "notes": "TCS26OCTFUT | TATA CONSULTANCY SERV LT | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE467B01029",
@@ -1067,16 +1067,16 @@
                 90
             ],
             "volumePerBar": [
-                22264,
-                23518,
-                24922,
-                26295,
-                28063,
-                30086,
-                32423,
-                34787,
-                37949,
-                41744
+                25311,
+                26737,
+                28334,
+                29895,
+                31905,
+                34204,
+                36861,
+                39549,
+                43144,
+                47459
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1093,7 +1093,7 @@
             "notes": "TCS | TATA CONSULTANCY SERV LT | Cash"
         },
         {
-            "key": "NSE_FO|68553",
+            "key": "NSE_FO|48886",
             "name": "Infosys Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1102,16 +1102,16 @@
                 30
             ],
             "volumePerBar": [
-                138,
-                146,
-                155,
-                163,
-                174,
-                187,
-                201,
-                216,
-                235,
-                259
+                104,
+                110,
+                116,
+                123,
+                131,
+                140,
+                151,
+                162,
+                177,
+                195
             ],
             "lotSize": 400,
             "tickSize": 0.1,
@@ -1125,7 +1125,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "INFY26SEPFUT | INFOSYS LIMITED | 2026-09-29"
+            "notes": "INFY26OCTFUT | INFOSYS LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE009A01021",
@@ -1137,16 +1137,16 @@
                 60
             ],
             "volumePerBar": [
-                51741,
-                54656,
-                57919,
-                61112,
-                65220,
-                69920,
-                75351,
-                80846,
-                88195,
-                97015
+                67428,
+                71226,
+                75479,
+                79639,
+                84993,
+                91118,
+                98195,
+                105356,
+                114933,
+                126427
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1163,7 +1163,7 @@
             "notes": "INFY | INFOSYS LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68558",
+            "key": "NSE_FO|48896",
             "name": "ITC Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1172,16 +1172,16 @@
                 10
             ],
             "volumePerBar": [
-                45,
-                48,
-                51,
-                53,
-                57,
-                61,
-                66,
-                71,
-                77,
-                85
+                35,
+                36,
+                39,
+                41,
+                43,
+                47,
+                50,
+                54,
+                59,
+                65
             ],
             "lotSize": 1725,
             "tickSize": 0.05,
@@ -1195,7 +1195,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "ITC26SEPFUT | ITC LTD | 2026-09-29"
+            "notes": "ITC26OCTFUT | ITC LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE154A01025",
@@ -1207,16 +1207,16 @@
                 10
             ],
             "volumePerBar": [
-                70667,
-                74649,
-                79105,
-                83465,
-                89077,
-                95497,
-                102914,
-                110418,
-                120456,
-                132501
+                64248,
+                67868,
+                71920,
+                75884,
+                80985,
+                86822,
+                93566,
+                100388,
+                109514,
+                120466
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1233,7 +1233,7 @@
             "notes": "ITC | ITC LTD | Cash"
         },
         {
-            "key": "NSE_FO|68449",
+            "key": "NSE_FO|48758",
             "name": "Bharti Airtel Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1242,16 +1242,16 @@
                 30
             ],
             "volumePerBar": [
-                55,
+                40,
+                42,
+                45,
+                47,
+                51,
+                54,
                 58,
-                61,
-                64,
-                69,
-                74,
-                79,
-                85,
-                93,
-                102
+                63,
+                68,
+                75
             ],
             "lotSize": 475,
             "tickSize": 0.1,
@@ -1265,7 +1265,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "BHARTIARTL26SEPFUT | BHARTI AIRTEL LIMITED | 2026-09-29"
+            "notes": "BHARTIARTL26OCTFUT | BHARTI AIRTEL LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE397D01024",
@@ -1277,16 +1277,16 @@
                 60
             ],
             "volumePerBar": [
-                28218,
-                29808,
-                31587,
-                33328,
-                35569,
-                38132,
-                41094,
-                44091,
-                48099,
-                52909
+                38827,
+                41014,
+                43463,
+                45859,
+                48942,
+                52469,
+                56544,
+                60667,
+                66182,
+                72801
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1303,7 +1303,7 @@
             "notes": "BHARTIARTL | BHARTI AIRTEL LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68434",
+            "key": "NSE_FO|48736",
             "name": "Axis Bank Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1312,16 +1312,16 @@
                 22
             ],
             "volumePerBar": [
-                46,
                 49,
-                52,
+                51,
                 54,
-                58,
-                62,
-                67,
-                72,
-                78,
-                86
+                57,
+                61,
+                66,
+                71,
+                76,
+                83,
+                91
             ],
             "lotSize": 625,
             "tickSize": 0.1,
@@ -1335,7 +1335,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "AXISBANK26SEPFUT | AXIS BANK LIMITED | 2026-09-29"
+            "notes": "AXISBANK26OCTFUT | AXIS BANK LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE238A01034",
@@ -1347,16 +1347,16 @@
                 44
             ],
             "volumePerBar": [
-                33837,
-                35744,
-                37878,
-                39965,
-                42652,
-                45726,
-                49278,
-                52871,
-                57677,
-                63445
+                35915,
+                37938,
+                40203,
+                42419,
+                45270,
+                48533,
+                52303,
+                56116,
+                61218,
+                67340
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1373,7 +1373,7 @@
             "notes": "AXISBANK | AXIS BANK LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68620",
+            "key": "NSE_FO|48920",
             "name": "L&T Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1382,16 +1382,16 @@
                 70
             ],
             "volumePerBar": [
+                28,
+                30,
+                31,
+                33,
+                35,
+                38,
+                41,
+                44,
                 48,
-                51,
-                54,
-                57,
-                61,
-                65,
-                70,
-                75,
-                82,
-                90
+                53
             ],
             "lotSize": 175,
             "tickSize": 0.1,
@@ -1405,7 +1405,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "LT26SEPFUT | LARSEN & TOUBRO LTD. | 2026-09-29"
+            "notes": "LT26OCTFUT | LARSEN & TOUBRO LTD. | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE018A01030",
@@ -1417,16 +1417,16 @@
                 140
             ],
             "volumePerBar": [
-                11383,
-                12024,
-                12742,
-                13444,
-                14348,
-                15382,
-                16577,
-                17785,
-                19402,
-                21343
+                8561,
+                9043,
+                9583,
+                10111,
+                10791,
+                11569,
+                12467,
+                13376,
+                14592,
+                16052
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1443,7 +1443,7 @@
             "notes": "LT | LARSEN & TOUBRO LTD. | Cash"
         },
         {
-            "key": "NSE_FO|68796",
+            "key": "NSE_FO|49012",
             "name": "Tata Steel Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1452,16 +1452,16 @@
                 25
             ],
             "volumePerBar": [
-                94,
-                99,
-                105,
-                111,
-                118,
-                127,
-                137,
-                147,
-                160,
-                176
+                45,
+                48,
+                51,
+                53,
+                57,
+                61,
+                66,
+                71,
+                77,
+                85
             ],
             "lotSize": 2750,
             "tickSize": 0.01,
@@ -1475,7 +1475,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "TATASTEEL26SEPFUT | TATA STEEL LIMITED | 2026-09-29"
+            "notes": "TATASTEEL26OCTFUT | TATA STEEL LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE081A01020",
@@ -1487,16 +1487,16 @@
                 8
             ],
             "volumePerBar": [
-                190461,
-                201191,
-                213203,
-                224954,
-                240077,
-                257380,
-                277370,
-                297595,
-                324650,
-                357114
+                181461,
+                191684,
+                203128,
+                214324,
+                228732,
+                245217,
+                264263,
+                283532,
+                309308,
+                340239
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1513,7 +1513,7 @@
             "notes": "TATASTEEL | TATA STEEL LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68801",
+            "key": "NSE_FO|49019",
             "name": "Tata Motors Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1522,16 +1522,16 @@
                 18
             ],
             "volumePerBar": [
-                32,
                 33,
-                35,
-                37,
-                40,
-                43,
-                46,
-                49,
-                54,
-                59
+                34,
+                36,
+                38,
+                41,
+                44,
+                47,
+                51,
+                56,
+                61
             ],
             "lotSize": 1600,
             "tickSize": 0.05,
@@ -1545,7 +1545,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "TMPV26SEPFUT | TATA MOTORS PASS VEH LTD | 2026-09-29"
+            "notes": "TMPV26OCTFUT | TATA MOTORS PASS VEH LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE1TAE01010",
@@ -1557,16 +1557,16 @@
                 18
             ],
             "volumePerBar": [
-                38861,
-                41050,
-                43501,
-                45899,
-                48984,
-                52515,
-                56594,
-                60720,
-                66240,
-                72864
+                39331,
+                41547,
+                44027,
+                46454,
+                49577,
+                53150,
+                57278,
+                61455,
+                67041,
+                73746
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1583,7 +1583,7 @@
             "notes": "TMCV | TATA MOTORS LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68442",
+            "key": "NSE_FO|48740",
             "name": "Bajaj Finance Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1592,16 +1592,16 @@
                 18
             ],
             "volumePerBar": [
-                46,
+                29,
+                30,
+                32,
+                34,
+                36,
+                39,
+                42,
+                45,
                 49,
-                52,
-                55,
-                58,
-                63,
-                68,
-                72,
-                79,
-                87
+                54
             ],
             "lotSize": 750,
             "tickSize": 0.1,
@@ -1615,7 +1615,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "BAJFINANCE26SEPFUT | BAJAJ FINANCE LIMITED | 2026-09-29"
+            "notes": "BAJFINANCE26OCTFUT | BAJAJ FINANCE LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE296A01032",
@@ -1627,16 +1627,16 @@
                 40
             ],
             "volumePerBar": [
-                44681,
-                47199,
-                50016,
-                52773,
-                56321,
-                60380,
-                65070,
-                69815,
-                76161,
-                83777
+                41253,
+                43577,
+                46179,
+                48724,
+                52000,
+                55748,
+                60078,
+                64458,
+                70318,
+                77350
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1653,7 +1653,7 @@
             "notes": "BAJFINANCE | BAJAJ FINANCE LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68610",
+            "key": "NSE_FO|48906",
             "name": "Kotak Bank Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1662,16 +1662,16 @@
                 15
             ],
             "volumePerBar": [
-                40,
-                43,
-                45,
+                33,
+                35,
+                37,
+                39,
+                41,
+                44,
                 48,
                 51,
-                54,
-                59,
-                63,
-                69,
-                75
+                56,
+                61
             ],
             "lotSize": 2000,
             "tickSize": 0.05,
@@ -1685,7 +1685,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "KOTAKBANK26SEPFUT | KOTAK MAHINDRA BANK LTD | 2026-09-29"
+            "notes": "KOTAKBANK26OCTFUT | KOTAK MAHINDRA BANK LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE237A01036",
@@ -1697,16 +1697,16 @@
                 15
             ],
             "volumePerBar": [
-                76973,
-                81310,
-                86164,
-                90913,
-                97025,
-                104018,
-                112097,
-                120271,
-                131204,
-                144325
+                127931,
+                135139,
+                143207,
+                151100,
+                161258,
+                172880,
+                186308,
+                199893,
+                218065,
+                239871
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1723,7 +1723,7 @@
             "notes": "KOTAKBANK | KOTAK MAHINDRA BANK LTD | Cash"
         },
         {
-            "key": "NSE_FO|68789",
+            "key": "NSE_FO|49003",
             "name": "Sun Pharma Sept Future",
             "isHeavyStock": true,
             "stealthThresholdFloor": 4,
@@ -1732,16 +1732,16 @@
                 25
             ],
             "volumePerBar": [
+                23,
+                24,
                 25,
                 26,
+                27,
                 28,
                 29,
                 30,
-                31,
-                33,
-                34,
-                36,
-                38
+                32,
+                34
             ],
             "lotSize": 350,
             "tickSize": 0.1,
@@ -1755,7 +1755,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "SUNPHARMA26SEPFUT | SUN PHARMACEUTICAL IND L | 2026-09-29"
+            "notes": "SUNPHARMA26OCTFUT | SUN PHARMACEUTICAL IND L | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE044A01036",
@@ -1767,16 +1767,16 @@
                 55
             ],
             "volumePerBar": [
-                7551,
-                7976,
-                8452,
-                8918,
-                9518,
-                10204,
-                10996,
-                11798,
-                12870,
-                14158
+                8956,
+                9461,
+                10026,
+                10578,
+                11289,
+                12103,
+                13043,
+                13994,
+                15266,
+                16793
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -1793,7 +1793,7 @@
             "notes": "HINDUNILVR | HINDUSTAN UNILEVER LTD. | Cash"
         },
         {
-            "key": "NSE_FO|68564",
+            "key": "NSE_FO|48900",
             "name": "JSW Steel Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -1802,16 +1802,16 @@
                 22
             ],
             "volumePerBar": [
-                22,
                 23,
-                25,
+                24,
                 26,
-                28,
-                30,
-                32,
-                34,
-                38,
-                41
+                27,
+                29,
+                31,
+                33,
+                36,
+                39,
+                43
             ],
             "lotSize": 675,
             "tickSize": 0.1,
@@ -1825,7 +1825,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "JSWSTEEL26SEPFUT | JSW STEEL LIMITED | 2026-09-29"
+            "notes": "JSWSTEEL26OCTFUT | JSW STEEL LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE019A01038",
@@ -1837,16 +1837,16 @@
                 45
             ],
             "volumePerBar": [
-                7942,
-                8389,
-                8890,
-                9380,
-                10011,
-                10732,
-                11566,
-                12409,
-                13537,
-                14891
+                8736,
+                9228,
+                9779,
+                10318,
+                11011,
+                11805,
+                12722,
+                13649,
+                14890,
+                16379
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -1863,7 +1863,7 @@
             "notes": "JSWSTEEL | JSW STEEL LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68463",
+            "key": "NSE_FO|48797",
             "name": "Coal India Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -1872,16 +1872,16 @@
                 15
             ],
             "volumePerBar": [
-                49,
-                52,
-                55,
-                58,
-                62,
-                67,
-                72,
-                77,
-                84,
-                93
+                29,
+                31,
+                33,
+                34,
+                37,
+                39,
+                43,
+                46,
+                50,
+                55
             ],
             "lotSize": 1350,
             "tickSize": 0.05,
@@ -1895,7 +1895,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "COALINDIA26SEPFUT | COAL INDIA LTD | 2026-09-29"
+            "notes": "COALINDIA26OCTFUT | COAL INDIA LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE522F01014",
@@ -1907,16 +1907,16 @@
                 15
             ],
             "volumePerBar": [
-                56104,
-                59265,
-                62803,
-                66264,
-                70719,
-                75816,
-                81705,
-                87662,
-                95632,
-                105195
+                52594,
+                55557,
+                58874,
+                62119,
+                66295,
+                71073,
+                76593,
+                82178,
+                89649,
+                98613
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -1933,7 +1933,7 @@
             "notes": "COALINDIA | COAL INDIA LTD | Cash"
         },
         {
-            "key": "NSE_FO|68417",
+            "key": "NSE_FO|48711",
             "name": "Adani Enterprises Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -1942,16 +1942,16 @@
                 45
             ],
             "volumePerBar": [
-                48,
-                51,
-                54,
-                57,
-                61,
-                65,
-                70,
-                75,
-                82,
-                90
+                29,
+                31,
+                32,
+                34,
+                37,
+                39,
+                42,
+                45,
+                49,
+                54
             ],
             "lotSize": 309,
             "tickSize": 0.1,
@@ -1965,7 +1965,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "ADANIENT26SEPFUT | ADANI ENTERPRISES LIMITED | 2026-09-29"
+            "notes": "ADANIENT26OCTFUT | ADANI ENTERPRISES LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE423A01024",
@@ -1977,16 +1977,16 @@
                 90
             ],
             "volumePerBar": [
-                7632,
-                8062,
-                8543,
-                9014,
-                9620,
-                10314,
-                11115,
-                11925,
-                13009,
-                14310
+                5864,
+                6194,
+                6564,
+                6926,
+                7391,
+                7924,
+                8539,
+                9162,
+                9995,
+                10994
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -2003,7 +2003,7 @@
             "notes": "ADANIENT | ADANI ENTERPRISES LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68419",
+            "key": "NSE_FO|48718",
             "name": "Adani Ports Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2012,16 +2012,16 @@
                 30
             ],
             "volumePerBar": [
-                34,
-                36,
-                38,
-                40,
-                43,
-                46,
-                50,
-                53,
-                58,
-                64
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                30,
+                31
             ],
             "lotSize": 475,
             "tickSize": 0.1,
@@ -2035,7 +2035,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "ADANIPORTS26SEPFUT | ADANI PORT & SEZ LTD | 2026-09-29"
+            "notes": "ADANIPORTS26OCTFUT | ADANI PORT & SEZ LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE742F01042",
@@ -2047,16 +2047,16 @@
                 60
             ],
             "volumePerBar": [
-                9814,
-                10367,
-                10986,
-                11592,
-                12371,
-                13262,
-                14293,
-                15335,
-                16729,
-                18402
+                11325,
+                11963,
+                12677,
+                13376,
+                14275,
+                15304,
+                16493,
+                17695,
+                19304,
+                21234
             ],
             "lotSize": 1,
             "tickSize": 0.1,
@@ -2073,7 +2073,7 @@
             "notes": "ADANIPORTS | ADANI PORT & SEZ LTD | Cash"
         },
         {
-            "key": "NSE_FO|68537",
+            "key": "NSE_FO|48867",
             "name": "Hindalco Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2082,16 +2082,16 @@
                 35
             ],
             "volumePerBar": [
-                42,
-                44,
-                47,
-                50,
-                53,
-                57,
-                61,
-                66,
-                72,
-                79
+                38,
+                40,
+                43,
+                45,
+                48,
+                51,
+                55,
+                59,
+                65,
+                71
             ],
             "lotSize": 700,
             "tickSize": 0.05,
@@ -2105,7 +2105,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.12,
-            "notes": "HINDALCO26SEPFUT | HINDALCO INDUSTRIES LTD | 2026-09-29"
+            "notes": "HINDALCO26OCTFUT | HINDALCO INDUSTRIES LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE038A01020",
@@ -2117,16 +2117,16 @@
                 35
             ],
             "volumePerBar": [
-                24783,
-                26179,
-                27742,
-                29271,
-                31239,
-                33491,
-                36092,
-                38724,
-                42244,
-                46468
+                25746,
+                27196,
+                28820,
+                30408,
+                32452,
+                34791,
+                37494,
+                40228,
+                43885,
+                48273
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -2143,7 +2143,7 @@
             "notes": "HINDALCO | HINDALCO INDUSTRIES LTD | Cash"
         },
         {
-            "key": "NSE_FO|68426",
+            "key": "NSE_FO|48730",
             "name": "Apollo Hospitals Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2152,16 +2152,16 @@
                 25
             ],
             "volumePerBar": [
+                9,
+                10,
+                11,
+                12,
                 13,
                 14,
                 15,
                 16,
                 17,
-                18,
-                19,
-                20,
-                21,
-                22
+                18
             ],
             "lotSize": 125,
             "tickSize": 0.5,
@@ -2175,7 +2175,7 @@
             "stopOffsetRatioV2": 0.35,
             "doubleTopBottomToleranceRatioV2": 0.1,
             "structureOffsetRatio": 0.12,
-            "notes": "APOLLOHOSP26SEPFUT | APOLLO HOSPITALS ENTER. L | 2026-09-29"
+            "notes": "APOLLOHOSP26OCTFUT | APOLLO HOSPITALS ENTER. L | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE437A01024",
@@ -2187,16 +2187,16 @@
                 250
             ],
             "volumePerBar": [
-                2241,
-                2367,
-                2509,
-                2647,
-                2825,
-                3029,
-                3264,
-                3502,
-                3820,
-                4202
+                2891,
+                3054,
+                3237,
+                3415,
+                3644,
+                3907,
+                4211,
+                4518,
+                4928,
+                5421
             ],
             "lotSize": 1,
             "tickSize": 0.5,
@@ -2213,7 +2213,7 @@
             "notes": "APOLLOHOSP | APOLLO HOSPITALS ENTER. L | Cash"
         },
         {
-            "key": "NSE_FO|68766",
+            "key": "NSE_FO|48974",
             "name": "PNB Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2222,16 +2222,16 @@
                 20
             ],
             "volumePerBar": [
-                28,
-                29,
-                30,
-                31,
-                32,
-                34,
-                35,
-                37,
-                39,
-                41
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24
             ],
             "lotSize": 8000,
             "tickSize": 0.01,
@@ -2245,7 +2245,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "PNB26SEPFUT | PUNJAB NATIONAL BANK | 2026-09-29"
+            "notes": "PNB26OCTFUT | PUNJAB NATIONAL BANK | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE160A01022",
@@ -2257,16 +2257,16 @@
                 4
             ],
             "volumePerBar": [
-                114053,
-                120479,
-                127671,
-                134708,
-                143765,
-                154126,
-                166097,
-                178208,
-                194409,
-                213850
+                80184,
+                84701,
+                89758,
+                94705,
+                101072,
+                108356,
+                116773,
+                125287,
+                136677,
+                150345
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2283,7 +2283,7 @@
             "notes": "PNB | PUNJAB NATIONAL BANK | Cash"
         },
         {
-            "key": "NSE_FO|68779",
+            "key": "NSE_FO|48989",
             "name": "SAIL Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2292,16 +2292,16 @@
                 40
             ],
             "volumePerBar": [
+                8,
+                9,
+                10,
                 11,
                 12,
                 13,
                 14,
                 15,
                 16,
-                17,
-                18,
-                19,
-                20
+                17
             ],
             "lotSize": 4700,
             "tickSize": 0.01,
@@ -2315,7 +2315,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "SAIL26SEPFUT | STEEL AUTHORITY OF INDIA | 2026-09-29"
+            "notes": "SAIL26OCTFUT | STEEL AUTHORITY OF INDIA | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE114A01011",
@@ -2327,16 +2327,16 @@
                 50
             ],
             "volumePerBar": [
-                87811,
-                92758,
-                98296,
-                103714,
-                110687,
-                118664,
-                127881,
-                137205,
-                149678,
-                164646
+                80512,
+                85048,
+                90125,
+                95093,
+                101485,
+                108800,
+                117250,
+                125799,
+                137236,
+                150959
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2353,7 +2353,7 @@
             "notes": "SAIL | STEEL AUTHORITY OF INDIA | Cash"
         },
         {
-            "key": "NSE_FO|68791",
+            "key": "NSE_FO|49005",
             "name": "SUZLON Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2362,16 +2362,16 @@
                 8
             ],
             "volumePerBar": [
+                23,
+                24,
+                25,
                 26,
                 27,
                 28,
-                29,
+                30,
                 31,
-                32,
-                34,
-                35,
-                37,
-                39
+                33,
+                35
             ],
             "lotSize": 12700,
             "tickSize": 0.01,
@@ -2385,7 +2385,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "SUZLON26SEPFUT | SUZLON ENERGY LIMITED | 2026-09-29"
+            "notes": "SUZLON26OCTFUT | SUZLON ENERGY LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE040H01021",
@@ -2397,16 +2397,16 @@
                 8
             ],
             "volumePerBar": [
-                454558,
-                480167,
-                508834,
-                536880,
-                572972,
-                614268,
-                661978,
-                710247,
-                774815,
-                852296
+                370353,
+                391218,
+                414575,
+                437425,
+                466832,
+                500478,
+                539350,
+                578677,
+                631284,
+                694413
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2423,7 +2423,7 @@
             "notes": "SUZLON | SUZLON ENERGY LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68758",
+            "key": "NSE_FO|48964",
             "name": "PAYTM Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2432,16 +2432,16 @@
                 25
             ],
             "volumePerBar": [
-                60,
-                63,
-                67,
-                70,
-                75,
-                81,
-                87,
-                93,
-                102,
-                112
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                28,
+                29
             ],
             "lotSize": 725,
             "tickSize": 0.1,
@@ -2455,7 +2455,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "PAYTM26SEPFUT | ONE 97 COMMUNICATIONS LTD | 2026-09-29"
+            "notes": "PAYTM26OCTFUT | ONE 97 COMMUNICATIONS LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE928J01020",
@@ -2498,7 +2498,7 @@
             "notes": "PAYTM | ONE 97 COMMUNICATIONS LTD | Cash"
         },
         {
-            "key": "NSE_FO|68778",
+            "key": "NSE_FO|48988",
             "name": "RVNL Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2507,16 +2507,16 @@
                 40
             ],
             "volumePerBar": [
-                16,
-                17,
-                18,
                 19,
                 20,
                 21,
                 22,
                 23,
                 24,
-                25
+                25,
+                26,
+                27,
+                28
             ],
             "lotSize": 1925,
             "tickSize": 0.01,
@@ -2530,7 +2530,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "RVNL26SEPFUT | RAIL VIKAS NIGAM LIMITED | 2026-09-29"
+            "notes": "RVNL26OCTFUT | RAIL VIKAS NIGAM LIMITED | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE415G01027",
@@ -2542,16 +2542,16 @@
                 60
             ],
             "volumePerBar": [
-                23331,
-                24645,
-                26117,
-                27556,
-                29409,
-                31528,
-                33977,
-                36455,
-                39769,
-                43746
+                32192,
+                34005,
+                36035,
+                38022,
+                40578,
+                43502,
+                46881,
+                50299,
+                54872,
+                60359
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2568,7 +2568,7 @@
             "notes": "RVNL | RAIL VIKAS NIGAM LIMITED | Cash"
         },
         {
-            "key": "NSE_FO|68557",
+            "key": "NSE_FO|48895",
             "name": "IRFC Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2577,16 +2577,16 @@
                 20
             ],
             "volumePerBar": [
-                11,
-                12,
-                13,
-                14,
                 15,
                 16,
                 17,
                 18,
                 19,
-                20
+                20,
+                21,
+                22,
+                23,
+                24
             ],
             "lotSize": 5425,
             "tickSize": 0.01,
@@ -2600,7 +2600,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "IRFC26SEPFUT | INDIAN RAILWAY FIN CORP L | 2026-09-29"
+            "notes": "IRFC26OCTFUT | INDIAN RAILWAY FIN CORP L | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE053F01010",
@@ -2613,16 +2613,16 @@
                 20
             ],
             "volumePerBar": [
-                48647,
-                51388,
-                54456,
-                57457,
-                61320,
-                65739,
-                70845,
-                76011,
-                82921,
-                91213
+                67559,
+                71365,
+                75626,
+                79794,
+                85159,
+                91296,
+                98387,
+                105561,
+                115158,
+                126673
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2639,7 +2639,7 @@
             "notes": "IRFC | INDIAN RAILWAY FIN CORP L | Cash"
         },
         {
-            "key": "NSE_FO|68556",
+            "key": "NSE_FO|48894",
             "name": "IREDA Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2648,16 +2648,16 @@
                 20
             ],
             "volumePerBar": [
-                13,
-                14,
-                15,
-                16,
                 17,
                 18,
                 19,
                 20,
                 21,
-                22
+                22,
+                23,
+                24,
+                25,
+                26
             ],
             "lotSize": 4525,
             "tickSize": 0.01,
@@ -2671,7 +2671,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "IREDA26SEPFUT | INDIAN RENEWABLE ENERGY | 2026-09-29"
+            "notes": "IREDA26OCTFUT | INDIAN RENEWABLE ENERGY | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE202E01016",
@@ -2683,16 +2683,16 @@
                 24
             ],
             "volumePerBar": [
-                26147,
-                27620,
-                29269,
-                30882,
-                32958,
-                35334,
-                38078,
-                40855,
-                44569,
-                49026
+                38501,
+                40670,
+                43098,
+                45473,
+                48530,
+                52028,
+                56069,
+                60158,
+                65626,
+                72189
             ],
             "lotSize": 1,
             "tickSize": 0.01,
@@ -2709,7 +2709,7 @@
             "notes": "IREDA | INDIAN RENEWABLE ENERGY | Cash"
         },
         {
-            "key": "NSE_FO|68450",
+            "key": "NSE_FO|48764",
             "name": "BHEL Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2718,16 +2718,16 @@
                 15
             ],
             "volumePerBar": [
-                30,
-                31,
-                32,
-                33,
-                35,
-                36,
-                38,
-                40,
-                42,
-                44
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
             ],
             "lotSize": 2625,
             "tickSize": 0.05,
@@ -2741,7 +2741,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "BHEL26SEPFUT | BHEL | 2026-09-29"
+            "notes": "BHEL26OCTFUT | BHEL | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE257A01026",
@@ -2753,16 +2753,16 @@
                 15
             ],
             "volumePerBar": [
-                43907,
-                46381,
-                49150,
-                51859,
-                55345,
-                59334,
-                63943,
-                68605,
-                74842,
-                82326
+                42456,
+                44848,
+                47525,
+                50145,
+                53516,
+                57373,
+                61829,
+                66337,
+                72368,
+                79605
             ],
             "lotSize": 1,
             "tickSize": 0.05,
@@ -2779,7 +2779,7 @@
             "notes": "BHEL | BHEL | Cash"
         },
         {
-            "key": "NSE_FO|68482",
+            "key": "NSE_FO|48847",
             "name": "GAIL Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2788,7 +2788,6 @@
                 30
             ],
             "volumePerBar": [
-                9,
                 10,
                 11,
                 12,
@@ -2797,7 +2796,8 @@
                 15,
                 16,
                 17,
-                18
+                18,
+                19
             ],
             "lotSize": 3550,
             "tickSize": 0.01,
@@ -2811,7 +2811,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "GAIL26SEPFUT | GAIL (INDIA) LTD | 2026-09-29"
+            "notes": "GAIL26OCTFUT | GAIL (INDIA) LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE129A01025",
@@ -2854,7 +2854,7 @@
             "notes": "GAIL | GAIL (INDIA) LTD | Cash"
         },
         {
-            "key": "NSE_FO|68803",
+            "key": "NSE_FO|49021",
             "name": "TRENT Sept Future",
             "isHeavyStock": false,
             "stealthThresholdFloor": 5,
@@ -2870,9 +2870,9 @@
                 24,
                 25,
                 26,
-                28,
+                27,
                 29,
-                31
+                30
             ],
             "lotSize": 225,
             "tickSize": 0.1,
@@ -2886,7 +2886,7 @@
             "stopOffsetRatioV2": 0.4,
             "doubleTopBottomToleranceRatioV2": 0.12,
             "structureOffsetRatio": 0.15,
-            "notes": "TRENT26SEPFUT | TRENT LTD | 2026-09-29"
+            "notes": "TRENT26OCTFUT | TRENT LTD | 2026-10-27"
         },
         {
             "key": "NSE_EQ|INE849A01020",
@@ -2898,16 +2898,16 @@
                 70
             ],
             "volumePerBar": [
-                4128,
-                4361,
-                4621,
-                4876,
-                5203,
-                5578,
-                6012,
-                6450,
-                7036,
-                7740
+                5934,
+                6268,
+                6643,
+                7009,
+                7480,
+                8019,
+                8642,
+                9272,
+                10115,
+                11126
             ],
             "lotSize": 1,
             "tickSize": 0.1,

@@ -85,27 +85,59 @@ const INSTRUMENT_NAMES = {
     'INE415G01027': 'RVNL', 'INE053F01010': 'IRFC', 'INE202E01016': 'IREDA', 
     'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL', 'INE849A01020': 'TRENT',
 
-    // August MCX IDs
-    '568245': 'Natural Gas Future', '568246': 'Natural Gas Mini Future',
-    '565899': 'Crude Oil Future', '565900': 'Crude Oil Mini Future',
-    '574824': 'Silver Future', '483080': 'Silver Mini Future', '562058': 'Silver Micro Future',
-    '571298': 'Copper Future', '571303': 'Zinc Future', '571300': 'Lead Future',
-    '571297': 'Aluminium Future', '483079': 'Gold Future', '569003': 'Gold Mini Future',
-    '568839': 'Gold Petal Future',
+    // ── Updated October/November 2026 MCX IDs ──
+    '570750': 'Natural Gas Future',        // NATURALGAS26OCTFUT (Oct)
+    '570751': 'Natural Gas Mini Future',   // NATGASMINI26OCTFUT (Oct)
+    '569900': 'Crude Oil Future',          // CRUDEOIL26OCTFUT (Oct)
+    '569901': 'Crude Oil Mini Future',     // CRUDEOILM26OCTFUT (Oct)
+    '574825': 'Silver Future',             // SILVER10026OCTFUT (Oct)
+    '483080': 'Silver Mini Future',        // SILVERM26NOVFUT (Nov — unchanged)
+    '562058': 'Silver Micro Future',       // SILVERMIC26NOVFUT (Nov — unchanged)
+    '574834': 'Zinc Future',               // ZINC26OCTFUT (Oct)
+    '574830': 'Lead Future',               // LEAD26OCTFUT (Oct)
+    '574828': 'Aluminium Future',          // ALUMINIUM26OCTFUT (Oct)
+    '483079': 'Gold Future',               // GOLD26OCTFUT (Oct — unchanged)
+    '569003': 'Gold Mini Future',          // GOLDM26OCTFUT (Oct — unchanged)
+    '571306': 'Gold Petal Future',         // GOLDPETAL26OCTFUT (Oct)
 
-    // September NSE Index/Stock IDs
-    '68407': 'Nifty 50 Future', '68390': 'Nifty Bank Future', '68391': 'Fin Nifty Future',
-    '68406': 'Midcap Nifty Future', '68777': 'Reliance Future', '68534': 'HDFC Bank Future',
-    '68542': 'ICICI Bank Future', '68782': 'SBI Future', '68797': 'TCS Future',
-    '68553': 'Infosys Future', '68558': 'ITC Future', '68449': 'Bharti Airtel Future',
-    '68434': 'Axis Bank Future', '68620': 'L&T Future', '68796': 'Tata Steel Future',
-    '68801': 'Tata Motors Future', '68442': 'Bajaj Finance Future', '68610': 'Kotak Bank Future',
-    '68789': 'Sun Pharma Future', '68564': 'JSW Steel Future', '68463': 'Coal India Future',
-    '68417': 'Adani Enterprises Future', '68419': 'Adani Ports Future', '68537': 'Hindalco Future',
-    '68426': 'Apollo Hospitals Future', '68766': 'PNB Future', '68779': 'SAIL Future',
-    '68791': 'SUZLON Future', '68758': 'PAYTM Future', '68778': 'RVNL Future',
-    '68557': 'IRFC Future', '68556': 'IREDA Future', '68450': 'BHEL Future',
-    '68482': 'GAIL Future', '68803': 'TRENT Future'
+    // ── Updated October 2026 NSE Index IDs ──
+    '48704': 'Nifty 50 Future',            // NIFTY26OCTFUT (Oct)
+    '48699': 'Nifty Bank Future',          // BANKNIFTY26OCTFUT (Oct)
+    '48702': 'Fin Nifty Future',           // FINNIFTY26OCTFUT (Oct)
+    '48703': 'Midcap Nifty Future',        // MIDCPNIFTY26OCTFUT (Oct)
+
+    // ── Updated October 2026 NSE Stock IDs ──
+    '48987': 'Reliance Future',            // RELIANCE26OCTFUT (Oct)
+    '48864': 'HDFC Bank Future',           // HDFCBANK26OCTFUT (Oct)
+    '48874': 'ICICI Bank Future',          // ICICIBANK26OCTFUT (Oct)
+    '48994': 'SBI Future',                 // SBIN26OCTFUT (Oct)
+    '49013': 'TCS Future',                 // TCS26OCTFUT (Oct)
+    '48886': 'Infosys Future',             // INFY26OCTFUT (Oct)
+    '48896': 'ITC Future',                 // ITC26OCTFUT (Oct)
+    '48758': 'Bharti Airtel Future',       // BHARTIARTL26OCTFUT (Oct)
+    '48736': 'Axis Bank Future',           // AXISBANK26OCTFUT (Oct)
+    '48920': 'L&T Future',                 // LT26OCTFUT (Oct)
+    '49012': 'Tata Steel Future',          // TATASTEEL26OCTFUT (Oct)
+    '49019': 'Tata Motors Future',         // TMPV26OCTFUT (Oct)
+    '48740': 'Bajaj Finance Future',       // BAJFINANCE26OCTFUT (Oct)
+    '48906': 'Kotak Bank Future',          // KOTAKBANK26OCTFUT (Oct)
+    '49003': 'Sun Pharma Future',          // SUNPHARMA26OCTFUT (Oct)
+    '48900': 'JSW Steel Future',           // JSWSTEEL26OCTFUT (Oct)
+    '48797': 'Coal India Future',          // COALINDIA26OCTFUT (Oct)
+    '48711': 'Adani Enterprises Future',   // ADANIENT26OCTFUT (Oct)
+    '48718': 'Adani Ports Future',         // ADANIPORTS26OCTFUT (Oct)
+    '48867': 'Hindalco Future',            // HINDALCO26OCTFUT (Oct)
+    '48730': 'Apollo Hospitals Future',    // APOLLOHOSP26OCTFUT (Oct)
+    '48974': 'PNB Future',                 // PNB26OCTFUT (Oct)
+    '48989': 'SAIL Future',                // SAIL26OCTFUT (Oct)
+    '49005': 'SUZLON Future',              // SUZLON26OCTFUT (Oct)
+    '48964': 'PAYTM Future',               // PAYTM26OCTFUT (Oct)
+    '48988': 'RVNL Future',                // RVNL26OCTFUT (Oct)
+    '48895': 'IRFC Future',                // IRFC26OCTFUT (Oct)
+    '48894': 'IREDA Future',               // IREDA26OCTFUT (Oct)
+    '48764': 'BHEL Future',                // BHEL26OCTFUT (Oct)
+    '48847': 'GAIL Future',                // GAIL26OCTFUT (Oct)
+    '49021': 'TRENT Future'                // TRENT26OCTFUT (Oct)
 };
 
 function getInstrumentDisplayName(rawInstrument) {

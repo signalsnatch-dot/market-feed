@@ -19,17 +19,31 @@ const CONFIG_FILE = './build-version-config.json';
 const RESULTS_DIR = './live-backtest-results';
 const CANDLES_DIR = './candles/live';
 
-// ─── UPDATED SEPTEMBER/OCTOBER 2026 MULTIPLIERS ────────────────────────
+// ─── UPDATED OCTOBER/NOVEMBER 2026 MULTIPLIERS ────────────────────────
 const MCX_MULTIPLIERS = {
-    '568245': 1250, '568246': 250,  // Natural Gas & Mini
-    '565899': 100,  '565900': 10,   // Crude Oil & Mini
-    '574824': 30,   '483080': 5,    '562058': 1,    // Silver, Mini, Micro
-    '571298': 2500, '571303': 5,    '571300': 5,    '571297': 5,    // Copper, Zinc, Lead, Alu
-    '483079': 1,    '569003': 100,  '568839': 1     // Gold, Mini, Petal
+    // MCX Oct/Nov Keys (updated from Sept keys)
+    '570750': 1250, '570751': 250,  // Natural Gas, Natural Gas Mini (Oct)
+    '569900': 100,  '569901': 10,   // Crude Oil, Crude Oil Mini (Oct)
+    '574825': 100,  '483080': 5,    '562058': 1,    // Silver100 (Oct), Silver Mini (Nov), Silver Micro (Nov)
+    '574834': 5,    '574830': 5,    '574828': 5,    // Zinc (Oct), Lead (Oct), Aluminium (Oct)
+    '483079': 1,    '569003': 100,  '571306': 1     // Gold (Oct), Gold Mini (Oct), Gold Petal (Oct)
 };
 
 const INDEX_MULTIPLIERS = { 
-    '68407': 65, '68390': 30, '68391': 60, '68406': 120 // Nifty, Bank, Fin, Midcap
+    // NSE Index Oct Keys (updated from Sept keys)
+    '48704': 65, '48699': 30, '48702': 60, '48703': 120 // Nifty, Bank, Fin, Midcap
+};
+
+// NSE Stock Oct Keys (fallback — config.json is preferred source)
+const STOCK_MULTIPLIERS = {
+    '48987': 500,   '48864': 650,   '48874': 700,   '48994': 750,   // Reliance, HDFC, ICICI, SBI
+    '49013': 225,   '48886': 400,   '48896': 1725,  '48758': 475,   // TCS, Infy, ITC, Airtel
+    '48736': 625,   '48920': 175,   '49012': 2750,  '49019': 1600,  // Axis, L&T, TataSteel, TataMot
+    '48740': 750,   '48906': 2000,  '49003': 350,   '48900': 675,   // BajFin, Kotak, Sun, JSW
+    '48797': 1350,  '48711': 309,   '48718': 475,   '48867': 700,   // Coal, AdaniEnt, AdaniPort, Hindalco
+    '48730': 125,   '48974': 8000,  '48989': 4700,  '49005': 12700, // Apollo, PNB, SAIL, Suzlon
+    '48964': 725,   '48988': 1925,  '48895': 5425,  '48894': 4525,  // Paytm, RVNL, IRFC, IREDA
+    '48764': 2625,  '48847': 3550,  '49021': 225                    // BHEL, GAIL, Trent
 };
 
 function getLotMultiplier(instKey) {
@@ -44,7 +58,7 @@ function getLotMultiplier(instKey) {
         if (i && i.lotSize !== undefined) return i.lotSize;
     } catch (e) {}
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
-    return MCX_MULTIPLIERS[id] ?? INDEX_MULTIPLIERS[id] ?? 1;
+    return MCX_MULTIPLIERS[id] ?? INDEX_MULTIPLIERS[id] ?? STOCK_MULTIPLIERS[id] ?? 1;
 }
 
 function buildColumnIndex(headersLine) {
