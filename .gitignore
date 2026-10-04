@@ -37,6 +37,7 @@ candles/
 venv/
 .roo/
 al-brooks-bar-by-bar/
+scripts/signals/
 
 # Legacy data directories (if any)
 data/
