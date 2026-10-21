@@ -468,7 +468,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.090Z",
+    "last_updated": "2026-10-21T18:07:01.733Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -950,7 +950,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.105Z",
+    "last_updated": "2026-10-21T18:07:01.753Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -2324,7 +2324,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.242Z",
+    "last_updated": "2026-10-21T18:07:01.901Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -2806,7 +2806,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.257Z",
+    "last_updated": "2026-10-21T18:07:01.923Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -3288,7 +3288,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.275Z",
+    "last_updated": "2026-10-21T18:07:01.948Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -3770,7 +3770,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.289Z",
+    "last_updated": "2026-10-21T18:07:01.965Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -4180,7 +4180,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.304Z",
+    "last_updated": "2026-10-21T18:07:01.980Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -4662,7 +4662,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.318Z",
+    "last_updated": "2026-10-21T18:07:01.999Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -6084,7 +6084,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.433Z",
+    "last_updated": "2026-10-21T18:07:02.167Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.28,
       "triggerOffsetRatio": 0.08,
@@ -6538,7 +6538,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.448Z",
+    "last_updated": "2026-10-21T18:07:02.190Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -6992,7 +6992,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.461Z",
+    "last_updated": "2026-10-21T18:07:02.208Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -7208,7 +7208,7 @@
       "isHeuristic": true,
       "dayOfWeekFactor": {}
     },
-    "last_updated": "2026-10-21T17:58:02.476Z",
+    "last_updated": "2026-10-21T18:07:02.228Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -7662,7 +7662,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.492Z",
+    "last_updated": "2026-10-21T18:07:02.248Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -8116,7 +8116,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.505Z",
+    "last_updated": "2026-10-21T18:07:02.269Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -8570,7 +8570,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.518Z",
+    "last_updated": "2026-10-21T18:07:02.289Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -9024,7 +9024,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.536Z",
+    "last_updated": "2026-10-21T18:07:02.307Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -9478,7 +9478,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.560Z",
+    "last_updated": "2026-10-21T18:07:02.328Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -9932,7 +9932,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.575Z",
+    "last_updated": "2026-10-21T18:07:02.347Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -10386,7 +10386,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.589Z",
+    "last_updated": "2026-10-21T18:07:02.363Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -10840,7 +10840,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.603Z",
+    "last_updated": "2026-10-21T18:07:02.382Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -11294,7 +11294,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.621Z",
+    "last_updated": "2026-10-21T18:07:02.400Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -11748,7 +11748,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.636Z",
+    "last_updated": "2026-10-21T18:07:02.415Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -12202,7 +12202,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.651Z",
+    "last_updated": "2026-10-21T18:07:02.433Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -12656,7 +12656,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.665Z",
+    "last_updated": "2026-10-21T18:07:02.452Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -13110,7 +13110,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.679Z",
+    "last_updated": "2026-10-21T18:07:02.471Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -13564,7 +13564,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.692Z",
+    "last_updated": "2026-10-21T18:07:02.489Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -14018,7 +14018,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.705Z",
+    "last_updated": "2026-10-21T18:07:02.504Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -14472,7 +14472,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.719Z",
+    "last_updated": "2026-10-21T18:07:02.523Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -14926,7 +14926,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.733Z",
+    "last_updated": "2026-10-21T18:07:02.539Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -15380,7 +15380,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.748Z",
+    "last_updated": "2026-10-21T18:07:02.557Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -15834,7 +15834,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.762Z",
+    "last_updated": "2026-10-21T18:07:02.573Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -16288,7 +16288,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.775Z",
+    "last_updated": "2026-10-21T18:07:02.594Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -16742,7 +16742,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.789Z",
+    "last_updated": "2026-10-21T18:07:02.612Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -17196,7 +17196,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.803Z",
+    "last_updated": "2026-10-21T18:07:02.629Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -17650,7 +17650,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.818Z",
+    "last_updated": "2026-10-21T18:07:02.648Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -18104,7 +18104,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.830Z",
+    "last_updated": "2026-10-21T18:07:02.663Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -18558,7 +18558,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.845Z",
+    "last_updated": "2026-10-21T18:07:02.680Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -19012,7 +19012,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.858Z",
+    "last_updated": "2026-10-21T18:07:02.695Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -19466,7 +19466,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.871Z",
+    "last_updated": "2026-10-21T18:07:02.712Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -19920,7 +19920,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.885Z",
+    "last_updated": "2026-10-21T18:07:02.729Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -20374,7 +20374,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.902Z",
+    "last_updated": "2026-10-21T18:07:02.747Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -20828,7 +20828,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.917Z",
+    "last_updated": "2026-10-21T18:07:02.764Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -21282,7 +21282,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.933Z",
+    "last_updated": "2026-10-21T18:07:02.783Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -21736,7 +21736,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.948Z",
+    "last_updated": "2026-10-21T18:07:02.803Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -22190,7 +22190,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.961Z",
+    "last_updated": "2026-10-21T18:07:02.824Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -22644,7 +22644,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.976Z",
+    "last_updated": "2026-10-21T18:07:02.842Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -23098,7 +23098,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:02.992Z",
+    "last_updated": "2026-10-21T18:07:02.864Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -23552,7 +23552,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.007Z",
+    "last_updated": "2026-10-21T18:07:02.881Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -24006,7 +24006,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.022Z",
+    "last_updated": "2026-10-21T18:07:02.900Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -24460,7 +24460,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.037Z",
+    "last_updated": "2026-10-21T18:07:02.917Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -24914,7 +24914,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.051Z",
+    "last_updated": "2026-10-21T18:07:02.935Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -25368,7 +25368,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.069Z",
+    "last_updated": "2026-10-21T18:07:02.955Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -25822,7 +25822,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.082Z",
+    "last_updated": "2026-10-21T18:07:02.969Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -26276,7 +26276,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.095Z",
+    "last_updated": "2026-10-21T18:07:02.986Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -26730,7 +26730,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.110Z",
+    "last_updated": "2026-10-21T18:07:03.004Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -27184,7 +27184,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.125Z",
+    "last_updated": "2026-10-21T18:07:03.022Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -27638,7 +27638,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.138Z",
+    "last_updated": "2026-10-21T18:07:03.039Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -28080,7 +28080,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.152Z",
+    "last_updated": "2026-10-21T18:07:03.061Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -28534,7 +28534,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.165Z",
+    "last_updated": "2026-10-21T18:07:03.079Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -28988,7 +28988,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.179Z",
+    "last_updated": "2026-10-21T18:07:03.096Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -29442,7 +29442,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.193Z",
+    "last_updated": "2026-10-21T18:07:03.116Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -29896,7 +29896,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.206Z",
+    "last_updated": "2026-10-21T18:07:03.130Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -30390,7 +30390,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.264Z",
+    "last_updated": "2026-10-21T18:07:03.209Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -30844,7 +30844,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.277Z",
+    "last_updated": "2026-10-21T18:07:03.230Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -31298,7 +31298,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.294Z",
+    "last_updated": "2026-10-21T18:07:03.245Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -31752,7 +31752,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.307Z",
+    "last_updated": "2026-10-21T18:07:03.264Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -32206,7 +32206,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.322Z",
+    "last_updated": "2026-10-21T18:07:03.287Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -32660,7 +32660,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.336Z",
+    "last_updated": "2026-10-21T18:07:03.304Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -33114,7 +33114,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.349Z",
+    "last_updated": "2026-10-21T18:07:03.323Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -33568,7 +33568,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.362Z",
+    "last_updated": "2026-10-21T18:07:03.341Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -34022,7 +34022,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.376Z",
+    "last_updated": "2026-10-21T18:07:03.357Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -34516,7 +34516,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.440Z",
+    "last_updated": "2026-10-21T18:07:03.432Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
@@ -34970,7 +34970,7 @@
         "Fri": 1
       }
     },
-    "last_updated": "2026-10-21T17:58:03.453Z",
+    "last_updated": "2026-10-21T18:07:03.450Z",
     "recommended_ratios": {
       "stopOffsetRatio": 0.3,
       "triggerOffsetRatio": 0.08,
