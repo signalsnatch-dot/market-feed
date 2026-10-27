@@ -2,6 +2,242 @@
 
 update -
 
+oct 1st  based on sept analysis
+### **Core Clarification on Trade & Outcome Determination**
+
+1. **Cluster Result Independence:** `ELITE_UBER_ENGINE` trades (and all `META_*` trades) are strictly excluded from determining the cluster’s baseline outcome. A cluster’s original result is evaluated **exclusively by whether the real, completed Base Versions hit `take_profit` or `stop_loss`**.
+2. **Engine Decision Outcomes:**
+   * **`PICK` Decision:** Evaluated in the Original Signal direction $\rightarrow$ **WIN** if Base Versions hit `take_profit`; **LOSS** if Base Versions hit `stop_loss`.
+   * **`REVERSE` Decision:** Evaluated in the Inverted direction $\rightarrow$ **WIN** if Base Versions hit `stop_loss` (reversal target reached); **LOSS** if Base Versions hit `take_profit` (stopped out by original move).
+3. **`UBER_ENGINE` Role:** `UBER_ENGINE` serves purely as an **external structural indicator** (identifying whether exhaustion/momentum is confirmed or contradicted), not as the arbiter of cluster P&L.
+
+---
+
+# **1. Re-Evaluated Dynamic Pattern Scorecard (Full Month: Sep 1 – Sep 30)**
+
+Evaluated across all **274 trade clusters** using strict Base-Version settlement:
+
+| Pattern ID | Pattern Condition & Description | Verified Wins / Trades | Win Rate | Engine Action Classification |
+| :--- | :--- | :---: | :---: | :--- |
+| **P-GEN-1** | **`REVERSE (P1 or Base)` with `UBER_ENGINE` Presence on Reversal Setups**<br>*(Both `S_ULTRA` & `T_MED` absent + Base versions in exhaustion)* | **22 / 24 Wins** | **91.7%** | **`[TAKE IN FAVOUR]`** *(Execute REVERSE)* |
+| **P1-OVERRIDE** | **`P1 REVERSE` Overrides `META_*` Signals**<br>*(S_ULTRA & T_MED absent + `Ref2` present + count $\ge 3$ + Uber presence vs Meta bias)* | **4 / 4 Wins** | **100.0%** | **`[TAKE IN FAVOUR]`** *(Execute REVERSE)* |
+| **P-TH-1** | **Thursday Expiry Post-13:00 `PICK` (Full Stack)**<br>*(Expiry afternoon trend pinning in equities/futures)* | **11 / 13 Wins** | **84.6%** | **`[TAKE IN FAVOUR]`** *(Execute PICK)* |
+| **P-TU-2** | **Tuesday Cash Equity (`NSE_EQ`) `PICK` Superiority**<br>*(Post-12:00 IST full-cluster picks on Cash Equities)* | **9 / 11 Wins** | **81.8%** | **`[TAKE IN FAVOUR]`** *(Execute PICK)* |
+| **P-WE-1** | **Wednesday Mid-Day Trend Pivots (11:00–13:30 IST)**<br>*(Primary institutional repositioning window: PICK & P1-Reverse)* | **5 / 5 Wins** | **100.0%** | **`[TAKE IN FAVOUR]`** *(Execute as Generated)* |
+| **P-GEN-3** | **Late-Evening (20:30+ IST) Multi-Contract MCX `PICK`**<br>*(Energy & Metals breakout with `S_ULTRA + T_MED`)* | **7 / 7 Wins** | **100.0%** | **`[TAKE IN FAVOUR]`** *(Execute PICK)* |
+| **P-TH-2** | **Thursday Morning (Pre-12:30 IST) Equity/Index `PICK`**<br>*(Full stack during opening range decay/expansion)* | **0 / 7 Wins** | **0.0%** *(100% Loss)* | **`[TAKE AGAINST DECISION / INVERT]`** *(Invert to REVERSE)* |
+| **P-FR-2** | **Base `REVERSE` (No P1/Ref2) vs `META_*` Aligned Trades**<br>*(Simple base reversal failing against Meta directional dominance)* | **0 / 8 Wins** | **0.0%** *(100% Loss)* | **`[TAKE AGAINST DECISION / INVERT]`** *(Overrule $\rightarrow$ Execute PICK)* |
+| **P-FR-3** | **US Macro Economic Data Release Window (18:00–19:00 IST) Bullion**<br>*(High-impact US data sweeps Gold & Silver)* | **0 / 5 Wins** | **0.0%** *(100% Loss)* | **`[TAKE AGAINST DECISION / INVERT]`** *(Mandatory BLOCK)* |
+| **P-GEN-2** | **Overextended Rapid Re-Entry `PICK` (<20 mins on same instrument)**<br>*(Momentum exhaustion chasing extended breakouts)* | **0 / 3 Wins** | **0.0%** *(100% Loss)* | **`[TAKE AGAINST DECISION / INVERT]`** *(Block Entry / Fade)* |
+
+---
+
+# **2. Detailed Operational Rules for LLM / Automated Decision-Maker**
+
+---
+
+## **PART A: High-Conviction Rules (> 80% Win Rate) $\rightarrow$ `[TAKE IN FAVOUR]`**
+
+### **RULE 1.1: `P-GEN-1` — The Uber-Confirmed Structural Reversal Rule**
+* **Win Rate:** **91.7%** (22 Wins / 24 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE REVERSE]`**
+* **Trigger Conditions:**
+  1. `S_ULTRA` (`ELITE_V945A_S_ULTRA`) is **ABSENT**.
+  2. `T_MED` (`ELITE_V945A_T_MED`) is **ABSENT**.
+  3. `UBER_ENGINE` trade is **PRESENT** in the cluster.
+  4. Base Versions show trend exhaustion at key levels.
+* **Execution Parameters:**
+  * **Direction:** **OPPOSITE** to Original Signal direction (Execute `REVERSE`).
+  * **Entry Price:** Original Signal Entry Price.
+  * **Take Profit (TP):** Original Signal Stop Loss Price.
+  * **Stop Loss (SL):** Original Signal Take Profit Price.
+
+---
+
+### **RULE 1.2: `P1-OVERRIDE` — The P1-Breadth Meta Invalidation Rule**
+* **Win Rate:** **100.0%** (4 Wins / 4 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE REVERSE]`**
+* **Trigger Conditions:**
+  1. `S_ULTRA` and `T_MED` are **ABSENT**.
+  2. `P1` conditions are **MET** (Cluster version count $\ge 3$ **AND** at least one `Ref2` version is present: `V935A_N_MED`, `V935A_T_MED`, or `V955A_N_LOOSE`).
+  3. `UBER_ENGINE` is **PRESENT** in the cluster.
+  4. `META_*` derived trades (`ELITE_META_2_0`, `ELITE_META_THURSDAY`) are present in the original signal direction.
+* **Execution Parameters:**
+  * **Direction:** **OPPOSITE** to Original Signal direction (Execute `REVERSE`).
+  * **Target (TP):** Original SL.
+  * **Stop (SL):** Original TP.
+* **LLM Ingestion Logic:** Broad `P1` version cluster breadth combined with `UBER_ENGINE` invalidates institutional `META_*` alignment. Overrule Meta bias and execute `REVERSE`.
+
+---
+
+### **RULE 1.3: `P-TH-1` — Thursday Expiry Afternoon Trend Pinning**
+* **Win Rate:** **84.6%** (11 Wins / 13 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE PICK]`**
+* **Trigger Conditions:**
+  1. **Day of Week:** `Thursday` (Weekly/Monthly Expiry).
+  2. **Timestamp:** $\ge$ `13:00 IST` (through `15:30 IST`).
+  3. **Segment:** Equities or Equity Derivatives (`NSE_EQ`, `NSE_FO`).
+  4. `S_ULTRA` is **PRESENT** **OR** `T_MED` is **PRESENT**.
+  5. Cluster contains `V125A_N_LOOSE` **OR** `TIER_HIGH` versions.
+* **Execution Parameters:**
+  * **Direction:** Original Signal direction (Execute `PICK`).
+  * **Entry / SL / TP:** Standard Original Parameters.
+
+---
+
+### **RULE 1.4: `P-TU-2` — Tuesday Cash Equity Momentum Superiority**
+* **Win Rate:** **81.8%** (9 Wins / 11 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE PICK]`**
+* **Trigger Conditions:**
+  1. **Day of Week:** `Tuesday`.
+  2. **Timestamp:** $\ge$ `12:00 IST`.
+  3. **Instrument Segment:** Cash Equity (`NSE_EQ`).
+  4. `S_ULTRA` is **PRESENT** **OR** `T_MED` is **PRESENT**.
+* **Execution Parameters:**
+  * **Direction:** Original Signal direction (Execute `PICK`).
+  * **Entry / SL / TP:** Standard Original Parameters.
+
+---
+
+### **RULE 1.5: `P-WE-1` — Wednesday Mid-Day Trend Pivot (11:00–13:30 IST)**
+* **Win Rate:** **100.0%** (5 Wins / 5 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE AS GENERATED]`**
+* **Trigger Conditions:**
+  1. **Day of Week:** `Wednesday`.
+  2. **Time Window:** Between `11:00 IST` and `13:30 IST`.
+  3. Valid cluster setup:
+     * If `S_ULTRA` / `T_MED` present $\rightarrow$ **Execute PICK**.
+     * If `S_ULTRA` & `T_MED` absent with `P1` or `P2` criteria met $\rightarrow$ **Execute REVERSE**.
+* **Execution Parameters:**
+  * Standard `PICK` or `REVERSE` mapping as generated by the core engine.
+
+---
+
+### **RULE 1.6: `P-GEN-3` — Late-Evening MCX Commodity Breakout ($\ge$ 20:30 IST)**
+* **Win Rate:** **100.0%** (7 Wins / 7 Trades)
+* **Directive:** **`[TAKE IN FAVOUR: EXECUTE PICK]`**
+* **Trigger Conditions:**
+  1. **Timestamp:** $\ge$ `20:30 IST`.
+  2. **Segment:** Commodities (`MCX_FO` — Energy & Metals).
+  3. `S_ULTRA` is **PRESENT** **AND** `T_MED` is **PRESENT**.
+* **Execution Parameters:**
+  * **Direction:** Original Signal direction (Execute `PICK`).
+  * **Entry / SL / TP:** Standard Original Parameters.
+
+---
+
+## **PART B: Low-Conviction Rules (< 20% Win Rate) $\rightarrow$ `[TAKE AGAINST DECISION / INVERT]`**
+
+---
+
+### **RULE 2.1: `P-TH-2` — Thursday Morning Expiry Range Decay Inversion**
+* **Win Rate:** **0.0%** (0 Wins / 7 Trades $\rightarrow$ **100% Failure Rate**)
+* **Directive:** **`[TAKE AGAINST DECISION: INVERT PICK TO REVERSE]`**
+* **Trigger Conditions:**
+  1. **Day of Week:** `Thursday`.
+  2. **Timestamp:** `< 12:30 IST`.
+  3. **Segment:** Equities & Equity Derivatives (`NSE_EQ`, `NSE_FO`).
+  4. Core Engine generated a `PICK` (`S_ULTRA` or `T_MED` present).
+* **Inverted Execution Parameters:**
+  * **Action:** **DO NOT FOLLOW ORIGINAL DIRECTION.**
+  * **Inverted Execution:** Execute **`REVERSE`** (Take opposite direction).
+  * **Target (TP):** Original Signal Stop Loss.
+  * **Stop Loss (SL):** Original Signal Take Profit.
+  * *(Alternative Risk Protocol: Complete Trade `BLOCK`)*.
+
+---
+
+### **RULE 2.2: `P-FR-2` — Meta-Aligned Reversal Trap Overrule**
+* **Win Rate:** **0.0%** (0 Wins / 8 Trades $\rightarrow$ **100% Failure Rate**)
+* **Directive:** **`[TAKE AGAINST DECISION: OVERRULE REVERSE -> EXECUTE PICK]`**
+* **Trigger Conditions:**
+  1. Core Engine generated a `REVERSE` based on Base or P2 alone (`S_ULTRA` & `T_MED` absent).
+  2. `P1` conditions are **NOT MET** (`Ref2` absent OR version count $< 3$).
+  3. `META_*` derived trades (`ELITE_META_2_0`, `ELITE_META_THURSDAY`) are **PRESENT** aligned with the original signal direction.
+* **Inverted Execution Parameters:**
+  * **Action:** **CANCEL THE REVERSAL.**
+  * **Inverted Execution:** Execute **`PICK`** (Follow Original Signal Direction).
+  * **Entry / SL / TP:** Standard Original Parameters.
+
+---
+
+### **RULE 2.3: `P-FR-3` — US Macro Economic Data Release Blackout (18:00–19:00 IST)**
+* **Win Rate:** **0.0%** (0 Wins / 5 Trades $\rightarrow$ **100% Failure Rate**)
+* **Directive:** **`[TAKE AGAINST DECISION: MANDATORY SIGNAL CANCELLATION / BLOCK]`**
+* **Trigger Conditions:**
+  1. **Time Window:** Between `18:00 IST` and `19:00 IST`.
+  2. **Segment:** MCX Bullion (`MCX_FO` — Gold, Gold Mini, Gold Petal, Silver, Silver Mini, Silver Micro).
+  3. Any signal generated (`PICK` or `REVERSE`).
+* **Execution Directive:**
+  * **Action:** **`BLOCK / CANCEL TRADE`**.
+  * **Do NOT execute any order.** High-impact US data triggers two-way stop sweeps on Base Versions.
+
+---
+
+### **RULE 2.4: `P-GEN-2` — Overextended Rapid Re-Entry Filter (< 20 Minutes)**
+* **Win Rate:** **0.0%** (0 Wins / 3 Trades $\rightarrow$ **100% Failure Rate**)
+* **Directive:** **`[TAKE AGAINST DECISION: BLOCK ENTRY / FADE AS EXHAUSTION]`**
+* **Trigger Conditions:**
+  1. A new signal fires on the **SAME INSTRUMENT** $< 20$ minutes after an immediate prior WIN (`take_profit` hit by Base Versions).
+  2. The signal targets an overextended continuation price in the same direction.
+* **Execution Directive:**
+  * **Action:** **`BLOCK ENTRY`** (Do not chase).
+  * *(Aggressive Protocol: Invert to `REVERSE` to scalp the exhaustion mean-reversion pullback)*.
+
+---
+
+# **3. Master Decision Flowchart for LLM Prompt Ingestion**
+
+```text
+====================================================================================================
+LLM REAL-TIME DECISION FLOWCHART
+====================================================================================================
+
+[STEP 1: TIME & MACRO FILTERS (BLOCK / INVERT PROTOCOLS)]
+  │
+  ├──► IF (Time is 18:00–19:00 IST AND Segment is MCX Bullion)
+  │        └──► ACTION: BLOCK TRADE (Rule 2.3: P-FR-3)
+  │
+  └──► IF (Signal is <20 min repeat on same instrument after Base Version WIN)
+           └──► ACTION: BLOCK / FADE EXHAUSTION (Rule 2.4: P-GEN-2)
+
+[STEP 2: REVERSAL ENGINE EVALUATION (S_ULTRA & T_MED ARE ABSENT)]
+  │
+  ├──► IF (UBER_ENGINE is PRESENT AND P1 is MET [Ref2 present & Count >= 3] AND META is PRESENT)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE REVERSE (Rule 1.2: P1-OVERRIDE [100% Win])
+  │
+  ├──► IF (UBER_ENGINE is PRESENT)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE REVERSE (Rule 1.1: P-GEN-1 [91.7% Win])
+  │
+  ├──► IF (META_* is PRESENT AND P1 is NOT MET)
+  │        └──► ACTION: [TAKE AGAINST DECISION] -> OVERRULE TO PICK (Rule 2.2: P-FR-2 [100% Fade])
+  │
+  └──► ELSE
+           └──► ACTION: EXECUTE STANDARD BASE REVERSE
+
+[STEP 3: PICK ENGINE EVALUATION (S_ULTRA IS PRESENT OR T_MED IS PRESENT)]
+  │
+  ├──► IF (Day is Thursday AND Time < 12:30 IST AND Segment is NSE_EQ / NSE_FO)
+  │        └──► ACTION: [TAKE AGAINST DECISION] -> INVERT TO REVERSE (Rule 2.1: P-TH-2 [100% Fade])
+  │
+  ├──► IF (Day is Thursday AND Time >= 13:00 IST AND Full Stack / Tier_High Present)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE PICK (Rule 1.3: P-TH-1 [84.6% Win])
+  │
+  ├──► IF (Day is Tuesday AND Time >= 12:00 IST AND Segment is NSE_EQ)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE PICK (Rule 1.4: P-TU-2 [81.8% Win])
+  │
+  ├──► IF (Day is Wednesday AND Time is 11:00–13:30 IST)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE PICK (Rule 1.5: P-WE-1 [100% Win])
+  │
+  ├──► IF (Time >= 20:30 IST AND Segment is MCX Commodities AND Both S_ULTRA & T_MED Present)
+  │        └──► ACTION: [TAKE IN FAVOUR] -> EXECUTE PICK (Rule 1.6: P-GEN-3 [100% Win])
+  │
+  └──► ELSE
+           └──► ACTION: EXECUTE STANDARD BASE PICK
+====================================================================================================
+```
+----------------------------------------------------------------------------------------------
+
 This document provides the formalized instructions for the **VP (Unanimity)** and **AP (Structural)** Rule Engines. Use these criteria to audit JSON trade data clusters grouped by instrument and timestamp.
 
 ---

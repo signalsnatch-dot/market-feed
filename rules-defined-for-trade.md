@@ -68,7 +68,7 @@ To hit the 95% goal, the Meta-Engine no longer asks "What stock is this?" It ask
     *   **Action:** **EXIT IMMEDIATELY.** (Saved Sun Pharma).
 *   **Veto 4: Sector Contagion**
     *   **Condition:** A sector peer has already hit a **Stop Loss** today.
-    *   **Action:** **EXIT/SKIP SECTOR.** (Saved SAIL disaster).
+    *   **Action:** **EXIT/SKIP SECTOR for next 45 minutes in that direction** (Saved SAIL disaster).
 
 ### **Conclusion**
 By making **Potential-Sync** the master rule and **Floor 0** the volume policy, your total return doubled (**+6.92%**). The win rate remained elite (86%) because you replaced a generic "Level Floor" with a specific **"Efficiency Floor"** (Absorption Veto). 
