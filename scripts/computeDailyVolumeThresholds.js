@@ -48,43 +48,38 @@ const CHECK_TIME = timeIdx !== -1 && args[timeIdx + 1] ? args[timeIdx + 1] : nul
 const updateDayIdx = args.indexOf('--update-day');
 const UPDATE_DAY = updateDayIdx !== -1 && args[updateDayIdx + 1] && !args[updateDayIdx + 1].startsWith('--') ? args[updateDayIdx + 1] : null;
 
-// ─── UPDATED LOT MULTIPLIERS (Oct/Nov 2026 Expiry) ───────────
-// Values sourced from upstox oct expiry.csv lot_size column
+// ─── UPDATED LOT MULTIPLIERS (Nov/Dec 2026 Expiry) ───────────
 const LOT_MULTIPLIERS = {
-    // MCX Oct/Nov Keys
-    '570750': 1250, '570751': 250,  // Natural Gas, Natural Gas Mini (Oct)
-    '569900': 100,  '569901': 10,   // Crude Oil, Crude Oil Mini (Oct)
-    '574825': 100,  '483080': 5,    '562058': 1,    // Silver100, Silver Mini (Nov), Silver Micro (Nov)
-    '574834': 5,    '574830': 5,    '574828': 5,    // Zinc, Lead, Aluminium (Oct)
-    '483079': 1,    '569003': 100,  '571306': 1,    // Gold (Oct), Gold Mini (Oct), Gold Petal (Oct)
+    // MCX Nov/Dec Keys
+    '574319': 1250, '574320': 250,  // Natural Gas, Natural Gas Mini (Nov)
+    '573422': 100,  '573423': 10,   // Crude Oil, Crude Oil Mini (Nov)
+    '574826': 100,  '483080': 5,    '562058': 1,    // Silver100 (Nov), Silver Mini (Nov), Silver Micro (Nov)
+    '578638': 5,    '578635': 5,    '578633': 5,    // Zinc (Nov), Lead (Nov), Aluminium (Nov)
+    '495213': 1,    '571445': 100,  '574841': 1,    // Gold (Dec), Gold Mini (Nov), Gold Petal (Nov)
+    '578634': 2500, '582827': 15,   '582370': 40,   // Copper, Bulldex, Metldex (Nov)
+    '578639': 1,    '578632': 1,    '578636': 1,    '578640': 250, // ZincMini, Alumini, LeadMini, Nickel (Nov)
     
-    // NSE Index Oct Keys
-    '48704': 65,    '48699': 30,    '48702': 60,    '48703': 120, // Nifty, Bank, Fin, Midcap
+    // NSE Index Nov Keys
+    '61471': 65,    '61466': 30,    '61469': 60,    '61470': 120, // Nifty, Bank, Fin, Midcap
+    '61473': 25,                                                  // Nifty Next 50
     
-    // NSE Stock Oct Keys
-    '48987': 500,   '48864': 650,   '48874': 700,   '48994': 750, // Reliance, HDFC, ICICI, SBI
-    '49013': 225,   '48886': 400,   '48896': 1725,  '48758': 475, // TCS, Infy, ITC, Airtel
-    '48736': 625,   '48920': 175,   '49012': 2750,  '49019': 1600, // Axis, L&T, TataSteel, TataMot
-    '48740': 750,   '48906': 2000,  '49003': 350,   '48900': 675, // BajFin, Kotak, Sun, JSW
-    '48797': 1350,  '48711': 309,   '48718': 475,   '48867': 700, // Coal, AdaniEnt, AdaniPort, Hindalco
-    '48730': 125,   '48974': 8000,  '48989': 4700,  '49005': 12700, // Apollo, PNB, SAIL, Suzlon
-    '48964': 725,   '48988': 1925,  '48895': 5425,  '48894': 4525, // Paytm, RVNL, IRFC, IREDA
-    '48764': 2625,  '48847': 3550,  '49021': 225                   // BHEL, GAIL, Trent
+    // NSE Stock Nov Keys
+    '61697': 500,   '61582': 650,   '61595': 700,   '61706': 750, // Reliance, HDFC, ICICI, SBI
+    '61724': 225,   '61608': 400,   '61615': 1725,  '61515': 475, // TCS, Infy, ITC, Airtel
+    '61504': 625,   '61633': 175,   '61723': 2750,  '61730': 1600, // Axis, L&T, TataSteel, TataMot
+    '61507': 750,   '61627': 2000,  '61713': 350,   '61619': 675, // BajFin, Kotak, Sun, JSW
+    '61540': 1350,  '61478': 309,   '61480': 475,   '61585': 700, // Coal, AdaniEnt, AdaniPort, Hindalco
+    '61487': 125,   '61682': 8000,  '61702': 4700,  '61715': 12700, // Apollo, PNB, SAIL, Suzlon
+    '61674': 725,   '61698': 1925,  '61614': 5425,  '61613': 4525, // Paytm, RVNL, IRFC, IREDA
+    '61516': 2625,  '61569': 3550,  '61732': 225,                  // BHEL, GAIL, Trent
+    '61591': 300,   '61644': 50,    '61637': 200,   '61729': 175, // HindUnilvr, Maruti, M&M, Titan
+    '61722': 1450,  '61736': 50,    '61580': 400,   '61725': 600, // TataPower, UltraCem, HCLTech, TechM
+    '61512': 1425,  '61578': 150,   '61664': 1500,  '61669': 2250, // BEL, HAL, NTPC, ONGC
+    '61690': 1900,  '61523': 1975,  '61612': 4875,  '61742': 1150, // PowerGrid, BPCL, IOC, Vedanta
+    '61689': 125,   '61561': 950,   '61603': 150,   '61741': 1275, // Polycab, DLF, IndiGo, VBL
+    '61509': 2925,  '61564': 100                                   // BankBaroda, EicherMot
 };
 
-const NSE_EQ_INSTRUMENTS = new Set([
-    'NSE_EQ|INE002A01018', 'NSE_EQ|INE040A01034', 'NSE_EQ|INE090A01021',
-    'NSE_EQ|INE062A01020', 'NSE_EQ|INE467B01029', 'NSE_EQ|INE009A01021',
-    'NSE_EQ|INE154A01025', 'NSE_EQ|INE397D01024', 'NSE_EQ|INE238A01034',
-    'NSE_EQ|INE018A01030', 'NSE_EQ|INE081A01020', 'NSE_EQ|INE1TAE01010',
-    'NSE_EQ|INE296A01032', 'NSE_EQ|INE237A01036', 'NSE_EQ|INE044A01036',
-    'NSE_EQ|INE019A01038', 'NSE_EQ|INE522F01014', 'NSE_EQ|INE423A01024',
-    'NSE_EQ|INE742F01042', 'NSE_EQ|INE038A01020', 'NSE_EQ|INE437A01024',
-    'NSE_EQ|INE160A01022', 'NSE_EQ|INE114A01011', 'NSE_EQ|INE040H01021',
-    'NSE_EQ|INE928J01020', 'NSE_EQ|INE415G01027', 'NSE_EQ|INE053F01010',
-    'NSE_EQ|INE202E01016', 'NSE_EQ|INE257A01026', 'NSE_EQ|INE129A01025',
-    'NSE_EQ|INE849A01020'
-]);
 
 function getLotMultiplier(instKey) {
     if (!instKey) return 1;
@@ -115,11 +110,11 @@ function getLiquidityTier(avgDailyVolumeLots) {
 function classifyInstrument(instKey) {
     const id = instKey.includes('|') ? instKey.split('|')[1] : instKey;
 
-    const highVolMCX = ['570750', '570751', '569900', '569901'];
-    const metalsMCX = ['574825', '483080', '562058', '483079', '569003', '571306'];
-    const baseMetalsMCX = ['574834', '574830', '574828'];
-    const nseIndices = ['48704', '48699', '48702', '48703'];
-    const nseLowVol = ['48974', '48989', '49005', '48964', '48988', '48895', '48894', '48764', '48847', '49021'];
+    const highVolMCX = ['574319', '574320', '573422', '573423'];
+    const metalsMCX = ['574826', '483080', '562058', '495213', '571445', '574841', '582827'];
+    const baseMetalsMCX = ['578638', '578635', '578633', '578634', '578639', '578632', '578636', '578640', '582370'];
+    const nseIndices = ['61471', '61466', '61469', '61470', '61473'];
+    const nseLowVol = ['61682', '61702', '61715', '61674', '61698', '61614', '61613', '61516', '61569', '61732', '61509'];
 
     if (highVolMCX.includes(id)) return 'mCX_high_vol';
     if (metalsMCX.includes(id)) return 'mCX_metal';

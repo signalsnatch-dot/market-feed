@@ -19,31 +19,50 @@ const CONFIG_FILE = './build-version-config.json';
 const RESULTS_DIR = './live-backtest-results';
 const CANDLES_DIR = './candles/live';
 
-// ─── UPDATED OCTOBER/NOVEMBER 2026 MULTIPLIERS ────────────────────────
+// ─── UPDATED NOVEMBER 2026 MULTIPLIERS ────────────────────────
 const MCX_MULTIPLIERS = {
-    // MCX Oct/Nov Keys (updated from Sept keys)
-    '570750': 1250, '570751': 250,  // Natural Gas, Natural Gas Mini (Oct)
-    '569900': 100,  '569901': 10,   // Crude Oil, Crude Oil Mini (Oct)
-    '574825': 100,  '483080': 5,    '562058': 1,    // Silver100 (Oct), Silver Mini (Nov), Silver Micro (Nov)
-    '574834': 5,    '574830': 5,    '574828': 5,    // Zinc (Oct), Lead (Oct), Aluminium (Oct)
-    '483079': 1,    '569003': 100,  '571306': 1     // Gold (Oct), Gold Mini (Oct), Gold Petal (Oct)
+    // Existing MCX rolled to Nov/Dec
+    '574319': 1250, '574320': 250,  // Natural Gas, Natural Gas Mini (Nov)
+    '573422': 100,  '573423': 10,   // Crude Oil, Crude Oil Mini (Nov)
+    '574826': 100,  '483080': 5,    '562058': 1,    // Silver100 (Nov), Silver Mini (Nov), Silver Micro (Nov)
+    '578638': 5,    '578635': 5,    '578633': 5,    // Zinc (Nov), Lead (Nov), Aluminium (Nov)
+    '495213': 1,    '571445': 100,  '574841': 1,    // Gold (Dec), Gold Mini (Nov), Gold Petal (Nov)
+
+    // Newly added MCX instruments
+    '578634': 2500, // Copper (Nov)
+    '582827': 15,   // MCX Bulldex (Nov)
+    '582370': 40,   // MCX Metldex (Nov)
+    '578639': 1,    // Zinc Mini (Nov)
+    '578632': 1,    // Aluminium Mini (Nov)
+    '578636': 1,    // Lead Mini (Nov)
+    '578640': 250   // Nickel (Nov)
 };
 
 const INDEX_MULTIPLIERS = { 
-    // NSE Index Oct Keys (updated from Sept keys)
-    '48704': 65, '48699': 30, '48702': 60, '48703': 120 // Nifty, Bank, Fin, Midcap
+    // NSE Index Nov Keys
+    '61471': 65, '61466': 30, '61469': 60, '61470': 120, // Nifty, Bank, Fin, Midcap
+    '61473': 25                                           // Nifty Next 50 (New)
 };
 
-// NSE Stock Oct Keys (fallback — config.json is preferred source)
+// NSE Stock Nov Keys (fallback — config.json is preferred source)
 const STOCK_MULTIPLIERS = {
-    '48987': 500,   '48864': 650,   '48874': 700,   '48994': 750,   // Reliance, HDFC, ICICI, SBI
-    '49013': 225,   '48886': 400,   '48896': 1725,  '48758': 475,   // TCS, Infy, ITC, Airtel
-    '48736': 625,   '48920': 175,   '49012': 2750,  '49019': 1600,  // Axis, L&T, TataSteel, TataMot
-    '48740': 750,   '48906': 2000,  '49003': 350,   '48900': 675,   // BajFin, Kotak, Sun, JSW
-    '48797': 1350,  '48711': 309,   '48718': 475,   '48867': 700,   // Coal, AdaniEnt, AdaniPort, Hindalco
-    '48730': 125,   '48974': 8000,  '48989': 4700,  '49005': 12700, // Apollo, PNB, SAIL, Suzlon
-    '48964': 725,   '48988': 1925,  '48895': 5425,  '48894': 4525,  // Paytm, RVNL, IRFC, IREDA
-    '48764': 2625,  '48847': 3550,  '49021': 225                    // BHEL, GAIL, Trent
+    // Existing 31 stocks rolled to Nov
+    '61697': 500,   '61582': 650,   '61595': 700,   '61706': 750,   // Reliance, HDFC, ICICI, SBI
+    '61724': 225,   '61608': 400,   '61615': 1725,  '61515': 475,   // TCS, Infy, ITC, Airtel
+    '61504': 625,   '61633': 175,   '61723': 2750,  '61730': 1600,  // Axis, L&T, TataSteel, TataMot
+    '61507': 750,   '61627': 2000,  '61713': 350,   '61619': 675,   // BajFin, Kotak, Sun, JSW
+    '61540': 1350,  '61478': 309,   '61480': 475,   '61585': 700,   // Coal, AdaniEnt, AdaniPort, Hindalco
+    '61487': 125,   '61682': 8000,  '61702': 4700,  '61715': 12700, // Apollo, PNB, SAIL, Suzlon
+    '61674': 725,   '61698': 1925,  '61614': 5425,  '61613': 4525,  // Paytm, RVNL, IRFC, IREDA
+    '61516': 2625,  '61569': 3550,  '61732': 225,                   // BHEL, GAIL, Trent
+
+    // Newly added 22 NSE Stock Futures
+    '61591': 300,   '61644': 50,    '61637': 200,   '61729': 175,   // HindUnilvr, Maruti, M&M, Titan
+    '61722': 1450,  '61736': 50,    '61580': 400,   '61725': 600,   // TataPower, UltraCem, HCLTech, TechM
+    '61512': 1425,  '61578': 150,   '61664': 1500,  '61669': 2250,  // BEL, HAL, NTPC, ONGC
+    '61690': 1900,  '61523': 1975,  '61612': 4875,  '61742': 1150,  // PowerGrid, BPCL, IOC, Vedanta
+    '61689': 125,   '61561': 950,   '61603': 150,   '61741': 1275,  // Polycab, DLF, IndiGo, VBL
+    '61509': 2925,  '61564': 100                                    // BankBaroda, EicherMot
 };
 
 function getLotMultiplier(instKey) {

@@ -33,61 +33,92 @@ const INSTRUMENT_NAMES = {
     'INE202E01016': 'IREDA', 'INE257A01026': 'BHEL', 'INE129A01025': 'GAIL',
     'INE849A01020': 'TRENT',
 
-    // ── Updated October/November 2026 MCX IDs ──
-    '570750': 'Natural Gas Future',        // NATURALGAS26OCTFUT (Oct)
-    '570751': 'Natural Gas Mini Future',   // NATGASMINI26OCTFUT (Oct)
-    '569900': 'Crude Oil Future',          // CRUDEOIL26OCTFUT (Oct)
-    '569901': 'Crude Oil Mini Future',     // CRUDEOILM26OCTFUT (Oct)
-    '574825': 'Silver Future',             // SILVER10026OCTFUT (Oct)
-    '483080': 'Silver Mini Future',        // SILVERM26NOVFUT (Nov — unchanged)
-    '562058': 'Silver Micro Future',       // SILVERMIC26NOVFUT (Nov — unchanged)
-    '574834': 'Zinc Future',               // ZINC26OCTFUT (Oct)
-    '574830': 'Lead Future',               // LEAD26OCTFUT (Oct)
-    '574828': 'Aluminium Future',          // ALUMINIUM26OCTFUT (Oct)
-    '483079': 'Gold Future',               // GOLD26OCTFUT (Oct — unchanged)
-    '569003': 'Gold Mini Future',          // GOLDM26OCTFUT (Oct — unchanged)
-    '571306': 'Gold Petal Future',         // GOLDPETAL26OCTFUT (Oct)
+    // ── Updated November/December 2026 MCX Tokens ──
+    '574319': 'Natural Gas Nov Future',        // NATURALGAS26NOVFUT
+    '574320': 'Natural Gas Mini Nov Future',   // NATGASMINI26NOVFUT
+    '573422': 'Crude Oil Nov Future',          // CRUDEOIL26NOVFUT
+    '573423': 'Crude Oil Mini Nov Future',     // CRUDEOILM26NOVFUT
+    '574826': 'Silver Nov Future',             // SILVER10026NOVFUT
+    '483080': 'Silver Mini Nov Future',        // SILVERM26NOVFUT (unchanged)
+    '562058': 'Silver Micro Nov Future',       // SILVERMIC26NOVFUT (unchanged)
+    '578638': 'Zinc Nov Future',               // ZINC26NOVFUT
+    '578635': 'Lead Nov Future',               // LEAD26NOVFUT
+    '578633': 'Aluminium Nov Future',          // ALUMINIUM26NOVFUT
+    '495213': 'Gold Dec Future',               // GOLD26DECFUT
+    '571445': 'Gold Mini Nov Future',          // GOLDM26NOVFUT
+    '574841': 'Gold Petal Nov Future',         // GOLDPETAL26NOVFUT
+    '578634': 'Copper Nov Future',             // COPPER26NOVFUT (New)
+    '582827': 'MCX Bulldex Nov Future',        // MCXBULLDEX26NOVFUT (New)
+    '582370': 'MCX Metldex Nov Future',        // MCXMETLDEX26NOVFUT (New)
+    '578639': 'Zinc Mini Nov Future',          // ZINCMINI26NOVFUT (New)
+    '578632': 'Aluminium Mini Nov Future',     // ALUMINI26NOVFUT (New)
+    '578636': 'Lead Mini Nov Future',          // LEADMINI26NOVFUT (New)
+    '578640': 'Nickel Nov Future',             // NICKEL26NOVFUT (New)
 
-    // ── Updated October 2026 NSE Index IDs ──
-    '48704': 'Nifty 50 Future',            // NIFTY26OCTFUT (Oct)
-    '48699': 'Nifty Bank Future',          // BANKNIFTY26OCTFUT (Oct)
-    '48702': 'Fin Nifty Future',           // FINNIFTY26OCTFUT (Oct)
-    '48703': 'Midcap Nifty Future',        // MIDCPNIFTY26OCTFUT (Oct)
+    // ── Updated November 2026 NSE Index Tokens ──
+    '61471': 'Nifty 50 Nov Future',            // NIFTY26NOVFUT
+    '61466': 'Nifty Bank Nov Future',          // BANKNIFTY26NOVFUT
+    '61469': 'Fin Nifty Nov Future',           // FINNIFTY26NOVFUT
+    '61470': 'Midcap Nifty Nov Future',        // MIDCPNIFTY26NOVFUT
+    '61473': 'Nifty Next 50 Nov Future',       // NIFTYNXT5026NOVFUT (New)
 
-    // ── Updated October 2026 NSE Stock IDs ──
-    '48987': 'Reliance Future',            // RELIANCE26OCTFUT (Oct)
-    '48864': 'HDFC Bank Future',           // HDFCBANK26OCTFUT (Oct)
-    '48874': 'ICICI Bank Future',          // ICICIBANK26OCTFUT (Oct)
-    '48994': 'SBI Future',                 // SBIN26OCTFUT (Oct)
-    '49013': 'TCS Future',                 // TCS26OCTFUT (Oct)
-    '48886': 'Infosys Future',             // INFY26OCTFUT (Oct)
-    '48896': 'ITC Future',                 // ITC26OCTFUT (Oct)
-    '48758': 'Bharti Airtel Future',       // BHARTIARTL26OCTFUT (Oct)
-    '48736': 'Axis Bank Future',           // AXISBANK26OCTFUT (Oct)
-    '48920': 'L&T Future',                 // LT26OCTFUT (Oct)
-    '49012': 'Tata Steel Future',          // TATASTEEL26OCTFUT (Oct)
-    '49019': 'Tata Motors Future',         // TMPV26OCTFUT (Oct)
-    '48740': 'Bajaj Finance Future',       // BAJFINANCE26OCTFUT (Oct)
-    '48906': 'Kotak Bank Future',          // KOTAKBANK26OCTFUT (Oct)
-    '49003': 'Sun Pharma Future',          // SUNPHARMA26OCTFUT (Oct)
-    '48900': 'JSW Steel Future',           // JSWSTEEL26OCTFUT (Oct)
-    '48797': 'Coal India Future',          // COALINDIA26OCTFUT (Oct)
-    '48711': 'Adani Enterprises Future',   // ADANIENT26OCTFUT (Oct)
-    '48718': 'Adani Ports Future',         // ADANIPORTS26OCTFUT (Oct)
-    '48867': 'Hindalco Future',            // HINDALCO26OCTFUT (Oct)
-    '48730': 'Apollo Hospitals Future',    // APOLLOHOSP26OCTFUT (Oct)
-    '48974': 'PNB Future',                 // PNB26OCTFUT (Oct)
-    '48989': 'SAIL Future',                // SAIL26OCTFUT (Oct)
-    '49005': 'SUZLON Future',              // SUZLON26OCTFUT (Oct)
-    '48964': 'PAYTM Future',               // PAYTM26OCTFUT (Oct)
-    '48988': 'RVNL Future',                // RVNL26OCTFUT (Oct)
-    '48895': 'IRFC Future',                // IRFC26OCTFUT (Oct)
-    '48894': 'IREDA Future',               // IREDA26OCTFUT (Oct)
-    '48764': 'BHEL Future',                // BHEL26OCTFUT (Oct)
-    '48847': 'GAIL Future',                // GAIL26OCTFUT (Oct)
-    '49021': 'TRENT Future'                // TRENT26OCTFUT (Oct)
+    // ── Updated November 2026 NSE Stock Tokens ──
+    '61697': 'Reliance Nov Future',            // RELIANCE26NOVFUT
+    '61582': 'HDFC Bank Nov Future',           // HDFCBANK26NOVFUT
+    '61595': 'ICICI Bank Nov Future',          // ICICIBANK26NOVFUT
+    '61706': 'SBI Nov Future',                 // SBIN26NOVFUT
+    '61724': 'TCS Nov Future',                 // TCS26NOVFUT
+    '61608': 'Infosys Nov Future',             // INFY26NOVFUT
+    '61615': 'ITC Nov Future',                 // ITC26NOVFUT
+    '61515': 'Bharti Airtel Nov Future',       // BHARTIARTL26NOVFUT
+    '61504': 'Axis Bank Nov Future',           // AXISBANK26NOVFUT
+    '61633': 'L&T Nov Future',                 // LT26NOVFUT
+    '61723': 'Tata Steel Nov Future',          // TATASTEEL26NOVFUT
+    '61730': 'Tata Motors Nov Future',         // TMPV26NOVFUT
+    '61507': 'Bajaj Finance Nov Future',       // BAJFINANCE26NOVFUT
+    '61627': 'Kotak Bank Nov Future',          // KOTAKBANK26NOVFUT
+    '61713': 'Sun Pharma Nov Future',          // SUNPHARMA26NOVFUT
+    '61619': 'JSW Steel Nov Future',           // JSWSTEEL26NOVFUT
+    '61540': 'Coal India Nov Future',          // COALINDIA26NOVFUT
+    '61478': 'Adani Enterprises Nov Future',   // ADANIENT26NOVFUT
+    '61480': 'Adani Ports Nov Future',         // ADANIPORTS26NOVFUT
+    '61585': 'Hindalco Nov Future',            // HINDALCO26NOVFUT
+    '61487': 'Apollo Hospitals Nov Future',    // APOLLOHOSP26NOVFUT
+    '61682': 'PNB Nov Future',                 // PNB26NOVFUT
+    '61702': 'SAIL Nov Future',                // SAIL26NOVFUT
+    '61715': 'SUZLON Nov Future',              // SUZLON26NOVFUT
+    '61674': 'PAYTM Nov Future',               // PAYTM26NOVFUT
+    '61698': 'RVNL Nov Future',                // RVNL26NOVFUT
+    '61614': 'IRFC Nov Future',                // IRFC26NOVFUT
+    '61613': 'IREDA Nov Future',               // IREDA26NOVFUT
+    '61516': 'BHEL Nov Future',                // BHEL26NOVFUT
+    '61569': 'GAIL Nov Future',                // GAIL26NOVFUT
+    '61732': 'TRENT Nov Future',               // TRENT26NOVFUT
+
+    // ── Newly Added NSE Stock Futures (22 additions) ──
+    '61591': 'Hindustan Unilever Nov Future',  // HINDUNILVR26NOVFUT
+    '61644': 'Maruti Nov Future',              // MARUTI26NOVFUT
+    '61637': 'M&M Nov Future',                 // M&M26NOVFUT
+    '61729': 'Titan Nov Future',               // TITAN26NOVFUT
+    '61722': 'Tata Power Nov Future',          // TATAPOWER26NOVFUT
+    '61736': 'UltraTech Cement Nov Future',    // ULTRACEMCO26NOVFUT
+    '61580': 'HCL Tech Nov Future',            // HCLTECH26NOVFUT
+    '61725': 'Tech Mahindra Nov Future',       // TECHM26NOVFUT
+    '61512': 'BEL Nov Future',                 // BEL26NOVFUT
+    '61578': 'HAL Nov Future',                 // HAL26NOVFUT
+    '61664': 'NTPC Nov Future',                // NTPC26NOVFUT
+    '61669': 'ONGC Nov Future',                // ONGC26NOVFUT
+    '61690': 'Power Grid Nov Future',          // POWERGRID26NOVFUT
+    '61523': 'BPCL Nov Future',                // BPCL26NOVFUT
+    '61612': 'IOC Nov Future',                 // IOC26NOVFUT
+    '61742': 'Vedanta Nov Future',             // VEDL26NOVFUT
+    '61689': 'Polycab Nov Future',             // POLYCAB26NOVFUT
+    '61561': 'DLF Nov Future',                 // DLF26NOVFUT
+    '61603': 'IndiGo Nov Future',              // INDIGO26NOVFUT
+    '61741': 'Varun Beverages Nov Future',     // VBL26NOVFUT
+    '61509': 'Bank of Baroda Nov Future',      // BANKBARODA26NOVFUT
+    '61564': 'Eicher Motors Nov Future'        // EICHERMOT26NOVFUT
 };
-
 
 function getInstrumentDisplayName(rawInstrument) {
     for (const [key, value] of Object.entries(INSTRUMENT_NAMES)) {
